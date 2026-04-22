@@ -5,7 +5,7 @@
 |--------|-------|
 | Framework | Next.js 16 (App Router, TypeScript strict) |
 | Style | Tailwind CSS v4 + shadcn/ui |
-| Base de données | Supabase (PostgreSQL) — projet `gtvcbymbremngkeijkfd` (eu-central-1) |
+| Base de données | Supabase (PostgreSQL) — eu-central-1 |
 | ORM | Prisma |
 | Auth | Supabase Auth (magic link) — whitelist admin par email |
 | Email | Resend |

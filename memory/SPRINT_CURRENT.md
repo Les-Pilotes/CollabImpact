@@ -10,7 +10,7 @@
 - ⬜ Remplir `.env.local` avec toutes les valeurs (DB, Supabase, Resend, secrets)
 - ⬜ Étendre `prisma/schema.prisma` : champs auth jeune, import, image rights, Update, Poll, PollResponse
 - ⬜ `pnpm prisma generate` + `pnpm db:push`
-- ⬜ `SEED_ADMIN_EMAIL="amadou_g@hotmail.fr" pnpm db:seed` → copier orga ID dans `.env.local`
+- ⬜ `SEED_ADMIN_EMAIL="<ton-email-admin>" pnpm db:seed` → copier orga ID dans `.env.local`
 - ⬜ Vérifier que `pnpm dev` répond sur `/`
 
 ### Phase 1 — UI kit + Landing + Catalogue
