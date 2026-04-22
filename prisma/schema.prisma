@@ -1,0 +1,385 @@
+// Prisma schema — Immersion App V1 (Les Pilotes)
+//
+// Conventions
+// - IDs cuid() (courts en URL)
+// - `organisationId` sur toutes les entités métier (prêt multi-tenant)
+// - Soft delete via `deletedAt`
+// - Noms techniques en anglais, libellés UI en français
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =====================
+// Enums
+// =====================
+
+enum Gender {
+  femme
+  homme
+  autre
+  non_precise
+}
+
+enum DietaryPreference {
+  aucun
+  vegetarien
+  vegan
+  halal
+  casher
+  sans_gluten
+  sans_porc
+  autre
+}
+
+enum EducationLevel {
+  college
+  lycee
+  bac
+  post_bac_1
+  post_bac_2
+  post_bac_3
+  post_bac_4_5
+  hors_cursus
+}
+
+enum ProjectStatus {
+  aucun
+  en_construction
+  defini
+}
+
+enum EnvironmentType {
+  startup
+  grand_groupe
+  public
+  associatif
+}
+
+enum ImmersionStatus {
+  brouillon
+  publie
+  complet
+  en_cours
+  termine
+}
+
+enum EnrollmentStatus {
+  inscrit
+  contacte
+  confirme_j7
+  confirme_j2
+  present
+  absent
+  desistement
+}
+
+enum EnrollmentMode {
+  individuel
+  via_referent
+}
+
+enum EnrollmentSource {
+  whatsapp
+  instagram
+  bouche_a_oreille
+  classe
+  conseiller
+  autre
+}
+
+enum SnapshotTrigger {
+  inscription
+  mise_a_jour
+  post_immersion
+}
+
+enum UpdateKind {
+  news
+  post_linkedin
+  video
+  article
+}
+
+enum PollStatus {
+  brouillon
+  actif
+  clos
+}
+
+// =====================
+// Entities
+// =====================
+
+model Organisation {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  admins       Admin[]
+  immersions   Immersion[]
+  enrollments  Enrollment[]
+  updates      Update[]
+  polls        Poll[]
+}
+
+// Administrateur du dashboard (identifié par email Supabase Auth).
+// Whitelist : toute ligne présente ici peut se connecter via magic link.
+model Admin {
+  id             String       @id @default(cuid())
+  organisationId String
+  email          String       @unique
+  firstName      String?
+  lastName       String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+
+  @@index([organisationId])
+}
+
+// Le jeune — acteur principal de la plateforme.
+model User {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+
+  // Liaison Supabase Auth (magic link jeune)
+  supabaseAuthId String?  @unique
+
+  // Couche 1 — données stables
+  firstName       String?
+  lastName        String?
+  email           String            @unique
+  phone           String?
+  birthDate       DateTime?         @db.Date
+  gender          Gender?
+  city            String?
+  dietary         DietaryPreference @default(aucun)
+  dietaryOther    String?
+  emailVerified   Boolean           @default(false)
+  reliabilityScore Int              @default(0)
+
+  // Couche 2 — mise à jour tous les 6 mois (snapshottée à chaque changement)
+  educationLevel       EducationLevel?
+  field                String?            // filière
+  institution          String?            // établissement
+  projectStatus        ProjectStatus?     @default(aucun)
+  projectDescription   String?
+  interestAreas        String[]           @default([])
+  preferredEnvironment EnvironmentType?
+
+  // Dates de mise à jour Couche 2 (pour rappel 6 mois)
+  layer2UpdatedAt DateTime?
+
+  // Infra import historique (V2)
+  importedFrom  String?
+  importedAt    DateTime?
+
+  // Soft delete
+  deletedAt   DateTime?
+  deletedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  enrollments      Enrollment[]
+  profileSnapshots ProfileSnapshot[]
+  pollResponses    PollResponse[]
+
+  @@index([organisationId])
+  @@index([email])
+}
+
+// Historique Couche 2 (projection des champs Couche 2 au moment de la capture)
+model ProfileSnapshot {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  data      Json            // snapshot figé de la Couche 2
+  trigger   SnapshotTrigger
+  createdAt DateTime        @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// Une immersion (visite entreprise).
+model Immersion {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+
+  name            String
+  status          ImmersionStatus @default(brouillon)
+
+  // Entreprise
+  companyName     String
+  companySector   String
+  companyAddress  String
+  companyCity     String
+
+  // Intervenants : liste libre d'objets { prenom, nom, role, email? }
+  speakers        Json         @default("[]")
+
+  // Logistique
+  date            DateTime
+  durationMinutes Int
+  maxCapacity     Int
+
+  themes          String[]     @default([])
+  description     String?
+  internalContact String?      // référent interne Les Pilotes
+  program         String?      // programme détaillé (optionnel)
+  imageUrl        String?      // image de couverture
+
+  // Infra import historique (V2)
+  importedFrom  String?
+  importedAt    DateTime?
+  notionPageId  String?   @unique
+
+  // Soft delete
+  deletedAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  enrollments     Enrollment[]
+  updates         Update[]
+
+  @@index([organisationId])
+  @@index([date])
+  @@index([status])
+}
+
+// Inscription d'un jeune à une immersion.
+model Enrollment {
+  id              String           @id @default(cuid())
+  organisationId  String
+  organisation    Organisation     @relation(fields: [organisationId], references: [id])
+
+  immersionId     String
+  immersion       Immersion        @relation(fields: [immersionId], references: [id])
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+
+  status          EnrollmentStatus @default(inscrit)
+  mode            EnrollmentMode   @default(individuel)
+  referentName    String?
+  referentStructure String?
+  source          EnrollmentSource @default(autre)
+  comment         String?
+
+  // Droits à l'image
+  imageRightsSignedAt   DateTime?
+  imageRightsIp         String?
+  imageRightsReminderAt DateTime?
+
+  // Feedback tracking
+  feedbackToken     String?   @unique
+  feedbackSentAt    DateTime?
+  feedbackReminderAt DateTime?
+
+  // Infra import historique (V2)
+  importedFrom  String?
+  importedAt    DateTime?
+
+  // Soft delete
+  deletedAt   DateTime?
+  enrolledAt  DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  feedback    Feedback?
+
+  @@unique([immersionId, userId])
+  @@index([organisationId])
+  @@index([immersionId])
+  @@index([userId])
+  @@index([status])
+}
+
+// Réponse feedback post-immersion.
+model Feedback {
+  id             String      @id @default(cuid())
+  enrollmentId   String      @unique
+  enrollment     Enrollment  @relation(fields: [enrollmentId], references: [id])
+
+  overallRating       Int       // ressenti général (1-5)
+  organizationRating  Int       // note organisation (1-5)
+  favoriteMoment      String?
+  favoriteSpeaker     String?
+  changedVision       Boolean
+  wouldContinue       Boolean   // envisage une suite
+  improvements        String?
+  verbatim            String?
+
+  submittedAt    DateTime    @default(now())
+
+  @@index([submittedAt])
+}
+
+// Post de feed (news, articles, vidéos) curé par l'admin
+model Update {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+
+  title       String
+  body        String        // markdown
+  imageUrl    String?
+  sourceUrl   String?       // lien LinkedIn/YouTube/article
+  kind        UpdateKind    @default(news)
+
+  // Optionnel : lié à une immersion spécifique
+  immersionId String?
+  immersion   Immersion?   @relation(fields: [immersionId], references: [id])
+
+  publishedAt DateTime?    // null = brouillon
+  deletedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([organisationId])
+  @@index([publishedAt])
+  @@index([immersionId])
+}
+
+// Sondage pour collecter les préférences jeunes
+model Poll {
+  id             String      @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+
+  question  String
+  options   Json         // [{ id: string, label: string }, ...]
+  status    PollStatus   @default(brouillon)
+
+  openedAt  DateTime?
+  closedAt  DateTime?
+  createdAt DateTime     @default(now())
+
+  responses PollResponse[]
+
+  @@index([organisationId, status])
+}
+
+// Réponse d'un jeune à un sondage (1 réponse par jeune par sondage)
+model PollResponse {
+  id         String   @id @default(cuid())
+  pollId     String
+  poll       Poll     @relation(fields: [pollId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  optionId   String   // correspond à l'id dans Poll.options JSON
+  answeredAt DateTime @default(now())
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+  @@index([userId])
+}
