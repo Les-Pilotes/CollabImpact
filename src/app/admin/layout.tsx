@@ -1,16 +1,12 @@
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
-import { Rocket, LayoutDashboard, CalendarDays, Users, Newspaper, BarChart3, Image, LogOut } from "lucide-react";
+import { Rocket, LayoutDashboard, Users, CheckSquare } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
 const NAV = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/immersions", label: "Immersions", icon: CalendarDays },
-  { href: "/admin/inscrits", label: "Inscrits", icon: Users },
-  { href: "/admin/feed", label: "Feed", icon: Newspaper },
-  { href: "/admin/sondages", label: "Sondages", icon: BarChart3 },
-  { href: "/admin/droits", label: "Droits image", icon: Image },
-  { href: "/admin/insights", label: "Insights", icon: BarChart3 },
+  { href: "/admin", label: "Visibilité", icon: LayoutDashboard },
+  { href: "/admin/participants", label: "Participantes", icon: Users },
+  { href: "/admin/taches", label: "Tâches", icon: CheckSquare },
 ];
 
 export default async function AdminLayout({

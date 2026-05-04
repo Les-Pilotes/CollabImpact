@@ -1,4 +1,8 @@
-// Prisma schema — Immersion App V1 (Les Pilotes)
+// Prisma schema — CollabImpact / Les Pilotes — Wave 0
+//
+// NOTE: Model names kept from v1 for minimal churn:
+//   `User`      → aliased as "Participante" in the UI
+//   `Immersion` → aliased as "Évent" in the UI
 //
 // Conventions
 // - IDs cuid() (courts en URL)
@@ -20,46 +24,11 @@ datasource db {
 // Enums
 // =====================
 
-enum Gender {
-  femme
-  homme
-  autre
-  non_precise
-}
-
-enum DietaryPreference {
-  aucun
-  vegetarien
-  vegan
-  halal
-  casher
-  sans_gluten
-  sans_porc
-  autre
-}
-
-enum EducationLevel {
-  college
-  lycee
-  bac
-  post_bac_1
-  post_bac_2
-  post_bac_3
-  post_bac_4_5
-  hors_cursus
-}
-
-enum ProjectStatus {
-  aucun
-  en_construction
-  defini
-}
-
-enum EnvironmentType {
-  startup
-  grand_groupe
-  public
-  associatif
+enum EventType {
+  FEMININ
+  IMMERSION
+  ATELIER
+  IMPULSION
 }
 
 enum ImmersionStatus {
@@ -72,12 +41,13 @@ enum ImmersionStatus {
 
 enum EnrollmentStatus {
   inscrit
-  contacte
-  confirme_j7
-  confirme_j2
-  present
-  absent
+  contactee
+  confirmee_j7
+  confirmee_j2
+  presente
+  absente
   desistement
+  feedback_recu
 }
 
 enum EnrollmentMode {
@@ -85,32 +55,10 @@ enum EnrollmentMode {
   via_referent
 }
 
-enum EnrollmentSource {
-  whatsapp
-  instagram
-  bouche_a_oreille
-  classe
-  conseiller
-  autre
-}
-
-enum SnapshotTrigger {
-  inscription
-  mise_a_jour
-  post_immersion
-}
-
-enum UpdateKind {
-  news
-  post_linkedin
-  video
-  article
-}
-
-enum PollStatus {
-  brouillon
-  actif
-  clos
+enum TaskPhase {
+  PREPARATION
+  WORKSHOP
+  POST_EVENT
 }
 
 // =====================
@@ -123,12 +71,10 @@ model Organisation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users        User[]
-  admins       Admin[]
-  immersions   Immersion[]
-  enrollments  Enrollment[]
-  updates      Update[]
-  polls        Poll[]
+  users       User[]
+  admins      Admin[]
+  immersions  Immersion[]
+  enrollments Enrollment[]
 }
 
 // Administrateur du dashboard (identifié par email Supabase Auth).
@@ -146,156 +92,89 @@ model Admin {
   @@index([organisationId])
 }
 
-// Le jeune — acteur principal de la plateforme.
+// La participante — actrice principale de la plateforme (aliasée "User" pour compatibilité v1).
 model User {
   id             String       @id @default(cuid())
   organisationId String
   organisation   Organisation @relation(fields: [organisationId], references: [id])
 
-  // Liaison Supabase Auth (magic link jeune)
-  supabaseAuthId String?  @unique
+  supabaseAuthId String? @unique
 
-  // Couche 1 — données stables
-  firstName       String?
-  lastName        String?
-  email           String            @unique
-  phone           String?
-  birthDate       DateTime?         @db.Date
-  gender          Gender?
-  city            String?
-  dietary         DietaryPreference @default(aucun)
-  dietaryOther    String?
-  emailVerified   Boolean           @default(false)
-  reliabilityScore Int              @default(0)
+  firstName        String
+  lastName         String
+  email            String  @unique
+  phone            String?
+  birthDate        DateTime? @db.Date
+  city             String?
+  source           String?  // "whatsapp" | "instagram" | "classe" | "conseiller" | "autre" | "bouche_a_oreille"
+  reliabilityScore Int     @default(0)
+  emailVerified    Boolean @default(false)
 
-  // Couche 2 — mise à jour tous les 6 mois (snapshottée à chaque changement)
-  educationLevel       EducationLevel?
-  field                String?            // filière
-  institution          String?            // établissement
-  projectStatus        ProjectStatus?     @default(aucun)
-  projectDescription   String?
-  interestAreas        String[]           @default([])
-  preferredEnvironment EnvironmentType?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  // Dates de mise à jour Couche 2 (pour rappel 6 mois)
-  layer2UpdatedAt DateTime?
-
-  // Infra import historique (V2)
-  importedFrom  String?
-  importedAt    DateTime?
-
-  // Soft delete
-  deletedAt   DateTime?
-  deletedBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  enrollments      Enrollment[]
-  profileSnapshots ProfileSnapshot[]
-  pollResponses    PollResponse[]
+  enrollments Enrollment[]
 
   @@index([organisationId])
   @@index([email])
 }
 
-// Historique Couche 2 (projection des champs Couche 2 au moment de la capture)
-model ProfileSnapshot {
-  id        String          @id @default(cuid())
-  userId    String
-  user      User            @relation(fields: [userId], references: [id])
-  data      Json            // snapshot figé de la Couche 2
-  trigger   SnapshotTrigger
-  createdAt DateTime        @default(now())
-
-  @@index([userId])
-  @@index([createdAt])
-}
-
-// Une immersion (visite entreprise).
+// Un évent (workshop, immersion…) — aliasé "Immersion" pour compatibilité v1.
 model Immersion {
-  id             String       @id @default(cuid())
+  id             String          @id @default(cuid())
   organisationId String
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  organisation   Organisation    @relation(fields: [organisationId], references: [id])
 
-  name            String
-  status          ImmersionStatus @default(brouillon)
+  type        EventType       @default(FEMININ)
+  name        String
+  status      ImmersionStatus @default(brouillon)
+  address     String
+  date        DateTime
+  capacity    Int
+  description String?
 
-  // Entreprise
-  companyName     String
-  companySector   String
-  companyAddress  String
-  companyCity     String
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  // Intervenants : liste libre d'objets { prenom, nom, role, email? }
-  speakers        Json         @default("[]")
-
-  // Logistique
-  date            DateTime
-  durationMinutes Int
-  maxCapacity     Int
-
-  themes          String[]     @default([])
-  description     String?
-  internalContact String?      // référent interne Les Pilotes
-  program         String?      // programme détaillé (optionnel)
-  imageUrl        String?      // image de couverture
-
-  // Infra import historique (V2)
-  importedFrom  String?
-  importedAt    DateTime?
-  notionPageId  String?   @unique
-
-  // Soft delete
-  deletedAt       DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  enrollments     Enrollment[]
-  updates         Update[]
+  enrollments Enrollment[]
+  tasks       Task[]
 
   @@index([organisationId])
   @@index([date])
   @@index([status])
 }
 
-// Inscription d'un jeune à une immersion.
+// Inscription d'une participante à un évent.
 model Enrollment {
-  id              String           @id @default(cuid())
-  organisationId  String
-  organisation    Organisation     @relation(fields: [organisationId], references: [id])
+  id             String           @id @default(cuid())
+  organisationId String
+  organisation   Organisation     @relation(fields: [organisationId], references: [id])
 
-  immersionId     String
-  immersion       Immersion        @relation(fields: [immersionId], references: [id])
-  userId          String
-  user            User             @relation(fields: [userId], references: [id])
+  immersionId String
+  immersion   Immersion @relation(fields: [immersionId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
 
-  status          EnrollmentStatus @default(inscrit)
-  mode            EnrollmentMode   @default(individuel)
-  referentName    String?
-  referentStructure String?
-  source          EnrollmentSource @default(autre)
-  comment         String?
+  status       EnrollmentStatus @default(inscrit)
+  mode         EnrollmentMode   @default(individuel)
+  referentName String?
+  source       String?          // free string: whatsapp, instagram, etc.
 
-  // Droits à l'image
-  imageRightsSignedAt   DateTime?
-  imageRightsIp         String?
-  imageRightsReminderAt DateTime?
+  attendedAt DateTime? // émargement Jour J
+  noShow     Boolean  @default(false)
+  j7SentAt   DateTime?
+  j2SentAt   DateTime?
 
-  // Feedback tracking
-  feedbackToken     String?   @unique
-  feedbackSentAt    DateTime?
-  feedbackReminderAt DateTime?
+  feedbackToken  String?   @unique
+  feedbackSentAt DateTime?
 
-  // Infra import historique (V2)
-  importedFrom  String?
-  importedAt    DateTime?
+  deletedAt  DateTime?
+  enrolledAt DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  // Soft delete
-  deletedAt   DateTime?
-  enrolledAt  DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  feedback    Feedback?
+  feedback Feedback?
 
   @@unique([immersionId, userId])
   @@index([organisationId])
@@ -304,82 +183,38 @@ model Enrollment {
   @@index([status])
 }
 
-// Réponse feedback post-immersion.
+// Réponse feedback post-évent.
 model Feedback {
-  id             String      @id @default(cuid())
-  enrollmentId   String      @unique
-  enrollment     Enrollment  @relation(fields: [enrollmentId], references: [id])
+  id           String     @id @default(cuid())
+  enrollmentId String     @unique
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
 
-  overallRating       Int       // ressenti général (1-5)
-  organizationRating  Int       // note organisation (1-5)
-  favoriteMoment      String?
-  favoriteSpeaker     String?
-  changedVision       Boolean
-  wouldContinue       Boolean   // envisage une suite
-  improvements        String?
-  verbatim            String?
+  overallRating  Int     // 1-5
+  orgRating      Int     // 1-5
+  favoriteMoment String?
+  changedVision  Boolean
+  improvements   String?
+  verbatim       String?
 
-  submittedAt    DateTime    @default(now())
+  submittedAt DateTime @default(now())
 
   @@index([submittedAt])
 }
 
-// Post de feed (news, articles, vidéos) curé par l'admin
-model Update {
-  id             String       @id @default(cuid())
-  organisationId String
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
+// Tâche de suivi liée à un évent.
+model Task {
+  id      String    @id @default(cuid())
+  eventId String
+  event   Immersion @relation(fields: [eventId], references: [id])
 
+  phase       TaskPhase
   title       String
-  body        String        // markdown
-  imageUrl    String?
-  sourceUrl   String?       // lien LinkedIn/YouTube/article
-  kind        UpdateKind    @default(news)
+  description String?
+  dueAt       DateTime?
+  doneAt      DateTime?
+  doneByEmail String?
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
 
-  // Optionnel : lié à une immersion spécifique
-  immersionId String?
-  immersion   Immersion?   @relation(fields: [immersionId], references: [id])
-
-  publishedAt DateTime?    // null = brouillon
-  deletedAt   DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  @@index([organisationId])
-  @@index([publishedAt])
-  @@index([immersionId])
-}
-
-// Sondage pour collecter les préférences jeunes
-model Poll {
-  id             String      @id @default(cuid())
-  organisationId String
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
-
-  question  String
-  options   Json         // [{ id: string, label: string }, ...]
-  status    PollStatus   @default(brouillon)
-
-  openedAt  DateTime?
-  closedAt  DateTime?
-  createdAt DateTime     @default(now())
-
-  responses PollResponse[]
-
-  @@index([organisationId, status])
-}
-
-// Réponse d'un jeune à un sondage (1 réponse par jeune par sondage)
-model PollResponse {
-  id         String   @id @default(cuid())
-  pollId     String
-  poll       Poll     @relation(fields: [pollId], references: [id])
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  optionId   String   // correspond à l'id dans Poll.options JSON
-  answeredAt DateTime @default(now())
-
-  @@unique([pollId, userId])
-  @@index([pollId])
-  @@index([userId])
+  @@index([eventId, phase])
 }
