@@ -246,7 +246,7 @@ export default async function AdminDashboardPage() {
         <Card>
           <CardContent className="pt-6">
             {recentEnrollments.length === 0 ? (
-              <p className="text-sm text-zinc-400">Aucune inscription pour l'instant.</p>
+              <p className="text-sm text-zinc-400">Aucune inscription pour l&apos;instant.</p>
             ) : (
               <ul className="divide-y divide-zinc-100">
                 {recentEnrollments.map((enrollment) => {

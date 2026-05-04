@@ -7,11 +7,6 @@ const EVENT_ID = 'seed-event-cite-audacieuse';
 
 const PHASES: TaskPhase[] = ['PREPARATION', 'WORKSHOP', 'POST_EVENT'];
 
-const PHASE_LABELS: Record<TaskPhase, string> = {
-  PREPARATION: 'Préparation',
-  WORKSHOP: 'Workshop',
-  POST_EVENT: 'Post-Event',
-};
 
 export default async function TachesPage() {
   const { admin } = await requireAdmin();

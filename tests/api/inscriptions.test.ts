@@ -110,7 +110,8 @@ describe("POST /api/inscriptions", () => {
   });
 
   it("returns 400 when firstName is missing", async () => {
-    const { firstName: _omitted, ...bodyWithoutFirstName } = validBody;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { firstName: _firstName, ...bodyWithoutFirstName } = validBody;
 
     const request = new Request("http://localhost:3000/api/inscriptions", {
       method: "POST",
