@@ -33,7 +33,7 @@ import {
   updateEnrollmentStatus,
   markAttendance,
   sendFeedbackInvite,
-} from '@/app/admin/participants/actions';
+} from '@/app/admin/(protected)/participants/actions';
 
 describe('participants server actions', () => {
   beforeEach(() => {

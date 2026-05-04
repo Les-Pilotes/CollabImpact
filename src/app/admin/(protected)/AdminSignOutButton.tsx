@@ -8,12 +8,16 @@ export default function AdminSignOutButton() {
   const router = useRouter();
 
   async function handleSignOut() {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
-    await supabase.auth.signOut();
-    router.push("/auth/login?next=/admin");
+    try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      );
+      await supabase.auth.signOut();
+    } catch {
+      // Supabase indisponible (ex. mode dev sans projet configuré)
+    }
+    router.push("/admin/login");
     router.refresh();
   }
 

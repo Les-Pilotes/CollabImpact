@@ -25,7 +25,7 @@ import {
   toggleTask,
   createTask,
   deleteTask,
-} from '@/app/admin/taches/actions';
+} from '@/app/admin/(protected)/taches/actions';
 
 describe('tasks server actions', () => {
   beforeEach(() => {
