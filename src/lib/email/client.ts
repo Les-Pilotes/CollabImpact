@@ -1,9 +1,14 @@
 import { Resend } from "resend";
 
-export const resend = new Resend(process.env.RESEND_API_KEY);
-
 export const EMAIL_FROM = process.env.EMAIL_FROM ?? "Les Pilotes <no-reply@lespilotes.fr>";
 export const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO ?? "contact@lespilotes.fr";
+
+// Lazy singleton — avoids throwing at module load when RESEND_API_KEY is empty.
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
 type SendEmailParams = {
   to: string | string[];
@@ -22,6 +27,7 @@ export async function sendEmail({ to, subject, react }: SendEmailParams) {
     return { sent: false as const, reason: "no-api-key" as const };
   }
 
+  const resend = getResend();
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
