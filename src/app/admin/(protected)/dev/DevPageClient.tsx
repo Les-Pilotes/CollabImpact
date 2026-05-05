@@ -10,6 +10,10 @@ import {
   triggerCron,
   submitFakesFeedbacks,
   resetDevData,
+  seedOneMarie,
+  advanceMarie,
+  resetMarie,
+  seedOneInscrite,
 } from './actions'
 
 type StepResult = { ok: boolean; [key: string]: unknown } | null
@@ -181,6 +185,47 @@ export function DevPageClient() {
         </div>
       </div>
 
+      {/* Suivi Marie (demo) */}
+      <div>
+        <h2 className="mb-1 text-lg font-bold text-zinc-900">Suivi Marie (démo)</h2>
+        <p className="mb-4 text-xs text-zinc-400">Crée Marie Dupont pour tester le flow de A à Z sans polluer les données</p>
+        <div className="space-y-4">
+          <QuickSection label="Créer Marie">
+            <QuickButton
+              label="Créer Marie Dupont"
+              action={seedOneMarie}
+              onLog={addLog}
+            />
+          </QuickSection>
+
+          <QuickSection label="Avancer Marie">
+            <QuickButton
+              label="Avancer d'un cran"
+              action={advanceMarie}
+              onLog={addLog}
+            />
+          </QuickSection>
+
+          <QuickSection label="Réinitialiser Marie">
+            <QuickButton
+              label="Réinitialiser à 'inscrite'"
+              action={resetMarie}
+              onLog={addLog}
+              confirm="Réinitialiser Marie à 'inscrit' ?"
+              destructive
+            />
+          </QuickSection>
+
+          <QuickSection label="+1 Participante">
+            <QuickButton
+              label="Ajouter 1 inscrite (aléatoire)"
+              action={seedOneInscrite}
+              onLog={addLog}
+            />
+          </QuickSection>
+        </div>
+      </div>
+
       {/* Log */}
       {log.length > 0 && (
         <div>
@@ -217,11 +262,13 @@ function QuickButton({
   action,
   onLog,
   confirm: confirmMsg,
+  destructive,
 }: {
   label: string
   action: () => Promise<{ ok: boolean; [key: string]: unknown }>
   onLog: (msg: string) => void
   confirm?: string
+  destructive?: boolean
 }) {
   const [isPending, startTransition] = useTransition()
 
@@ -238,7 +285,7 @@ function QuickButton({
   }
 
   return (
-    <Button size="sm" variant="outline" onClick={handleClick} disabled={isPending}>
+    <Button size="sm" variant={destructive ? 'destructive' : 'outline'} onClick={handleClick} disabled={isPending}>
       {isPending ? (
         <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       ) : null}

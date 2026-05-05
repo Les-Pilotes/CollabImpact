@@ -1,11 +1,12 @@
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
-import { Rocket, LayoutDashboard, Users, CheckSquare } from "lucide-react";
+import { Rocket, LayoutDashboard, Users, CheckSquare, Phone } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
 const NAV = [
   { href: "/admin", label: "Visibilité", icon: LayoutDashboard },
   { href: "/admin/participants", label: "Participantes", icon: Users },
+  { href: "/admin/appels", label: "Appels", icon: Phone },
   { href: "/admin/taches", label: "Tâches", icon: CheckSquare },
 ];
 

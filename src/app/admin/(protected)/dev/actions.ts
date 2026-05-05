@@ -255,3 +255,182 @@ export async function resetDevData(): Promise<{ ok: boolean }> {
 
   return { ok: true }
 }
+
+// ─── Demo mode: Marie & single inscrite ─────────────────────────────────────
+
+const MARIE_EMAIL = 'marie.dupont.pilotes@example.com'
+
+export async function seedOneInscrite(): Promise<{ ok: boolean; name: string }> {
+  await requireAdmin()
+
+  const firstName = faker.person.firstName('female')
+  const lastName = faker.person.lastName()
+  const email = faker.internet
+    .email({ firstName, lastName })
+    .toLowerCase()
+
+  const user = await prisma.user.upsert({
+    where: { email },
+    create: {
+      organisationId: ORG_ID,
+      firstName,
+      lastName,
+      email,
+      phone: faker.phone.number({ style: 'national' }),
+      city: faker.location.city(),
+      source: faker.helpers.arrayElement(SOURCES),
+    },
+    update: {},
+  })
+
+  await prisma.enrollment.upsert({
+    where: { immersionId_userId: { immersionId: EVENT_ID, userId: user.id } },
+    create: {
+      organisationId: ORG_ID,
+      immersionId: EVENT_ID,
+      userId: user.id,
+      status: 'inscrit',
+    },
+    update: {},
+  })
+
+  return { ok: true, name: `${firstName} ${lastName}` }
+}
+
+export async function seedOneMarie(): Promise<{ ok: boolean; status: string }> {
+  await requireAdmin()
+
+  const user = await prisma.user.upsert({
+    where: { email: MARIE_EMAIL },
+    create: {
+      organisationId: ORG_ID,
+      firstName: 'Marie',
+      lastName: 'Dupont',
+      email: MARIE_EMAIL,
+      phone: '06 12 34 56 78',
+      city: 'Paris',
+      source: 'instagram',
+    },
+    update: {},
+  })
+
+  const existing = await prisma.enrollment.findUnique({
+    where: { immersionId_userId: { immersionId: EVENT_ID, userId: user.id } },
+  })
+
+  if (existing) {
+    return { ok: true, status: existing.status }
+  }
+
+  await prisma.enrollment.create({
+    data: {
+      organisationId: ORG_ID,
+      immersionId: EVENT_ID,
+      userId: user.id,
+      status: 'inscrit',
+    },
+  })
+
+  return { ok: true, status: 'inscrit' }
+}
+
+export async function advanceMarie(): Promise<{ ok: boolean; from: string; to: string; message?: string }> {
+  await requireAdmin()
+
+  const marie = await prisma.user.findUnique({ where: { email: MARIE_EMAIL } })
+  if (!marie) {
+    return { ok: false, from: 'non_trouvee', to: 'non_trouvee', message: "Marie introuvable. Lance \"Créer Marie\" d'abord." }
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { immersionId_userId: { immersionId: EVENT_ID, userId: marie.id } },
+  })
+
+  if (!enrollment) {
+    return { ok: false, from: 'non_trouvee', to: 'non_trouvee', message: "Marie introuvable. Lance \"Créer Marie\" d'abord." }
+  }
+
+  const oldStatus = enrollment.status
+
+  if (oldStatus === 'feedback_recu' || oldStatus === 'absente' || oldStatus === 'desistement') {
+    return { ok: false, from: oldStatus, to: oldStatus, message: 'Statut terminal' }
+  }
+
+  let newStatus = oldStatus
+
+  if (oldStatus === 'inscrit') {
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { status: 'contactee' },
+    })
+    newStatus = 'contactee'
+  } else if (oldStatus === 'contactee' && enrollment.j7SentAt === null) {
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { j7SentAt: new Date() },
+    })
+    newStatus = 'contactee'
+  } else if (oldStatus === 'contactee' && enrollment.j7SentAt !== null) {
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { status: 'confirmee_j7' },
+    })
+    newStatus = 'confirmee_j7'
+  } else if (oldStatus === 'confirmee_j7' && enrollment.j2SentAt === null) {
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { j2SentAt: new Date() },
+    })
+    newStatus = 'confirmee_j7'
+  } else if (oldStatus === 'confirmee_j7' && enrollment.j2SentAt !== null) {
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { status: 'confirmee_j2' },
+    })
+    newStatus = 'confirmee_j2'
+  } else if (oldStatus === 'confirmee_j2') {
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { status: 'presente', attendedAt: new Date() },
+    })
+    newStatus = 'presente'
+  } else if (oldStatus === 'presente') {
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { feedbackSentAt: new Date() },
+    })
+    newStatus = 'presente'
+  }
+
+  return { ok: true, from: oldStatus, to: newStatus }
+}
+
+export async function resetMarie(): Promise<{ ok: boolean }> {
+  await requireAdmin()
+
+  const marie = await prisma.user.findUnique({ where: { email: MARIE_EMAIL } })
+  if (!marie) return { ok: true }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { immersionId_userId: { immersionId: EVENT_ID, userId: marie.id } },
+  })
+  if (!enrollment) return { ok: true }
+
+  await prisma.$transaction([
+    prisma.feedback.deleteMany({ where: { enrollmentId: enrollment.id } }),
+    prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: {
+        status: 'inscrit',
+        j7SentAt: null,
+        j2SentAt: null,
+        attendedAt: null,
+        noShow: false,
+        feedbackToken: null,
+        feedbackSentAt: null,
+      },
+    }),
+  ])
+
+  return { ok: true }
+}

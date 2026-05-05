@@ -155,6 +155,7 @@ export default async function ParticipantDetailPage({
             enrollmentId={enrollment.id}
             currentStatus={enrollment.status}
             j7SentAt={enrollment.j7SentAt}
+            j2SentAt={enrollment.j2SentAt}
             feedbackToken={enrollment.feedbackToken}
             feedbackSentAt={enrollment.feedbackSentAt}
             isEventDay={isEventDay}

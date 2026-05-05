@@ -5,9 +5,13 @@ import { useRouter } from 'next/navigation';
 import { EnrollmentStatus } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import {
-  updateEnrollmentStatus,
-  markAttendance,
+  markContactee,
+  markConfirmeeJ7,
+  markConfirmeeJ2,
+  markDesistement,
   sendManualReminder,
+  sendJ2Reminder,
+  markAttendance,
   sendFeedbackInvite,
 } from '../actions';
 
@@ -22,12 +26,11 @@ const STATUS_LABELS: Record<EnrollmentStatus, string> = {
   feedback_recu: 'Feedback reçu',
 };
 
-const ALL_STATUSES = Object.values(EnrollmentStatus);
-
 type Props = {
   enrollmentId: string;
   currentStatus: EnrollmentStatus;
   j7SentAt: Date | null;
+  j2SentAt: Date | null;
   feedbackToken: string | null;
   feedbackSentAt: Date | null;
   isEventDay: boolean;
@@ -37,6 +40,7 @@ export function ParticipantActions({
   enrollmentId,
   currentStatus,
   j7SentAt,
+  j2SentAt,
   feedbackToken,
   feedbackSentAt,
   isEventDay,
@@ -50,66 +54,188 @@ export function ParticipantActions({
     setTimeout(() => setMessage(null), 4000);
   }
 
-  function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const newStatus = e.target.value as EnrollmentStatus;
+  function run(action: () => Promise<{ ok: boolean; error?: string }>, successText: string) {
     startTransition(async () => {
-      const res = await updateEnrollmentStatus(enrollmentId, newStatus);
+      const res = await action();
       if (res.ok) {
-        showMessage('success', 'Statut mis à jour.');
+        showMessage('success', successText);
         router.refresh();
       } else {
-        showMessage('error', res.error ?? 'Erreur lors de la mise à jour.');
+        showMessage('error', res.error ?? 'Une erreur est survenue.');
       }
     });
   }
 
-  function handleMarkPresente() {
-    startTransition(async () => {
-      const res = await markAttendance(enrollmentId, true);
-      if (res.ok) {
-        showMessage('success', 'Marquée présente.');
-        router.refresh();
-      } else {
-        showMessage('error', 'Erreur lors de la mise à jour.');
+  function getContextualButtons() {
+    const s = currentStatus;
+
+    if (s === 'inscrit') {
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={isPending}
+            onClick={() => run(() => markContactee(enrollmentId), 'Marquée contactée.')}
+          >
+            Marquer contactée
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={isPending}
+            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
+          >
+            Désiste
+          </Button>
+        </div>
+      );
+    }
+
+    if (s === 'contactee' && j7SentAt === null) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={isPending}
+            onClick={() =>
+              run(() => sendManualReminder(enrollmentId), 'Message J-7 envoyé.')
+            }
+          >
+            Envoyer message J-7
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={isPending}
+            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
+          >
+            Désiste
+          </Button>
+        </div>
+      );
+    }
+
+    if (s === 'contactee' && j7SentAt !== null) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={isPending}
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => run(() => markConfirmeeJ7(enrollmentId), 'Confirmée J-7.')}
+          >
+            Elle a confirmé
+          </Button>
+          <Button variant="outline" disabled>
+            Pas de réponse
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={isPending}
+            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
+          >
+            Désiste
+          </Button>
+        </div>
+      );
+    }
+
+    if (s === 'confirmee_j7' && j2SentAt === null) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={isPending}
+            onClick={() => run(() => sendJ2Reminder(enrollmentId), 'Message J-2 envoyé.')}
+          >
+            Envoyer message J-2
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={isPending}
+            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
+          >
+            Désiste
+          </Button>
+        </div>
+      );
+    }
+
+    if (s === 'confirmee_j7' && j2SentAt !== null) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={isPending}
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => run(() => markConfirmeeJ2(enrollmentId), 'Confirmée J-2.')}
+          >
+            Elle a confirmé J-2
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={isPending}
+            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
+          >
+            Désiste
+          </Button>
+        </div>
+      );
+    }
+
+    if (s === 'confirmee_j2') {
+      if (!isEventDay) {
+        return (
+          <p className="text-sm text-zinc-500">En attente du jour J</p>
+        );
       }
-    });
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={isPending}
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => run(() => markAttendance(enrollmentId, true), 'Marquée présente.')}
+          >
+            Présente
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => run(() => markAttendance(enrollmentId, false), 'Marquée absente.')}
+          >
+            Absente
+          </Button>
+        </div>
+      );
+    }
+
+    if (s === 'presente') {
+      if (feedbackSentAt === null) {
+        return (
+          <Button
+            disabled={isPending}
+            onClick={() =>
+              run(() => sendFeedbackInvite(enrollmentId), 'Invitation feedback envoyée.')
+            }
+          >
+            Envoyer invitation feedback
+          </Button>
+        );
+      }
+      return (
+        <Button
+          variant="ghost"
+          disabled={isPending}
+          onClick={() =>
+            run(() => sendFeedbackInvite(enrollmentId), 'Invitation feedback renvoyée.')
+          }
+        >
+          Renvoyer le feedback
+        </Button>
+      );
+    }
+
+    // absente, desistement, feedback_recu — terminal states
+    return (
+      <p className="text-sm text-zinc-500">{STATUS_LABELS[s]}</p>
+    );
   }
 
-  function handleMarkAbsente() {
-    startTransition(async () => {
-      const res = await markAttendance(enrollmentId, false);
-      if (res.ok) {
-        showMessage('success', 'Marquée absente.');
-        router.refresh();
-      } else {
-        showMessage('error', 'Erreur lors de la mise à jour.');
-      }
-    });
-  }
-
-  function handleSendReminder() {
-    startTransition(async () => {
-      const res = await sendManualReminder(enrollmentId);
-      if (res.ok) {
-        showMessage('success', 'Relance J-7 envoyée.');
-        router.refresh();
-      } else {
-        showMessage('error', res.error ?? "Erreur lors de l'envoi.");
-      }
-    });
-  }
-
-  function handleSendFeedback() {
-    startTransition(async () => {
-      const res = await sendFeedbackInvite(enrollmentId);
-      if (res.ok) {
-        showMessage('success', 'Invitation feedback envoyée.');
-        router.refresh();
-      } else {
-        showMessage('error', res.error ?? "Erreur lors de l'envoi.");
-      }
-    });
-  }
+  // feedbackToken used only to suppress unused-var warning; the prop is kept for caller compat
+  void feedbackToken;
 
   return (
     <div className="space-y-4">
@@ -124,80 +250,7 @@ export function ParticipantActions({
           {message.text}
         </div>
       )}
-
-      {/* Status selector */}
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-zinc-700">Changer le statut</label>
-        <select
-          defaultValue={currentStatus}
-          onChange={handleStatusChange}
-          disabled={isPending}
-          className="w-full h-10 px-3 rounded-xl border border-zinc-200 bg-white text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 disabled:opacity-50"
-        >
-          {ALL_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Attendance buttons — only on event day ± 1 */}
-      {isEventDay && (
-        <div className="flex gap-2">
-          <Button
-            onClick={handleMarkPresente}
-            disabled={isPending || currentStatus === 'presente'}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isPending ? '...' : 'Marquer Présente'}
-          </Button>
-          <Button
-            onClick={handleMarkAbsente}
-            disabled={isPending || currentStatus === 'absente'}
-            variant="destructive"
-            className="flex-1"
-          >
-            {isPending ? '...' : 'Marquer Absente'}
-          </Button>
-        </div>
-      )}
-
-      {/* Send J7 reminder */}
-      {!j7SentAt && (
-        <Button
-          onClick={handleSendReminder}
-          disabled={isPending}
-          variant="outline"
-          className="w-full"
-        >
-          {isPending ? 'Envoi...' : 'Envoyer relance J-7'}
-        </Button>
-      )}
-
-      {/* Send feedback invite */}
-      {currentStatus === 'presente' && !feedbackToken && (
-        <Button
-          onClick={handleSendFeedback}
-          disabled={isPending}
-          variant="outline"
-          className="w-full"
-        >
-          {isPending ? 'Envoi...' : 'Envoyer invitation feedback'}
-        </Button>
-      )}
-
-      {/* Resend feedback */}
-      {feedbackSentAt && (
-        <Button
-          onClick={handleSendFeedback}
-          disabled={isPending}
-          variant="ghost"
-          className="w-full text-zinc-600"
-        >
-          {isPending ? 'Envoi...' : 'Renvoyer le feedback'}
-        </Button>
-      )}
+      {getContextualButtons()}
     </div>
   );
 }
