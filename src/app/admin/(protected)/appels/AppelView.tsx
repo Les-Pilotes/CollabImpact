@@ -213,7 +213,7 @@ export function AppelView({
 
           {isConfirmeeJ2 && (
             <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-3 text-sm text-violet-700 font-medium">
-              Confirmee — sera presente le jour J
+              Confirmée — sera présente le jour J
             </div>
           )}
 
@@ -236,7 +236,7 @@ export function AppelView({
               disabled={isPending}
               onClick={() => run(() => markDesistement(enrollmentId))}
             >
-              {isPending ? <Loader2 className="animate-spin" /> : 'Desiste'}
+              {isPending ? <Loader2 className="animate-spin" /> : 'Désiste'}
             </Button>
           )}
 

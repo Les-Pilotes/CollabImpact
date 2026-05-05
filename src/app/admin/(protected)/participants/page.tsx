@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { EnrollmentStatus } from '@prisma/client';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { InlineActions } from './InlineActions';
 
 export const metadata = { title: 'Participantes — Admin' };
 
@@ -52,6 +53,16 @@ export default async function ParticipantsPage({
     acc[e.status] = (acc[e.status] ?? 0) + 1;
     return acc;
   }, {});
+
+  const immersion = await prisma.immersion.findUnique({
+    where: { id: IMMERSION_ID },
+    select: { date: true },
+  });
+
+  const eventDate = immersion ? new Date(immersion.date) : new Date(0);
+  const now = new Date();
+  const diffDays = Math.abs(now.getTime() - eventDate.getTime()) / (1000 * 60 * 60 * 24);
+  const isEventDay = diffDays <= 1.5;
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
@@ -130,7 +141,7 @@ export default async function ParticipantsPage({
                   <th className="text-left px-4 py-3 font-semibold text-zinc-600">Statut</th>
                   <th className="text-left px-4 py-3 font-semibold text-zinc-600">Source</th>
                   <th className="text-left px-4 py-3 font-semibold text-zinc-600">Inscrite le</th>
-                  <th className="text-right px-4 py-3 font-semibold text-zinc-600">Actions</th>
+                  <th className="text-right px-4 py-3 font-semibold text-zinc-600 min-w-[200px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
@@ -163,12 +174,22 @@ export default async function ParticipantsPage({
                       })}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/admin/participants/${enrollment.id}`}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        Voir
-                      </Link>
+                      <div className="flex items-center gap-2 justify-end">
+                        <InlineActions
+                          enrollmentId={enrollment.id}
+                          status={enrollment.status}
+                          j7SentAt={enrollment.j7SentAt}
+                          j2SentAt={enrollment.j2SentAt}
+                          isEventDay={isEventDay}
+                          feedbackSentAt={enrollment.feedbackSentAt}
+                        />
+                        <Link
+                          href={`/admin/participants/${enrollment.id}`}
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                        >
+                          Voir
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
