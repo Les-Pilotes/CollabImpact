@@ -26,14 +26,14 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
-  inscrit: 'bg-zinc-100 text-zinc-700',
-  contactee: 'bg-blue-100 text-blue-700',
-  confirmee_j7: 'bg-indigo-100 text-indigo-700',
-  confirmee_j2: 'bg-violet-100 text-violet-700',
-  presente: 'bg-green-100 text-green-700',
-  absente: 'bg-red-100 text-red-700',
-  desistement: 'bg-orange-100 text-orange-700',
-  feedback_recu: 'bg-emerald-100 text-emerald-700',
+  inscrit: 'text-stone-500',
+  contactee: 'text-stone-700',
+  confirmee_j7: 'text-stone-700',
+  confirmee_j2: 'text-emerald-700',
+  presente: 'text-emerald-700',
+  absente: 'text-red-700',
+  desistement: 'text-red-700',
+  feedback_recu: 'text-stone-700',
 };
 
 type Props = {
@@ -102,55 +102,47 @@ export function AppelView({
   const showDesiste = !isConfirmeeJ2 && !isTerminal;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-zinc-900">Mode Appel</h1>
-        <span className="inline-flex items-center rounded-full bg-zinc-900 text-white text-sm font-semibold px-3 py-1">
+      <header className="flex items-baseline justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight text-stone-900">Mode appel</h1>
+        <span className="text-xs uppercase tracking-[0.18em] text-stone-500 tabular-nums">
           {totalInQueue} à appeler
         </span>
-      </div>
+      </header>
 
-      {/* Card */}
-      <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 space-y-4">
-        {/* Status badge */}
-        <div>
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeClass}`}
-          >
-            {badgeLabel}
-          </span>
-        </div>
+      {/* Contact, no surrounding card */}
+      <div className="space-y-3">
+        <p className={`text-xs uppercase tracking-[0.18em] font-medium ${badgeClass}`}>
+          {badgeLabel}
+        </p>
 
-        {/* Name */}
-        <p className="text-2xl font-bold text-zinc-900">
+        <p className="text-3xl font-semibold tracking-tight text-stone-900">
           {firstName} {lastName}
         </p>
 
-        {/* Phone — tap to call */}
         {phone ? (
           <a
             href={`tel:${phone}`}
-            className="block text-3xl font-bold text-zinc-900 hover:text-blue-700 transition-colors"
+            className="block text-2xl font-medium tabular-nums text-[var(--brand-orange)] hover:underline"
           >
             {phone}
           </a>
         ) : (
-          <p className="text-3xl font-bold text-zinc-400">—</p>
+          <p className="text-base text-stone-500">Pas de téléphone</p>
         )}
 
-        {/* Email */}
-        <p className="text-sm text-zinc-600">{email}</p>
+        <p className="text-sm text-stone-600">{email}</p>
 
-        {/* City + enrolled date */}
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-stone-500">
           {city ? `${city} · ` : ''}Inscrite le {enrolledDate}
         </p>
+      </div>
 
-        <hr className="border-zinc-100" />
+      <div className="h-px bg-stone-200" />
 
-        {/* Action buttons */}
-        <div className="space-y-3">
+      {/* Action buttons */}
+      <div className="space-y-3">
           {status === 'inscrit' && (
             <Button
               className="w-full"
@@ -174,7 +166,7 @@ export function AppelView({
           {status === 'contactee' && j7SentAt !== null && (
             <div className="flex gap-2">
               <Button
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                className="flex-1"
                 disabled={isPending}
                 onClick={() => run(() => markConfirmeeJ7(enrollmentId))}
               >
@@ -186,7 +178,7 @@ export function AppelView({
                 disabled={isPending}
                 onClick={() => router.refresh()}
               >
-                Pas de réponse — Passer
+                Pas de réponse, passer
               </Button>
             </div>
           )}
@@ -203,7 +195,7 @@ export function AppelView({
 
           {status === 'confirmee_j7' && j2SentAt !== null && (
             <Button
-              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              className="w-full"
               disabled={isPending}
               onClick={() => run(() => markConfirmeeJ2(enrollmentId))}
             >
@@ -212,17 +204,17 @@ export function AppelView({
           )}
 
           {isConfirmeeJ2 && (
-            <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-3 text-sm text-violet-700 font-medium">
-              Confirmée — sera présente le jour J
-            </div>
+            <p className="text-sm text-emerald-700 font-medium">
+              Confirmée, sera présente le jour J.
+            </p>
           )}
 
           {isTerminal && (
             <div className="space-y-3">
-              <p className="text-sm text-zinc-500">Aucune action requise</p>
+              <p className="text-sm text-stone-500">Aucune action requise.</p>
               <Link
                 href="/admin/participants"
-                className="block text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                className="block text-sm font-medium text-[var(--brand-orange)] hover:underline"
               >
                 Voir toutes les participantes
               </Link>
@@ -241,16 +233,15 @@ export function AppelView({
           )}
 
           {error && <p className="text-xs text-red-600">{error}</p>}
-        </div>
       </div>
 
       {/* Footer */}
       <div>
         <Link
           href="/admin/participants"
-          className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+          className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
         >
-          ← Voir toutes les participantes
+          {"<- Voir toutes les participantes"}
         </Link>
       </div>
     </div>

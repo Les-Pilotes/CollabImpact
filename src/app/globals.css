@@ -11,14 +11,14 @@
   --gradient-brand: linear-gradient(135deg, #ffe959 0%, #ff914d 100%);
   --gradient-brand-subtle: linear-gradient(135deg, #fffbe6 0%, #fff3e6 100%);
 
-  /* Semantic */
-  --background: #ffffff;
-  --foreground: #111111;
-  --muted: #f5f5f5;
-  --muted-foreground: #737373;
-  --border: #e5e5e5;
-  --card: #ffffff;
-  --card-foreground: #111111;
+  /* Semantic, neutrals tinted warm toward the brand orange */
+  --background: #fdfcfa;
+  --foreground: #1a1816;
+  --muted: #f5f3f0;
+  --muted-foreground: #75716c;
+  --border: #e5e2dd;
+  --card: #fdfcfa;
+  --card-foreground: #1a1816;
   --primary: #ff914d;
   --primary-foreground: #ffffff;
   --secondary: #ffe959;

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { InlineActions } from './InlineActions';
 
-export const metadata = { title: 'Participantes — Admin' };
+export const metadata = { title: 'Participantes, admin' };
 
 const IMMERSION_ID = 'seed-event-cite-audacieuse';
 

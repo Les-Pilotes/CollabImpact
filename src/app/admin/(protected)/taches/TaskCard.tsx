@@ -58,7 +58,7 @@ export function TaskCard({ task, adminEmail }: TaskCardProps) {
   return (
     <div
       className={cn(
-        'flex items-start gap-2 p-3 bg-white rounded-lg border border-zinc-100 shadow-sm group',
+        'flex items-start gap-2 py-2.5 border-b border-stone-200 group',
         isPending && 'opacity-60'
       )}
     >

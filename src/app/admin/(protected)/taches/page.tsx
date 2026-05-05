@@ -23,23 +23,19 @@ export default async function TachesPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold text-zinc-900 mb-6">
+    <div className="max-w-6xl">
+      <h1 className="text-2xl font-semibold tracking-tight text-stone-900 mb-8">
         Suivi des tâches
       </h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-8">
         {PHASES.map((phase) => (
-          <div
+          <TaskColumn
             key={phase}
-            className="bg-zinc-50 rounded-2xl p-4 border border-zinc-100"
-          >
-            <TaskColumn
-              tasks={grouped[phase]}
-              phase={phase}
-              adminEmail={admin.email}
-            />
-          </div>
+            tasks={grouped[phase]}
+            phase={phase}
+            adminEmail={admin.email}
+          />
         ))}
       </div>
     </div>

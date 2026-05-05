@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
-import { Rocket, LayoutDashboard, Users, CheckSquare, Phone, Terminal } from "lucide-react";
+import { LayoutDashboard, Users, CheckSquare, Phone, Terminal } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
 const NAV = [
@@ -18,27 +18,22 @@ export default async function AdminLayout({
   const { admin } = await requireAdmin();
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex">
+    <div className="min-h-screen bg-stone-50 flex">
       {/* Sidebar */}
-      <aside className="hidden md:flex flex-col w-60 bg-zinc-900 text-white shrink-0">
-        <div className="p-5 border-b border-zinc-800">
-          <Link href="/admin" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ffe959] to-[#ff914d] flex items-center justify-center">
-              <Rocket className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="font-bold text-sm">Les Pilotes</p>
-              <p className="text-xs text-zinc-400">Admin</p>
-            </div>
+      <aside className="hidden md:flex flex-col w-60 bg-stone-900 text-stone-100 shrink-0">
+        <div className="px-5 pt-6 pb-5 border-b border-stone-800">
+          <Link href="/admin" className="flex items-baseline gap-2">
+            <span className="font-semibold text-base tracking-tight text-white">Les Pilotes</span>
+            <span className="text-[11px] uppercase tracking-[0.18em] text-stone-500">admin</span>
           </Link>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5">
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
           {NAV.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 text-sm transition-colors"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-md text-stone-400 hover:text-white hover:bg-stone-800/70 text-sm transition-colors"
             >
               <Icon className="w-4 h-4 shrink-0" />
               {label}
@@ -46,22 +41,22 @@ export default async function AdminLayout({
           ))}
         </nav>
 
-        <div className="p-4 border-t border-zinc-800 space-y-3">
+        <div className="p-4 border-t border-stone-800 space-y-3">
           {(process.env.ENABLE_DEV_PAGE === "true" || process.env.NODE_ENV !== "production") && (
             <Link
               href="/admin/dev"
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-zinc-500 hover:text-white hover:bg-zinc-800 text-xs transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-md text-stone-500 hover:text-white hover:bg-stone-800/70 text-xs transition-colors"
             >
               <Terminal className="w-3.5 h-3.5 shrink-0" />
               Console dev
             </Link>
           )}
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-white">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-white truncate">
                 {admin.firstName ?? admin.email.split("@")[0]}
               </p>
-              <p className="text-xs text-zinc-500">{admin.email}</p>
+              <p className="text-xs text-stone-500 truncate">{admin.email}</p>
             </div>
             <AdminSignOutButton />
           </div>
@@ -69,18 +64,16 @@ export default async function AdminLayout({
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-zinc-900 text-white px-4 h-14 flex items-center justify-between">
-        <Link href="/admin" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#ffe959] to-[#ff914d] flex items-center justify-center">
-            <Rocket className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="font-bold text-sm">Admin</span>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-stone-900 text-white px-4 h-14 flex items-center justify-between">
+        <Link href="/admin" className="flex items-baseline gap-2">
+          <span className="font-semibold text-sm tracking-tight">Les Pilotes</span>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-stone-500">admin</span>
         </Link>
         <AdminSignOutButton />
       </div>
 
       {/* Main */}
-      <main className="flex-1 min-w-0 md:p-8 p-4 pt-16 md:pt-8">
+      <main className="flex-1 min-w-0 md:p-10 p-4 pt-16 md:pt-10">
         {children}
       </main>
     </div>

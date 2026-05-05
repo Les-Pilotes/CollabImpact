@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { AppelView } from './AppelView';
 
-export const metadata = { title: 'Mode Appel — Admin' };
+export const metadata = { title: 'Mode appel, admin' };
 
 const IMMERSION_ID = 'seed-event-cite-audacieuse';
 
@@ -98,19 +98,17 @@ export default async function AppelsPage() {
 
   if (!next) {
     return (
-      <div className="max-w-lg mx-auto space-y-6 py-8 px-4">
-        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-8 text-center">
-          <p className="text-2xl font-bold text-zinc-900 mb-2">Rien a faire</p>
-          <p className="text-zinc-500 text-sm mb-6">
-            Toutes les participantes ont été contactées ou confirmées.
-          </p>
-          <Link
-            href="/admin/participants"
-            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
-          >
-            ← Voir toutes les participantes
-          </Link>
-        </div>
+      <div className="max-w-lg mx-auto space-y-4 py-12">
+        <h1 className="text-2xl font-semibold tracking-tight text-stone-900">Rien à faire</h1>
+        <p className="text-stone-600 text-sm leading-relaxed max-w-[60ch]">
+          Toutes les participantes ont été contactées ou confirmées.
+        </p>
+        <Link
+          href="/admin/participants"
+          className="inline-block text-sm font-medium text-[var(--brand-orange)] hover:underline"
+        >
+          {"<- Voir toutes les participantes"}
+        </Link>
       </div>
     );
   }
