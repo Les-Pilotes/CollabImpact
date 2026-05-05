@@ -9,29 +9,65 @@ export const metadata = { title: 'Participantes — Admin' };
 
 const IMMERSION_ID = 'seed-event-cite-audacieuse';
 
-const STATUS_LABELS: Record<EnrollmentStatus, string> = {
-  inscrit: 'Inscrite',
-  contactee: 'Contactée',
-  confirmee_j7: 'Confirmée J-7',
-  confirmee_j2: 'Confirmée J-2',
-  presente: 'Présente',
-  absente: 'Absente',
-  desistement: 'Désistement',
-  feedback_recu: 'Feedback reçu',
+type Group = {
+  key: string;
+  label: string;
+  statuses: EnrollmentStatus[];
 };
 
-const STATUS_BADGE_CLASSES: Record<EnrollmentStatus, string> = {
-  inscrit: 'bg-zinc-100 text-zinc-700',
-  contactee: 'bg-blue-100 text-blue-700',
-  confirmee_j7: 'bg-indigo-100 text-indigo-700',
-  confirmee_j2: 'bg-violet-100 text-violet-700',
-  presente: 'bg-green-100 text-green-700',
-  absente: 'bg-red-100 text-red-700',
-  desistement: 'bg-orange-100 text-orange-700',
-  feedback_recu: 'bg-emerald-100 text-emerald-700',
+const GROUPS: Group[] = [
+  { key: 'a_contacter', label: 'À contacter', statuses: ['inscrit'] },
+  { key: 'en_suivi', label: 'En suivi', statuses: ['contactee', 'confirmee_j7'] },
+  { key: 'confirmees', label: 'Confirmées', statuses: ['confirmee_j2'] },
+  { key: 'presentes', label: 'Présentes', statuses: ['presente'] },
+  { key: 'cloturees', label: 'Clôturées', statuses: ['absente', 'desistement', 'feedback_recu'] },
+];
+
+type Enrollment = {
+  id: string;
+  status: EnrollmentStatus;
+  j7SentAt: Date | null;
+  j2SentAt: Date | null;
+  feedbackSentAt: Date | null;
+  enrolledAt: Date;
+  user: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string | null;
+  };
 };
 
-const ALL_STATUSES = Object.values(EnrollmentStatus);
+function EnrollmentRow({ enrollment, isEventDay }: { enrollment: Enrollment; isEventDay: boolean }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 transition-colors">
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-zinc-900 text-sm truncate">
+          {enrollment.user.firstName} {enrollment.user.lastName}
+        </p>
+        <p className="text-xs text-zinc-400 mt-0.5">
+          {enrollment.user.phone ?? enrollment.user.email}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <InlineActions
+          enrollmentId={enrollment.id}
+          status={enrollment.status}
+          j7SentAt={enrollment.j7SentAt}
+          j2SentAt={enrollment.j2SentAt}
+          isEventDay={isEventDay}
+          feedbackSentAt={enrollment.feedbackSentAt}
+        />
+        <Link
+          href={`/admin/participants/${enrollment.id}`}
+          className="text-xs font-medium text-zinc-400 hover:text-zinc-700 hover:underline whitespace-nowrap"
+        >
+          Voir
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 export default async function ParticipantsPage({
   searchParams,
@@ -41,9 +77,9 @@ export default async function ParticipantsPage({
   await requireAdmin();
 
   const params = await searchParams;
-  const statusFilter = params.status as EnrollmentStatus | undefined;
+  const groupFilter = params.group as string | undefined;
+  const activeGroup = GROUPS.find((g) => g.key === groupFilter);
 
-  // Get all enrollments for counts (no filter)
   const allEnrollments = await prisma.enrollment.findMany({
     where: { immersionId: IMMERSION_ID, deletedAt: null },
     select: { status: true },
@@ -54,150 +90,115 @@ export default async function ParticipantsPage({
     return acc;
   }, {});
 
+  function countGroup(g: Group) {
+    return g.statuses.reduce((sum, s) => sum + (countByStatus[s] ?? 0), 0);
+  }
+
   const immersion = await prisma.immersion.findUnique({
     where: { id: IMMERSION_ID },
     select: { date: true },
   });
-
   const eventDate = immersion ? new Date(immersion.date) : new Date(0);
-  const now = new Date();
-  const diffDays = Math.abs(now.getTime() - eventDate.getTime()) / (1000 * 60 * 60 * 24);
+  const diffDays = Math.abs(Date.now() - eventDate.getTime()) / 86_400_000;
   const isEventDay = diffDays <= 1.5;
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
       immersionId: IMMERSION_ID,
       deletedAt: null,
-      ...(statusFilter ? { status: statusFilter as EnrollmentStatus } : {}),
+      ...(activeGroup ? { status: { in: activeGroup.statuses } } : {}),
     },
-    include: { user: true, feedback: { select: { submittedAt: true } } },
-    orderBy: { enrolledAt: 'desc' },
+    include: { user: { select: { firstName: true, lastName: true, email: true, phone: true } } },
+    orderBy: { enrolledAt: 'asc' },
   });
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-zinc-900">Participantes</h1>
           <p className="text-sm text-zinc-500 mt-1">
-            {allEnrollments.length} inscription{allEnrollments.length !== 1 ? 's' : ''} au total
+            {allEnrollments.length} inscription{allEnrollments.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button asChild size="sm">
-          <Link href="/admin/participants/emargement">Mode émargement</Link>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/admin/participants/emargement">Émargement</Link>
         </Button>
       </div>
 
-      {/* Filter tabs */}
+      {/* Filter chips */}
       <div className="flex flex-wrap gap-2">
         <Link
           href="/admin/participants"
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-            !statusFilter
-              ? 'bg-zinc-900 text-white'
-              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+            !groupFilter ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
           }`}
         >
           Toutes
-          <span className="text-xs bg-white/20 rounded-full px-1.5 py-0.5">
-            {allEnrollments.length}
-          </span>
+          <span className="text-xs opacity-70">{allEnrollments.length}</span>
         </Link>
-        {ALL_STATUSES.map((s) => (
-          <Link
-            key={s}
-            href={`/admin/participants?status=${s}`}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              statusFilter === s
-                ? 'bg-zinc-900 text-white'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-            }`}
-          >
-            {STATUS_LABELS[s]}
-            {countByStatus[s] !== undefined && (
-              <span className="text-xs bg-white/20 rounded-full px-1.5 py-0.5">
-                {countByStatus[s]}
-              </span>
-            )}
-          </Link>
-        ))}
+        {GROUPS.map((group) => {
+          const count = countGroup(group);
+          if (count === 0) return null;
+          return (
+            <Link
+              key={group.key}
+              href={`/admin/participants?group=${group.key}`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                groupFilter === group.key
+                  ? 'bg-zinc-900 text-white'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+            >
+              {group.label}
+              <span className="text-xs opacity-70">{count}</span>
+            </Link>
+          );
+        })}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
-        {enrollments.length === 0 ? (
-          <div className="p-12 text-center text-zinc-400">
-            <p className="text-sm">Aucune participante{statusFilter ? ` avec ce statut` : ''}.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-100 bg-zinc-50">
-                  <th className="text-left px-4 py-3 font-semibold text-zinc-600">Nom complet</th>
-                  <th className="text-left px-4 py-3 font-semibold text-zinc-600">Email</th>
-                  <th className="text-left px-4 py-3 font-semibold text-zinc-600">Téléphone</th>
-                  <th className="text-left px-4 py-3 font-semibold text-zinc-600">Statut</th>
-                  <th className="text-left px-4 py-3 font-semibold text-zinc-600">Source</th>
-                  <th className="text-left px-4 py-3 font-semibold text-zinc-600">Inscrite le</th>
-                  <th className="text-right px-4 py-3 font-semibold text-zinc-600 min-w-[200px]">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {enrollments.map((enrollment) => (
-                  <tr key={enrollment.id} className="hover:bg-zinc-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-zinc-900">
-                      {enrollment.user.firstName} {enrollment.user.lastName}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-600">{enrollment.user.email}</td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {enrollment.user.phone ?? <span className="text-zinc-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[enrollment.status]}`}
-                      >
-                        {STATUS_LABELS[enrollment.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {enrollment.source ?? enrollment.user.source ?? (
-                        <span className="text-zinc-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {enrollment.enrolledAt.toLocaleDateString('fr-FR', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center gap-2 justify-end">
-                        <InlineActions
-                          enrollmentId={enrollment.id}
-                          status={enrollment.status}
-                          j7SentAt={enrollment.j7SentAt}
-                          j2SentAt={enrollment.j2SentAt}
-                          isEventDay={isEventDay}
-                          feedbackSentAt={enrollment.feedbackSentAt}
-                        />
-                        <Link
-                          href={`/admin/participants/${enrollment.id}`}
-                          className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
-                        >
-                          Voir
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Grouped view (Toutes) */}
+      {!groupFilter ? (
+        <div className="space-y-4">
+          {GROUPS.map((group) => {
+            const rows = enrollments.filter((e) => group.statuses.includes(e.status));
+            if (rows.length === 0) return null;
+            return (
+              <div key={group.key} className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-50 border-b border-zinc-100">
+                  <span className="text-sm font-semibold text-zinc-700">{group.label}</span>
+                  <span className="text-xs text-zinc-400 font-medium tabular-nums">{rows.length}</span>
+                </div>
+                <div className="divide-y divide-zinc-100">
+                  {rows.map((enrollment) => (
+                    <EnrollmentRow key={enrollment.id} enrollment={enrollment} isEventDay={isEventDay} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {enrollments.length === 0 && (
+            <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center">
+              <p className="text-sm text-zinc-400">Aucune participante pour l&apos;instant.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Filtered flat list */
+        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+          {enrollments.length === 0 ? (
+            <div className="p-12 text-center">
+              <p className="text-sm text-zinc-400">Aucune participante dans ce groupe.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-zinc-100">
+              {enrollments.map((enrollment) => (
+                <EnrollmentRow key={enrollment.id} enrollment={enrollment} isEventDay={isEventDay} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

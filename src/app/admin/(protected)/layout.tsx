@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
-import { Rocket, LayoutDashboard, Users, CheckSquare, Phone } from "lucide-react";
+import { Rocket, LayoutDashboard, Users, CheckSquare, Phone, Terminal } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
 const NAV = [
@@ -46,7 +46,16 @@ export default async function AdminLayout({
           ))}
         </nav>
 
-        <div className="p-4 border-t border-zinc-800">
+        <div className="p-4 border-t border-zinc-800 space-y-3">
+          {(process.env.ENABLE_DEV_PAGE === "true" || process.env.NODE_ENV !== "production") && (
+            <Link
+              href="/admin/dev"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-zinc-500 hover:text-white hover:bg-zinc-800 text-xs transition-colors"
+            >
+              <Terminal className="w-3.5 h-3.5 shrink-0" />
+              Console dev
+            </Link>
+          )}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-white">
