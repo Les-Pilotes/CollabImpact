@@ -172,14 +172,17 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
     setParticipants((prev) => {
       const p = prev.find((x) => x.id === id);
       if (!p) return prev;
-      setArchived((a) => [
-        ...a,
-        {
-          ...p,
-          archivedAs: as,
-          history: [...p.history, { id: "archive", label, kind: "warning", ...now() }],
-        },
-      ]);
+      setArchived((a) => {
+        if (a.some((x) => x.id === p.id)) return a; // guard contre double-call StrictMode
+        return [
+          ...a,
+          {
+            ...p,
+            archivedAs: as,
+            history: [...p.history, { id: "archive", label, kind: "warning", ...now() }],
+          },
+        ];
+      });
       return prev.filter((x) => x.id !== id);
     });
     setSelectedId(null);
