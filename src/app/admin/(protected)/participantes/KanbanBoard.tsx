@@ -573,14 +573,23 @@ function EmargRow({ p, st, groups, onMarkEmarg, avatarColor, initials }: {
         </div>
       </div>
       <div className="flex gap-2 shrink-0">
-        <button disabled={st === "present"} onClick={() => onMarkEmarg(p.id, "present")}
-          className="px-3 py-2 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-40 disabled:cursor-default transition-colors min-w-[72px] text-center">
-          Présente
-        </button>
-        <button disabled={st === "absent"} onClick={() => onMarkEmarg(p.id, "absent")}
-          className="px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-default transition-colors min-w-[72px] text-center">
-          Absente
-        </button>
+        {st === "pending" ? (
+          <>
+            <button onClick={() => onMarkEmarg(p.id, "present")}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors min-w-[72px] text-center">
+              Présente
+            </button>
+            <button onClick={() => onMarkEmarg(p.id, "absent")}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors min-w-[72px] text-center">
+              Absente
+            </button>
+          </>
+        ) : (
+          <button onClick={() => onMarkEmarg(p.id, "pending")}
+            className="px-3 py-2 rounded-lg text-xs font-semibold bg-zinc-100 text-zinc-500 border border-zinc-200 hover:bg-zinc-200 transition-colors text-center">
+            Annuler
+          </button>
+        )}
       </div>
     </div>
   );
@@ -595,7 +604,9 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
   initials: (p: ParticipantRow) => string;
 }) {
   const [mode, setMode] = useState<"groupes" | "emargement">("groupes");
-  const [picking, setPicking] = useState<string | null>(null); // participant ID being moved
+  const [picking, setPicking] = useState<string | null>(null);   // tap-to-assign (mobile)
+  const [draggingId, setDraggingId] = useState<string | null>(null); // drag (desktop)
+  const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
 
   const eligible = participants.filter((p) =>
     ["confirmee", "attente_j2", "attente_j7"].includes(p.status)
@@ -609,13 +620,17 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
     return initial;
   });
 
+  const assignGroup = (participantId: string, intervenanteId: string) => {
+    setGroups((prev) => ({ ...prev, [participantId]: intervenanteId }));
+  };
+
+  // Mobile: tap-to-select
   const handleParticipantTap = (id: string) => {
     setPicking((prev) => (prev === id ? null : id));
   };
-
   const handleGroupTap = (intervenanteId: string) => {
     if (!picking) return;
-    setGroups((prev) => ({ ...prev, [picking]: intervenanteId }));
+    assignGroup(picking, intervenanteId);
     setPicking(null);
   };
 
@@ -667,33 +682,49 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
       {mode === "groupes" && (
         <div className="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-3 content-start auto-rows-min">
           {INTERVENANTES.map((inv) => {
-            const members = eligible.filter((p) => groups[p.id] === inv.id);
-            const isTarget = !!picking;
+            const members = [...eligible.filter((p) => groups[p.id] === inv.id)]
+              .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName));
+            const isTapTarget = !!picking;
+            const isDragTarget = dragOverGroup === inv.id;
+
             return (
               <div
                 key={inv.id}
                 data-group
                 onClick={() => handleGroupTap(inv.id)}
+                onDragOver={(e) => { e.preventDefault(); setDragOverGroup(inv.id); }}
+                onDragLeave={() => setDragOverGroup(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (draggingId) { assignGroup(draggingId, inv.id); setDraggingId(null); }
+                  setDragOverGroup(null);
+                }}
                 className={`bg-white rounded-xl overflow-hidden transition-all ${
-                  isTarget
+                  isDragTarget
+                    ? "border-2 border-orange-400 shadow-md scale-[1.01]"
+                    : isTapTarget
                     ? "border-2 border-orange-400 cursor-pointer shadow-sm"
                     : "border border-zinc-200"
                 }`}
               >
-                {/* Group header */}
-                <div className={`px-4 py-3 flex items-center justify-between ${isTarget ? "bg-orange-50" : "border-b border-zinc-100"}`}>
+                {/* Header */}
+                <div className={`px-4 py-3 flex items-center justify-between ${
+                  isDragTarget ? "bg-orange-50" : isTapTarget ? "bg-orange-50" : "border-b border-zinc-100"
+                }`}>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-zinc-900">{inv.name}</span>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${inv.color}`}>
                       {inv.domain}
                     </span>
-                    {isTarget && <span className="text-xs text-orange-500 font-medium">← assigner ici</span>}
+                    {(isTapTarget || isDragTarget) && (
+                      <span className="text-xs text-orange-500 font-medium">← déposer ici</span>
+                    )}
                   </div>
                   <span className="text-xs font-semibold text-zinc-400">{members.length}</span>
                 </div>
 
-                {/* Members */}
-                {!isTarget && (
+                {/* Members — hidden during drag hover to keep card clean */}
+                {!isDragTarget && (
                   <div className="divide-y divide-zinc-50">
                     {members.length === 0 && (
                       <p className="px-4 py-2.5 text-xs text-zinc-300">Aucune participante</p>
@@ -702,20 +733,23 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
                       <div
                         key={p.id}
                         data-participant
+                        draggable
+                        onDragStart={() => { setDraggingId(p.id); setPicking(null); }}
+                        onDragEnd={() => { setDraggingId(null); setDragOverGroup(null); }}
                         onClick={(e) => { e.stopPropagation(); handleParticipantTap(p.id); }}
-                        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
-                          picking === p.id
-                            ? "bg-orange-50 ring-2 ring-inset ring-orange-300"
-                            : "hover:bg-zinc-50"
+                        className={`flex items-center gap-3 px-4 py-2.5 transition-colors select-none ${
+                          draggingId === p.id
+                            ? "opacity-40 cursor-grabbing"
+                            : picking === p.id
+                            ? "bg-orange-50 ring-2 ring-inset ring-orange-300 cursor-pointer"
+                            : "hover:bg-zinc-50 cursor-grab"
                         }`}
                       >
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${avatarColor(p.id)}`}>
                           {initials(p)}
                         </div>
                         <span className="text-sm text-zinc-800 flex-1 truncate">{p.firstName} {p.lastName}</span>
-                        <span className="text-[10px] text-zinc-400">
-                          {picking === p.id ? "sélectionnée ✓" : "déplacer →"}
-                        </span>
+                        <span className="text-[10px] text-zinc-300 hidden md:inline">⠿</span>
                       </div>
                     ))}
                   </div>
