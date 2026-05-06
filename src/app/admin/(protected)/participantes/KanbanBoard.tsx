@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, Users, MessageSquare } from "lucide-react";
+import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare } from "lucide-react";
 import PageHeader from "../PageHeader";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -258,7 +258,7 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
           tabs={[
             { id: "listing", label: "Listing", icon: List, count: initialParticipants.length },
             { id: "suivi", label: "Suivi", icon: GitBranch, count: participants.length },
-            { id: "workshop", label: "Workshop", icon: Users },
+            { id: "workshop", label: "Workshop", emoji: "🌟" },
             { id: "postevent", label: "Post-Event", icon: MessageSquare },
           ]}
           activeTab={activeTab}
