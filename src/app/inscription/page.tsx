@@ -17,17 +17,19 @@ type Step = 0 | 1 | 2 | 3 | 4; // 0=email, 1-3=new, 3=returning condensed, 4=suc
 
 // ─── Demo returning participants ──────────────────────────────────────────────
 
-const RETURNING: Record<string, Partial<FormData> & { lastEvent: string }> = {
+const RETURNING: Record<string, Partial<FormData> & { lastEvent: string; verifyBirthDate: string }> = {
   'sarah.cisse@gmail.com': {
     firstName: 'Sarah', lastName: 'Cissé', phone: '07 99 00 11 22',
-    birthDate: '2007-03-15', city: 'Bobigny', educationLevel: 'Première',
+    birthDate: '2007-03-15', verifyBirthDate: '2007-03-15',
+    city: 'Bobigny', educationLevel: 'Première',
     specialty: 'Générale', projectStatus: "Mon projet est en construction",
     interests: ['Tech & Numérique', 'Marketing & Communication'],
     lastEvent: 'Workshop 100% Féminin #4 · octobre 2025',
   },
   'lea.bernard@gmail.com': {
     firstName: 'Léa', lastName: 'Bernard', phone: '06 22 33 44 55',
-    birthDate: '2005-08-22', city: 'Paris 20e', educationLevel: 'Terminale',
+    birthDate: '2005-08-22', verifyBirthDate: '2005-08-22',
+    city: 'Paris 20e', educationLevel: 'Terminale',
     specialty: 'Économique et Sociale', projectStatus: "J'ai un projet défini",
     projectDescription: 'Marketing digital et communication de marque',
     interests: ['Marketing & Communication', 'Art & Culture'],
@@ -63,6 +65,33 @@ const readonlyCls = "w-full px-4 py-3 rounded-xl border border-zinc-100 text-sm 
 const EDUCATION_LEVELS = ['3ème', 'Seconde', 'Première', 'Terminale', 'BTS/BUT', 'Licence', 'Master', 'Autre'];
 const INTERESTS = ['Tech & Numérique', 'Finance & Banque', 'Marketing & Communication', 'Santé & Médecine', 'Droit & Justice', 'Art & Culture', 'Éducation & Social', 'Autre'];
 const SOURCES = ['WhatsApp', 'Instagram', 'Bouche à oreille', 'Via un référent / professeur', 'Autre'];
+
+// ─── Step 0v — Verify identity ────────────────────────────────────────────────
+
+function StepVerify({ birthDate, onChange, onConfirm, onFallback }: {
+  birthDate: string;
+  onChange: (v: string) => void;
+  onConfirm: () => void;
+  onFallback: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-extrabold text-zinc-900 mb-2">Confirme ton identité</h2>
+        <p className="text-sm text-zinc-500">Pour protéger tes informations, indique ta date de naissance.</p>
+      </div>
+      <Field label="Date de naissance" required>
+        <input type="date" value={birthDate} onChange={(e) => onChange(e.target.value)} className={inputCls} autoFocus />
+      </Field>
+      <button onClick={onConfirm} disabled={!birthDate} className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-200 disabled:text-zinc-400 text-white font-semibold rounded-xl transition-colors">
+        Confirmer →
+      </button>
+      <button onClick={onFallback} className="w-full text-sm text-zinc-400 hover:text-zinc-600 py-2 transition-colors">
+        ← Changer d'email
+      </button>
+    </div>
+  );
+}
 
 // ─── Step 0 — Email check ─────────────────────────────────────────────────────
 
@@ -324,6 +353,9 @@ function SuccessScreen({ firstName, isReturning }: { firstName: string; isReturn
 
 export default function InscriptionPage() {
   const [step, setStep] = useState<Step>(0);
+  const [verifying, setVerifying] = useState(false); // interstitiel vérif identité
+  const [verifyBirthDate, setVerifyBirthDate] = useState('');
+  const [pendingProfile, setPendingProfile] = useState<typeof RETURNING[string] | null>(null);
   const [flow, setFlow] = useState<Flow>('unknown');
   const [returningProfile, setReturningProfile] = useState<typeof RETURNING[string] | null>(null);
   const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
@@ -344,11 +376,31 @@ export default function InscriptionPage() {
   const handleEmailContinue = () => {
     const profile = RETURNING[formData.email.toLowerCase().trim()];
     if (profile) {
-      setReturningProfile(profile);
-      setFlow('returning');
-      setFormData((prev) => ({ ...prev, ...profile, email: prev.email }));
-      setStep(3); // jump to the condensed returning step (reuse step 3 slot)
+      // Email trouvé → demander vérification avant de révéler quoi que ce soit
+      setPendingProfile(profile);
+      setVerifying(true);
     } else {
+      setFlow('new');
+      setStep(1);
+    }
+  };
+
+  const handleVerifyConfirm = () => {
+    if (!pendingProfile) return;
+    if (verifyBirthDate === pendingProfile.verifyBirthDate) {
+      // Vérification réussie → pré-remplir et afficher le formulaire retour
+      setReturningProfile(pendingProfile);
+      setFlow('returning');
+      setFormData((prev) => ({ ...prev, ...pendingProfile, email: prev.email }));
+      setVerifying(false);
+      setPendingProfile(null);
+      setVerifyBirthDate('');
+      setStep(3);
+    } else {
+      // Échec silencieux → nouvelle inscription, sans révéler que l'email existe
+      setVerifying(false);
+      setPendingProfile(null);
+      setVerifyBirthDate('');
       setFlow('new');
       setStep(1);
     }
@@ -406,11 +458,19 @@ export default function InscriptionPage() {
 
       {/* Content */}
       <div className="max-w-lg mx-auto px-4 py-8">
-        {step === 0 && (
+        {step === 0 && !verifying && (
           <StepEmail
             email={formData.email}
             onChange={(v) => setFormData((p) => ({ ...p, email: v }))}
             onContinue={handleEmailContinue}
+          />
+        )}
+        {verifying && (
+          <StepVerify
+            birthDate={verifyBirthDate}
+            onChange={setVerifyBirthDate}
+            onConfirm={handleVerifyConfirm}
+            onFallback={() => { setVerifying(false); setPendingProfile(null); setVerifyBirthDate(''); }}
           />
         )}
         {flow === 'new' && step === 1 && <Step1 data={formData} onChange={handleChange} />}
