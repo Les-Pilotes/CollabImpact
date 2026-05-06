@@ -280,61 +280,12 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
 
         {/* ── Listing tab ── */}
         {activeTab === "listing" && (
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-100 bg-zinc-50">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">#</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Participante</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Statut</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Inscrite le</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Dernière action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-50">
-                  {[...initialParticipants]
-                    .sort((a, b) => new Date(a.enrolledAt).getTime() - new Date(b.enrolledAt).getTime())
-                    .map((p, i) => {
-                      const last = p.history.at(-1);
-                      const [labelTitle] = (last?.label ?? "Inscription").split(" · ");
-                      const statusColors: Record<KanbanStatus, string> = {
-                        attente_j7: "bg-zinc-100 text-zinc-600",
-                        attente_j2: "bg-blue-50 text-blue-700",
-                        confirmee: "bg-violet-50 text-violet-700",
-                      };
-                      const statusLabels: Record<KanbanStatus, string> = {
-                        attente_j7: "Confirmation J-7",
-                        attente_j2: "Confirmation J-2",
-                        confirmee: "Attendue Jour J",
-                      };
-                      return (
-                        <tr key={p.id} className="hover:bg-zinc-50 transition-colors">
-                          <td className="px-4 py-3 text-xs text-zinc-400">{i + 1}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${avatarColor(p.id)}`}>
-                                {initials(p)}
-                              </div>
-                              <span className="font-medium text-zinc-900">{p.firstName} {p.lastName}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusColors[p.status]}`}>
-                              {statusLabels[p.status]}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-zinc-500">
-                            {new Date(p.enrolledAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-zinc-500">{labelTitle}</td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ListingTab
+            initialParticipants={initialParticipants}
+            archived={archived}
+            avatarColor={avatarColor}
+            initials={initials}
+          />
         )}
 
         {/* ── Workshop tab ── */}
@@ -580,6 +531,145 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ─── Listing tab component ────────────────────────────────────────────────────
+
+function archivedStage(p: ParticipantRow): string {
+  const labels = p.history.map((h) => h.label);
+  const hasJ2 = labels.some((l) => l.includes("J-2"));
+  const hasJ7 = labels.some((l) => l.includes("J-7"));
+  if (p.archivedAs === "absente") return "Jour J";
+  if (hasJ2) return "Confirmation J-2";
+  if (hasJ7) return "Confirmation J-7";
+  return "Avant contact";
+}
+
+const STATUS_COLORS: Record<KanbanStatus, string> = {
+  attente_j7: "bg-zinc-100 text-zinc-600",
+  attente_j2: "bg-blue-50 text-blue-700",
+  confirmee: "bg-violet-50 text-violet-700",
+};
+const STATUS_LABELS_LISTING: Record<KanbanStatus, string> = {
+  attente_j7: "Confirmation J-7",
+  attente_j2: "Confirmation J-2",
+  confirmee: "Attendue Jour J",
+};
+
+function ListingRow({ p, i, avatarColor, initials }: { p: ParticipantRow; i: number; avatarColor: (id: string) => string; initials: (p: ParticipantRow) => string }) {
+  const last = p.history.at(-1);
+  const [labelTitle] = (last?.label ?? "Inscription").split(" · ");
+  const enrolledDate = new Date(p.enrolledAt);
+  return (
+    <tr className="hover:bg-zinc-50 transition-colors">
+      <td className="px-4 py-3 text-xs text-zinc-400">{i + 1}</td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${avatarColor(p.id)}`}>
+            {initials(p)}
+          </div>
+          <span className="font-medium text-zinc-900">{p.firstName} {p.lastName}</span>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        {"status" in p && (p as ParticipantRow).status ? (
+          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[(p as ParticipantRow).status]}`}>
+            {STATUS_LABELS_LISTING[(p as ParticipantRow).status]}
+          </span>
+        ) : (
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+            {p.archivedAs === "absente" ? "Absente Jour J" : "Désistée"}
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-xs text-zinc-500">
+        <div>{enrolledDate.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</div>
+        <div className="text-zinc-400">{enrolledDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
+      </td>
+      <td className="px-4 py-3 text-xs text-zinc-500">{labelTitle}</td>
+    </tr>
+  );
+}
+
+function ListingTab({ initialParticipants, archived, avatarColor, initials }: {
+  initialParticipants: ParticipantRow[];
+  archived: ParticipantRow[];
+  avatarColor: (id: string) => string;
+  initials: (p: ParticipantRow) => string;
+}) {
+  const [archiveOpen, setArchiveOpen] = useState(false);
+
+  const sorted = [...initialParticipants].sort(
+    (a, b) => new Date(a.enrolledAt).getTime() - new Date(b.enrolledAt).getTime()
+  );
+
+  const stageOrder = ["Avant contact", "Confirmation J-7", "Confirmation J-2", "Jour J"];
+  const groupedArchived = stageOrder
+    .map((stage) => ({
+      stage,
+      items: archived.filter((p) => archivedStage(p) === stage),
+    }))
+    .filter((g) => g.items.length > 0);
+
+  const thCls = "text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider";
+
+  return (
+    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      {/* Active participants */}
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-zinc-100 bg-zinc-50">
+              <th className={thCls}>#</th>
+              <th className={thCls}>Participante</th>
+              <th className={thCls}>Statut</th>
+              <th className={thCls}>Inscrite le</th>
+              <th className={thCls}>Dernière action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-50">
+            {sorted.map((p, i) => (
+              <ListingRow key={p.id} p={p} i={i} avatarColor={avatarColor} initials={initials} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Archived accordion */}
+      {archived.length > 0 && (
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setArchiveOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 transition-colors"
+          >
+            <span className="font-semibold text-zinc-500">
+              Archivées · {archived.length}
+            </span>
+            <span className="text-zinc-400 text-xs">{archiveOpen ? "▲" : "▼"}</span>
+          </button>
+
+          {archiveOpen && (
+            <div className="border-t border-zinc-100">
+              {groupedArchived.map(({ stage, items }) => (
+                <div key={stage}>
+                  <div className="px-4 py-2 bg-zinc-50 text-[10px] font-bold uppercase tracking-wider text-zinc-400 border-b border-zinc-100">
+                    Sortie au stade : {stage} · {items.length}
+                  </div>
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-zinc-50">
+                      {items.map((p, i) => (
+                        <ListingRow key={p.id} p={p} i={i} avatarColor={avatarColor} initials={initials} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
