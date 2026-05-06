@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LayoutDashboard, Users, CheckSquare, BarChart2, Terminal, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Users, CheckSquare, BarChart2, ClipboardList, Terminal, ChevronLeft, ChevronRight } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
 const NAV = [
@@ -12,6 +12,7 @@ const NAV = [
   { href: "/admin/participantes", label: "Participantes", icon: Users },
   { href: "/admin/taches", label: "Tâches", icon: CheckSquare },
   { href: "/admin/impact", label: "Impact", icon: BarChart2 },
+  { href: "/inscription", label: "Formulaire", icon: ClipboardList },
 ];
 
 type Props = {
