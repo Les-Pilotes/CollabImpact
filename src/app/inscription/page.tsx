@@ -3,64 +3,336 @@
 import { useState } from 'react';
 import Image from 'next/image';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface FormData {
-  // Couche 1 - Identité
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  birthDate: string;
-  city: string;
-
-  // Couche 2 - Orientation
-  educationLevel: string;
-  specialty: string;
-  projectStatus: string;
-  projectDescription: string;
-  interests: string[];
-
-  // Couche 3 - Événement
-  howYouHeard: string;
-  comment: string;
+  firstName: string; lastName: string; email: string; phone: string;
+  birthDate: string; city: string; educationLevel: string; specialty: string;
+  projectStatus: string; projectDescription: string; interests: string[];
+  howYouHeard: string; comment: string;
 }
 
-type StepType = 1 | 2 | 3 | 4;
+type Flow = 'unknown' | 'new' | 'returning';
+type Step = 0 | 1 | 2 | 3 | 4; // 0=email, 1-3=new, 3=returning condensed, 4=success
+
+// ─── Demo returning participants ──────────────────────────────────────────────
+
+const RETURNING: Record<string, Partial<FormData> & { lastEvent: string }> = {
+  'sarah.cisse@gmail.com': {
+    firstName: 'Sarah', lastName: 'Cissé', phone: '07 99 00 11 22',
+    birthDate: '2007-03-15', city: 'Bobigny', educationLevel: 'Première',
+    specialty: 'Générale', projectStatus: "Mon projet est en construction",
+    interests: ['Tech & Numérique', 'Marketing & Communication'],
+    lastEvent: 'Workshop 100% Féminin #4 · octobre 2025',
+  },
+  'lea.bernard@gmail.com': {
+    firstName: 'Léa', lastName: 'Bernard', phone: '06 22 33 44 55',
+    birthDate: '2005-08-22', city: 'Paris 20e', educationLevel: 'Terminale',
+    specialty: 'Économique et Sociale', projectStatus: "J'ai un projet défini",
+    projectDescription: 'Marketing digital et communication de marque',
+    interests: ['Marketing & Communication', 'Art & Culture'],
+    lastEvent: 'Workshop 100% Féminin #3 · mars 2025',
+  },
+};
+
+const EMPTY_FORM: FormData = {
+  firstName: '', lastName: '', email: '', phone: '', birthDate: '', city: '',
+  educationLevel: '', specialty: '', projectStatus: '', projectDescription: '',
+  interests: [], howYouHeard: '', comment: '',
+};
+
+const EVENT_DATE = new Date('2026-04-18');
+const DAYS_UNTIL_EVENT = Math.ceil((EVENT_DATE.getTime() - Date.now()) / 86400000);
+
+// ─── Shared components ────────────────────────────────────────────────────────
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-zinc-900 mb-1.5">
+        {label}{required && <span className="text-orange-500 ml-0.5">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = "w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition bg-white placeholder:text-zinc-400";
+const readonlyCls = "w-full px-4 py-3 rounded-xl border border-zinc-100 text-sm bg-zinc-50 text-zinc-500";
+
+const EDUCATION_LEVELS = ['3ème', 'Seconde', 'Première', 'Terminale', 'BTS/BUT', 'Licence', 'Master', 'Autre'];
+const INTERESTS = ['Tech & Numérique', 'Finance & Banque', 'Marketing & Communication', 'Santé & Médecine', 'Droit & Justice', 'Art & Culture', 'Éducation & Social', 'Autre'];
+const SOURCES = ['WhatsApp', 'Instagram', 'Bouche à oreille', 'Via un référent / professeur', 'Autre'];
+
+// ─── Step 0 — Email check ─────────────────────────────────────────────────────
+
+function StepEmail({ email, onChange, onContinue }: { email: string; onChange: (v: string) => void; onContinue: () => void }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-extrabold text-zinc-900 mb-2">Commence par ton email</h2>
+        <p className="text-sm text-zinc-500">Si tu t'es déjà inscrite à un Workshop Les Pilotes, tes informations seront pré-remplies.</p>
+      </div>
+      <Field label="Adresse email" required>
+        <input type="email" value={email} onChange={(e) => onChange(e.target.value)} placeholder="prenom.nom@exemple.fr" className={inputCls} onKeyDown={(e) => e.key === 'Enter' && email.includes('@') && onContinue()} autoFocus />
+      </Field>
+      <button onClick={onContinue} disabled={!email.includes('@')} className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-200 disabled:text-zinc-400 text-white font-semibold rounded-xl transition-colors">
+        Continuer →
+      </button>
+    </div>
+  );
+}
+
+// ─── Steps 1-3 — New participant ──────────────────────────────────────────────
+
+function Step1({ data, onChange }: { data: FormData; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-2xl font-extrabold text-zinc-900 mb-1">Tes informations</h2>
+        <p className="text-sm text-zinc-500">Ces informations ne seront jamais partagées avec des tiers.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Prénom" required><input name="firstName" value={data.firstName} onChange={onChange} placeholder="Marie" className={inputCls} /></Field>
+        <Field label="Nom" required><input name="lastName" value={data.lastName} onChange={onChange} placeholder="Dupont" className={inputCls} /></Field>
+      </div>
+      <Field label="Téléphone" required><input name="phone" type="tel" value={data.phone} onChange={onChange} placeholder="06 12 34 56 78" className={inputCls} /></Field>
+      <Field label="Date de naissance" required><input name="birthDate" type="date" value={data.birthDate} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Ville de résidence" required><input name="city" value={data.city} onChange={onChange} placeholder="Paris, Montreuil, Bobigny…" className={inputCls} /></Field>
+    </div>
+  );
+}
+
+function Step2({ data, onChange, onCheck }: { data: FormData; onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void; onCheck: (v: string) => void }) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-2xl font-extrabold text-zinc-900 mb-1">Ton orientation</h2>
+        <p className="text-sm text-zinc-500">Ces infos nous aident à te connecter avec les bonnes intervenantes.</p>
+      </div>
+      <Field label="Niveau scolaire" required>
+        <select name="educationLevel" value={data.educationLevel} onChange={onChange} className={inputCls}>
+          <option value="">Sélectionne ton niveau</option>
+          {EDUCATION_LEVELS.map((l) => <option key={l}>{l}</option>)}
+        </select>
+      </Field>
+      <Field label="Filière / Spécialité">
+        <input name="specialty" value={data.specialty} onChange={onChange} placeholder="Ex : Économique et Sociale, Informatique…" className={inputCls} />
+      </Field>
+      <Field label="Ton projet professionnel" required>
+        <div className="space-y-2">
+          {["J'ai un projet défini", "Mon projet est en construction", "Je n'ai pas encore de projet"].map((opt) => (
+            <label key={opt} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${data.projectStatus === opt ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 hover:border-zinc-300'}`}>
+              <input type="radio" name="projectStatus" value={opt} checked={data.projectStatus === opt} onChange={onChange} className="accent-orange-500" />
+              <span className="text-sm font-medium text-zinc-800">{opt}</span>
+            </label>
+          ))}
+        </div>
+      </Field>
+      {data.projectStatus === "J'ai un projet défini" && (
+        <Field label="Décris ton projet" required>
+          <textarea name="projectDescription" value={data.projectDescription} onChange={onChange} rows={3} placeholder="Ex : Je veux travailler dans la communication digitale…" className={inputCls} />
+        </Field>
+      )}
+      <Field label="Domaines qui t'intéressent" required>
+        <div className="flex flex-wrap gap-2 mt-1">
+          {INTERESTS.map((i) => (
+            <button key={i} type="button" onClick={() => onCheck(i)} className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${data.interests.includes(i) ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-zinc-600 border-zinc-200 hover:border-orange-300'}`}>
+              {i}
+            </button>
+          ))}
+        </div>
+      </Field>
+    </div>
+  );
+}
+
+function Step3({ data, onChange }: { data: FormData; onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void }) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-2xl font-extrabold text-zinc-900 mb-1">Derniers détails</h2>
+        <p className="text-sm text-zinc-500">Tu y es presque !</p>
+      </div>
+
+      {/* Late registration warning */}
+      {DAYS_UNTIL_EVENT <= 2 && DAYS_UNTIL_EVENT >= 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+          <strong>Inscription de dernière minute</strong> — L'événement est {DAYS_UNTIL_EVENT === 0 ? "aujourd'hui" : `dans ${DAYS_UNTIL_EVENT} jour(s)`}. Ta place sera validée directement sur place.
+        </div>
+      )}
+
+      <Field label="Comment as-tu entendu parler de cet événement ?" required>
+        <select name="howYouHeard" value={data.howYouHeard} onChange={onChange} className={inputCls}>
+          <option value="">Sélectionne une option</option>
+          {SOURCES.map((s) => <option key={s}>{s}</option>)}
+        </select>
+      </Field>
+      <Field label="Commentaire ou question">
+        <textarea name="comment" value={data.comment} onChange={onChange} rows={3} placeholder="Une question ? Un besoin particulier ?" className={inputCls} />
+      </Field>
+
+      {/* Recap */}
+      <div className="bg-zinc-50 rounded-xl p-4 space-y-2 text-sm">
+        <p className="font-semibold text-zinc-800 mb-3">Récapitulatif</p>
+        {[
+          ['Nom complet', `${data.firstName} ${data.lastName}`],
+          ['Email', data.email],
+          ['Téléphone', data.phone],
+          ['Ville', data.city],
+          ['Niveau', data.educationLevel],
+          ['Domaines', data.interests.join(', ') || '—'],
+        ].map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-4">
+            <span className="text-zinc-500">{k}</span>
+            <span className="text-zinc-800 font-medium text-right">{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Returning participant step ───────────────────────────────────────────────
+
+function ReturningStep({ data, profile, onChange, onCheck }: {
+  data: FormData;
+  profile: typeof RETURNING[string];
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
+  onCheck: (v: string) => void;
+}) {
+  const [editOrientation, setEditOrientation] = useState(false);
+
+  return (
+    <div className="space-y-6">
+      {/* Welcome back banner */}
+      <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-start gap-3">
+        <span className="text-2xl">👋</span>
+        <div>
+          <p className="font-bold text-orange-800">Bienvenue {profile.firstName} !</p>
+          <p className="text-sm text-orange-700 mt-0.5">On te reconnaît depuis <strong>{profile.lastEvent}</strong>. Tes infos sont pré-remplies.</p>
+        </div>
+      </div>
+
+      {/* Couche 1 - Read only */}
+      <div className="space-y-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Tes informations · pré-remplies</p>
+        <div className="bg-zinc-50 rounded-xl p-4 space-y-2 text-sm">
+          {[
+            [`${profile.firstName} ${profile.lastName}`, 'Nom complet'],
+            [data.email, 'Email'],
+            [profile.phone ?? '—', 'Téléphone'],
+            [profile.city ?? '—', 'Ville'],
+          ].map(([v, k]) => (
+            <div key={k} className="flex justify-between">
+              <span className="text-zinc-500">{k}</span>
+              <span className="font-medium text-zinc-800">{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Couche 2 - Editable */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Ton orientation</p>
+          <button onClick={() => setEditOrientation((v) => !v)} className="text-xs text-orange-500 hover:text-orange-700 font-semibold">
+            {editOrientation ? 'Fermer ↑' : 'Mettre à jour ↓'}
+          </button>
+        </div>
+        {!editOrientation ? (
+          <div className="bg-zinc-50 rounded-xl p-4 space-y-2 text-sm">
+            {[
+              [profile.educationLevel ?? '—', 'Niveau'],
+              [profile.specialty ?? '—', 'Filière'],
+              [profile.projectStatus ?? '—', 'Projet'],
+              [(profile.interests ?? []).join(', ') || '—', 'Domaines'],
+            ].map(([v, k]) => (
+              <div key={k} className="flex justify-between gap-4">
+                <span className="text-zinc-500">{k}</span>
+                <span className="font-medium text-zinc-800 text-right">{v}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4 border border-zinc-200 rounded-xl p-4">
+            <Field label="Niveau scolaire">
+              <select name="educationLevel" value={data.educationLevel} onChange={onChange} className={inputCls}>
+                {EDUCATION_LEVELS.map((l) => <option key={l}>{l}</option>)}
+              </select>
+            </Field>
+            <Field label="Domaines">
+              <div className="flex flex-wrap gap-2 mt-1">
+                {INTERESTS.map((i) => (
+                  <button key={i} type="button" onClick={() => onCheck(i)} className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${data.interests.includes(i) ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-zinc-600 border-zinc-200'}`}>
+                    {i}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </div>
+        )}
+      </div>
+
+      {/* Couche 3 - Must fill */}
+      <div className="space-y-4">
+        <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Pour cet événement</p>
+        <Field label="Comment as-tu entendu parler de cette édition ?" required>
+          <select name="howYouHeard" value={data.howYouHeard} onChange={onChange} className={inputCls}>
+            <option value="">Sélectionne une option</option>
+            {SOURCES.map((s) => <option key={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="Commentaire ou question">
+          <textarea name="comment" value={data.comment} onChange={onChange} rows={2} placeholder="Quelque chose à nous dire ?" className={inputCls} />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+// ─── Success screen ───────────────────────────────────────────────────────────
+
+function SuccessScreen({ firstName, isReturning }: { firstName: string; isReturning: boolean }) {
+  return (
+    <div className="text-center py-12 space-y-6">
+      <div className="text-6xl">🎉</div>
+      <div>
+        <h2 className="text-2xl font-extrabold text-zinc-900 mb-2">
+          {isReturning ? `Contente de te revoir, ${firstName} !` : `Bienvenue, ${firstName} !`}
+        </h2>
+        <p className="text-zinc-500 text-sm max-w-sm mx-auto">
+          Ton inscription au <strong>Workshop 100% Féminin</strong> est bien enregistrée.
+        </p>
+      </div>
+      <div className="bg-orange-50 rounded-2xl p-5 text-left space-y-3 max-w-sm mx-auto">
+        <p className="text-sm font-semibold text-orange-800">📅 Samedi 18 avril 2026 · 9h30–12h30</p>
+        <p className="text-sm text-orange-700">📍 9 rue de Vaugirard, 75006 Paris · La Cité Audacieuse</p>
+        <p className="text-sm text-orange-700">📧 Un email de confirmation va t'être envoyé. Garde un œil sur ta boîte !</p>
+      </div>
+      <div className="bg-zinc-50 rounded-xl p-4 text-sm text-zinc-600 text-left max-w-sm mx-auto space-y-2">
+        <p className="font-semibold text-zinc-800">La suite :</p>
+        <p>• Tu recevras une relance à J-7 pour confirmer ta présence</p>
+        <p>• Puis une dernière confirmation à J-2</p>
+        <p>• Le jour J : viens avec une pièce d'identité</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function InscriptionPage() {
-  const [step, setStep] = useState<StepType>(1);
-  const [formData, setFormData] = useState<FormData>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    birthDate: '',
-    city: '',
-    educationLevel: '',
-    specialty: '',
-    projectStatus: '',
-    projectDescription: '',
-    interests: [],
-    howYouHeard: '',
-    comment: '',
-  });
+  const [step, setStep] = useState<Step>(0);
+  const [flow, setFlow] = useState<Flow>('unknown');
+  const [returningProfile, setReturningProfile] = useState<typeof RETURNING[string] | null>(null);
+  const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    if (type === 'checkbox') {
-      const checked = (e.target as HTMLInputElement).checked;
-      setFormData((prev) => ({
-        ...prev,
-        interests: checked ? [...prev.interests, value] : prev.interests.filter((i) => i !== value),
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleCheckboxChange = (value: string) => {
+  const handleCheck = (value: string) => {
     setFormData((prev) => ({
       ...prev,
       interests: prev.interests.includes(value)
@@ -69,532 +341,98 @@ export default function InscriptionPage() {
     }));
   };
 
-  const isStep1Valid = () => {
-    return (
-      formData.firstName.trim() &&
-      formData.lastName.trim() &&
-      formData.email.trim() &&
-      formData.phone.trim() &&
-      formData.birthDate &&
-      formData.city.trim()
-    );
-  };
-
-  const isStep2Valid = () => {
-    const hasRequiredFields =
-      formData.educationLevel &&
-      formData.projectStatus &&
-      formData.interests.length > 0;
-
-    if (formData.projectStatus === 'J\'ai un projet défini') {
-      return hasRequiredFields && formData.projectDescription.trim();
-    }
-
-    return hasRequiredFields;
-  };
-
-  const isStep3Valid = () => {
-    return formData.howYouHeard.trim();
-  };
-
-  const handleNextStep = () => {
-    if (step === 1 && isStep1Valid()) {
-      setStep(2);
-    } else if (step === 2 && isStep2Valid()) {
-      setStep(3);
-    } else if (step === 3 && isStep3Valid()) {
-      setStep(4);
+  const handleEmailContinue = () => {
+    const profile = RETURNING[formData.email.toLowerCase().trim()];
+    if (profile) {
+      setReturningProfile(profile);
+      setFlow('returning');
+      setFormData((prev) => ({ ...prev, ...profile, email: prev.email }));
+      setStep(3); // jump to the condensed returning step (reuse step 3 slot)
+    } else {
+      setFlow('new');
+      setStep(1);
     }
   };
 
-  const handlePreviousStep = () => {
-    if (step > 1 && step < 4) {
-      setStep((step - 1) as StepType);
-    }
+  const isStep1Valid = formData.firstName.trim() && formData.lastName.trim() && formData.phone.trim() && formData.birthDate && formData.city.trim();
+  const isStep2Valid = formData.educationLevel && formData.projectStatus && formData.interests.length > 0 && (formData.projectStatus !== "J'ai un projet défini" || formData.projectDescription.trim());
+  const isStep3Valid = formData.howYouHeard.trim();
+
+  const handleNext = () => {
+    if (flow === 'returning' && step === 3 && isStep3Valid) { setStep(4); return; }
+    if (step === 1 && isStep1Valid) setStep(2);
+    else if (step === 2 && isStep2Valid) setStep(3);
+    else if (step === 3 && isStep3Valid) setStep(4);
   };
 
-  const getProgressPercentage = () => {
-    if (step === 1) return 33;
-    if (step === 2) return 66;
-    if (step === 3) return 100;
-    return 100;
+  const handleBack = () => {
+    if (flow === 'returning' && step === 3) { setStep(0); setFlow('unknown'); setReturningProfile(null); setFormData(EMPTY_FORM); return; }
+    if (step > 0 && step < 4) setStep((step - 1) as Step);
   };
+
+  const stepLabel = flow === 'returning' ? 'Retour' : step === 1 ? 'Étape 1/3' : step === 2 ? 'Étape 2/3' : step === 3 ? 'Étape 3/3' : '';
+  const progress = step === 0 ? 0 : flow === 'returning' ? 66 : step === 1 ? 33 : step === 2 ? 66 : 100;
+
+  const nextDisabled = step === 0 ? !formData.email.includes('@')
+    : step === 1 ? !isStep1Valid
+    : step === 2 ? !isStep2Valid
+    : step === 3 ? !isStep3Valid
+    : false;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
-      {/* Header */}
+      {/* Sticky header */}
       <div className="sticky top-0 z-50 bg-white border-b border-zinc-200 shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10">
-              <Image
-                src="/logo-pilotes.png"
-                alt="Les Pilotes"
-                fill
-                className="object-contain"
-              />
-            </div>
-            <div className="text-xs text-zinc-600">
-              <div className="font-semibold text-zinc-900">Workshop 100% Féminin</div>
-              <div>La Cité Audacieuse · 18 avril 2026 · 9h30–12h30</div>
-            </div>
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+          <div className="relative w-8 h-8 shrink-0">
+            <Image src="/logo-pilotes.png" alt="Les Pilotes" fill className="object-contain" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-zinc-900 truncate">Workshop 100% Féminin · Les Pilotes</p>
+            <p className="text-[11px] text-zinc-500">18 avril 2026 · 9h30–12h30 · 9 rue de Vaugirard, Paris 6e</p>
           </div>
         </div>
-
-        {/* Progress Bar */}
-        {step < 4 && (
-          <div className="bg-zinc-100">
-            <div className="max-w-2xl mx-auto px-4 py-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-zinc-700">Étape {step}/3</span>
-                <span className="text-sm text-zinc-600">{getProgressPercentage()}%</span>
-              </div>
-              <div className="w-full bg-zinc-200 rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-orange-500 h-full transition-all duration-300"
-                  style={{ width: `${getProgressPercentage()}%` }}
-                />
-              </div>
+        {step > 0 && step < 4 && (
+          <div className="max-w-lg mx-auto px-4 pb-3">
+            <div className="flex justify-between text-[11px] text-zinc-500 mb-1">
+              <span>{stepLabel}</span><span>{progress}%</span>
+            </div>
+            <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+              <div className="h-full bg-orange-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
             </div>
           </div>
         )}
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
-        {step === 1 && <Step1 formData={formData} handleInputChange={handleInputChange} />}
-        {step === 2 && <Step2 formData={formData} handleInputChange={handleInputChange} handleCheckboxChange={handleCheckboxChange} />}
-        {step === 3 && (
-          <Step3
-            formData={formData}
-            handleInputChange={handleInputChange}
-            onPreviousStep={handlePreviousStep}
+      {/* Content */}
+      <div className="max-w-lg mx-auto px-4 py-8">
+        {step === 0 && (
+          <StepEmail
+            email={formData.email}
+            onChange={(v) => setFormData((p) => ({ ...p, email: v }))}
+            onContinue={handleEmailContinue}
           />
         )}
-        {step === 4 && <SuccessScreen firstName={formData.firstName} />}
+        {flow === 'new' && step === 1 && <Step1 data={formData} onChange={handleChange} />}
+        {flow === 'new' && step === 2 && <Step2 data={formData} onChange={handleChange} onCheck={handleCheck} />}
+        {flow === 'new' && step === 3 && <Step3 data={formData} onChange={handleChange} />}
+        {flow === 'returning' && step === 3 && returningProfile && (
+          <ReturningStep data={formData} profile={returningProfile} onChange={handleChange} onCheck={handleCheck} />
+        )}
+        {step === 4 && <SuccessScreen firstName={formData.firstName} isReturning={flow === 'returning'} />}
 
-        {/* Navigation Buttons */}
-        {step < 4 && (
-          <div className="mt-12 flex gap-3 items-center">
-            {step > 1 && (
-              <button
-                onClick={handlePreviousStep}
-                className="flex-1 px-6 py-3 border-2 border-zinc-300 text-zinc-700 font-medium rounded-lg hover:bg-zinc-50 transition-colors"
-              >
-                Retour
-              </button>
-            )}
-            <button
-              onClick={handleNextStep}
-              disabled={
-                (step === 1 && !isStep1Valid()) ||
-                (step === 2 && !isStep2Valid()) ||
-                (step === 3 && !isStep3Valid())
-              }
-              className={`flex-1 px-6 py-3 font-medium rounded-lg transition-colors ${
-                (step === 1 && !isStep1Valid()) ||
-                (step === 2 && !isStep2Valid()) ||
-                (step === 3 && !isStep3Valid())
-                  ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
-                  : 'bg-orange-500 text-white hover:bg-orange-600'
-              }`}
-            >
-              {step === 3 ? 'Valider mon inscription' : 'Continuer'}
+        {/* Nav buttons */}
+        {step > 0 && step < 4 && (
+          <div className="mt-8 flex gap-3">
+            <button onClick={handleBack} className="px-5 py-3 rounded-xl border border-zinc-200 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors">
+              ← Retour
+            </button>
+            <button onClick={handleNext} disabled={nextDisabled} className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-200 disabled:text-zinc-400 text-white font-semibold rounded-xl transition-colors">
+              {step === 3 ? "Confirmer mon inscription →" : "Continuer →"}
             </button>
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-interface Step1Props {
-  formData: FormData;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-}
-
-function Step1({ formData, handleInputChange }: Step1Props) {
-  return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-zinc-900 mb-2">Qui es-tu?</h1>
-        <p className="text-lg text-zinc-600">Commençons par les bases</p>
-      </div>
-
-      <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            label="Prénom*"
-            name="firstName"
-            type="text"
-            value={formData.firstName}
-            onChange={handleInputChange}
-            placeholder="Alice"
-          />
-          <FormField
-            label="Nom*"
-            name="lastName"
-            type="text"
-            value={formData.lastName}
-            onChange={handleInputChange}
-            placeholder="Dupont"
-          />
-        </div>
-
-        <FormField
-          label="Email*"
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleInputChange}
-          placeholder="alice@example.com"
-        />
-
-        <FormField
-          label="Téléphone*"
-          name="phone"
-          type="tel"
-          value={formData.phone}
-          onChange={handleInputChange}
-          placeholder="+33 6 12 34 56 78"
-        />
-
-        <FormField
-          label="Date de naissance*"
-          name="birthDate"
-          type="date"
-          value={formData.birthDate}
-          onChange={handleInputChange}
-        />
-
-        <FormField
-          label="Ville de résidence*"
-          name="city"
-          type="text"
-          value={formData.city}
-          onChange={handleInputChange}
-          placeholder="Paris"
-        />
-      </div>
-    </div>
-  );
-}
-
-interface Step2Props {
-  formData: FormData;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-  handleCheckboxChange: (value: string) => void;
-}
-
-function Step2({ formData, handleInputChange, handleCheckboxChange }: Step2Props) {
-  const interests = [
-    'Tech & Numérique',
-    'Finance & Banque',
-    'Marketing & Communication',
-    'Santé & Médecine',
-    'Droit & Justice',
-    'Art & Culture',
-    'Éducation & Social',
-    'Autre',
-  ];
-
-  return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-zinc-900 mb-2">Tes orientations</h1>
-        <p className="text-lg text-zinc-600">Parlons de ton parcours et tes ambitions</p>
-      </div>
-
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-semibold text-zinc-900 mb-3">
-            Niveau scolaire*
-          </label>
-          <select
-            name="educationLevel"
-            value={formData.educationLevel}
-            onChange={handleInputChange}
-            className="w-full px-4 py-3 border-2 border-zinc-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 transition-colors"
-          >
-            <option value="">Sélectionne ton niveau</option>
-            <option value="3ème">3ème</option>
-            <option value="Seconde">Seconde</option>
-            <option value="Première">Première</option>
-            <option value="Terminale">Terminale</option>
-            <option value="BTS/BUT">BTS/BUT</option>
-            <option value="Licence">Licence</option>
-            <option value="Master">Master</option>
-            <option value="Autre">Autre</option>
-          </select>
-        </div>
-
-        <FormField
-          label="Filière / Spécialité"
-          name="specialty"
-          type="text"
-          value={formData.specialty}
-          onChange={handleInputChange}
-          placeholder="Ex: Scientifique, Économique..."
-          required={false}
-        />
-
-        <div>
-          <label className="block text-sm font-semibold text-zinc-900 mb-4">
-            Ton projet professionnel*
-          </label>
-          <div className="space-y-3">
-            {['J\'ai un projet défini', 'Mon projet est en construction', 'Je n\'ai pas encore de projet'].map(
-              (option) => (
-                <label key={option} className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="projectStatus"
-                    value={option}
-                    checked={formData.projectStatus === option}
-                    onChange={handleInputChange}
-                    className="w-5 h-5 text-orange-500 border-2 border-zinc-300 focus:ring-2 focus:ring-orange-100"
-                  />
-                  <span className="text-zinc-700">{option}</span>
-                </label>
-              )
-            )}
-          </div>
-        </div>
-
-        {formData.projectStatus === 'J\'ai un projet défini' && (
-          <FormField
-            label="Décris ton projet*"
-            name="projectDescription"
-            type="textarea"
-            value={formData.projectDescription}
-            onChange={handleInputChange}
-            placeholder="Partage tes ambitions..."
-            rows={4}
-          />
-        )}
-
-        <div>
-          <label className="block text-sm font-semibold text-zinc-900 mb-4">
-            Domaines d'intérêt*
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {interests.map((interest) => (
-              <label key={interest} className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.interests.includes(interest)}
-                  onChange={() => handleCheckboxChange(interest)}
-                  className="w-5 h-5 text-orange-500 border-2 border-zinc-300 rounded focus:ring-2 focus:ring-orange-100"
-                />
-                <span className="text-zinc-700">{interest}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface Step3Props {
-  formData: FormData;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-  onPreviousStep: () => void;
-}
-
-function Step3({ formData, handleInputChange, onPreviousStep }: Step3Props) {
-  return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-zinc-900 mb-2">Dernières informations</h1>
-        <p className="text-lg text-zinc-600">Et un récapitulatif</p>
-      </div>
-
-      <div className="space-y-8">
-        {/* Question */}
-        <div>
-          <label className="block text-sm font-semibold text-zinc-900 mb-3">
-            Comment as-tu entendu parler de cet événement?*
-          </label>
-          <select
-            name="howYouHeard"
-            value={formData.howYouHeard}
-            onChange={handleInputChange}
-            className="w-full px-4 py-3 border-2 border-zinc-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 transition-colors"
-          >
-            <option value="">Sélectionne une option</option>
-            <option value="WhatsApp">WhatsApp</option>
-            <option value="Instagram">Instagram</option>
-            <option value="Bouche à oreille">Bouche à oreille</option>
-            <option value="Via un référent/professeur">Via un référent/professeur</option>
-            <option value="Autre">Autre</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-zinc-900 mb-3">
-            Commentaire / Question
-          </label>
-          <textarea
-            name="comment"
-            value={formData.comment}
-            onChange={handleInputChange}
-            placeholder="As-tu des questions? Des besoins spécifiques?"
-            rows={4}
-            className="w-full px-4 py-3 border-2 border-zinc-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 transition-colors resize-none"
-          />
-        </div>
-
-        {/* Récapitulatif */}
-        <div className="bg-gradient-to-br from-zinc-50 to-zinc-100 rounded-lg p-6 border border-zinc-200">
-          <h3 className="text-lg font-semibold text-zinc-900 mb-4">Récapitulatif</h3>
-
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-zinc-600">Prénom & Nom</span>
-              <span className="font-medium text-zinc-900">
-                {formData.firstName} {formData.lastName}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-600">Email</span>
-              <span className="font-medium text-zinc-900">{formData.email}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-600">Téléphone</span>
-              <span className="font-medium text-zinc-900">{formData.phone}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-600">Ville</span>
-              <span className="font-medium text-zinc-900">{formData.city}</span>
-            </div>
-
-            <div className="border-t border-zinc-300 pt-3 mt-3" />
-
-            <div className="flex justify-between">
-              <span className="text-zinc-600">Niveau scolaire</span>
-              <span className="font-medium text-zinc-900">{formData.educationLevel}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-600">Projet</span>
-              <span className="font-medium text-zinc-900">{formData.projectStatus}</span>
-            </div>
-            <div className="flex justify-start gap-2 flex-wrap">
-              <span className="text-zinc-600">Intérêts:</span>
-              <div className="flex flex-wrap gap-2">
-                {formData.interests.map((interest) => (
-                  <span key={interest} className="inline-block bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-medium">
-                    {interest}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t border-zinc-300 pt-3 mt-3" />
-
-            <div className="flex justify-between">
-              <span className="text-zinc-600">Source</span>
-              <span className="font-medium text-zinc-900">{formData.howYouHeard}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-900">
-            ✓ En validant, tu confirmes avoir lu et accepté notre politique de confidentialité.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface SuccessScreenProps {
-  firstName: string;
-}
-
-function SuccessScreen({ firstName }: SuccessScreenProps) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12">
-      <div className="text-6xl mb-6">✨</div>
-
-      <h1 className="text-4xl font-bold text-zinc-900 mb-3 text-center">Félicitations {firstName}!</h1>
-
-      <p className="text-xl text-zinc-600 text-center mb-8 max-w-md">
-        Ton inscription au Workshop 100% Féminin a été confirmée.
-      </p>
-
-      <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-8 border border-orange-200 max-w-md text-center mb-8">
-        <div className="text-sm text-zinc-600 mb-2">Tes informations ont été envoyées à</div>
-        <div className="font-semibold text-zinc-900 text-lg">amadou@les-pilotes.fr</div>
-      </div>
-
-      <div className="bg-zinc-50 rounded-lg p-6 border border-zinc-200 max-w-md space-y-4 text-center mb-8">
-        <div className="font-semibold text-zinc-900">Ce qui t'attend:</div>
-        <ul className="space-y-2 text-sm text-zinc-700">
-          <li>📧 Un email de confirmation avec tous les détails</li>
-          <li>📍 La Cité Audacieuse, 18 avril 2026</li>
-          <li>⏰ 9h30 – 12h30</li>
-          <li>👩‍💼 À bientôt pour découvrir tes ambitions!</li>
-        </ul>
-      </div>
-
-      <p className="text-sm text-zinc-500 text-center">
-        Tu recevras bientôt un email de confirmation avec les détails pratiques.
-      </p>
-    </div>
-  );
-}
-
-interface FormFieldProps {
-  label: string;
-  name: string;
-  type: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  placeholder?: string;
-  required?: boolean;
-  rows?: number;
-}
-
-function FormField({
-  label,
-  name,
-  type,
-  value,
-  onChange,
-  placeholder,
-  required = true,
-  rows = 1,
-}: FormFieldProps) {
-  const baseClasses =
-    'w-full px-4 py-3 border-2 border-zinc-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 transition-colors';
-
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-zinc-900 mb-2">
-        {label}
-        {required && <span className="text-orange-500 ml-0.5">*</span>}
-      </label>
-      {type === 'textarea' ? (
-        <textarea
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          rows={rows}
-          className={`${baseClasses} resize-none`}
-        />
-      ) : (
-        <input
-          type={type}
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          className={baseClasses}
-        />
-      )}
     </div>
   );
 }
