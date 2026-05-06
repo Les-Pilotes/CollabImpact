@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, CheckSquare } from "lucide-react";
+import { LayoutDashboard, Users, CheckSquare, BarChart2 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Visibilité", icon: LayoutDashboard },
   { href: "/admin/participantes", label: "Participantes", icon: Users },
   { href: "/admin/taches", label: "Tâches", icon: CheckSquare },
+  { href: "/admin/impact", label: "Impact", icon: BarChart2 },
 ];
 
 export default function NavLinks() {

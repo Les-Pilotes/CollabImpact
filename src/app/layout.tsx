@@ -11,15 +11,15 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: {
-    default: "Immersion — Les Pilotes",
-    template: "%s | Les Pilotes",
+    default: "Workshop 100% Féminin · Les Pilotes",
+    template: "%s · Les Pilotes",
   },
   description:
-    "Découvre des entreprises, explore des métiers, prends le contrôle de ton avenir.",
-  keywords: ["immersion", "métiers", "orientation", "jeunes", "entreprise", "Les Pilotes"],
+    "Workshop 100% Féminin by Les Pilotes — suivi des participantes, groupes et mesure d'impact.",
+  keywords: ["workshop", "100% féminin", "orientation", "jeunes", "Les Pilotes"],
   openGraph: {
-    title: "Immersion — Les Pilotes",
-    description: "Découvre des entreprises, explore des métiers, prends le contrôle de ton avenir.",
+    title: "Workshop 100% Féminin · Les Pilotes",
+    description: "Workshop 100% Féminin by Les Pilotes.",
     locale: "fr_FR",
     type: "website",
   },

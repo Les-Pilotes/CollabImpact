@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getKpis, getTaskProgress, getNextActions } from "@/lib/dashboard";
 import { Badge } from "@/components/ui/badge";
 
-export const metadata = { title: "Visibilité, admin" };
+export const metadata = { title: "Visibilité" };
 
 const SEED_EVENT_ID = "seed-event-cite-audacieuse";
 

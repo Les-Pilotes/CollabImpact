@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus } from "lucide-react";
+import { useState, useCallback } from "react";
+import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, Users, MessageSquare } from "lucide-react";
+import PageHeader from "../PageHeader";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,6 +142,7 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
   const [simOpen, setSimOpen] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState("listing");
 
   const selected = participants.find((p) => p.id === selectedId) ?? null;
 
@@ -245,33 +247,124 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
 
       {/* ── Kanban area ── */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4 border-b border-zinc-100 bg-white flex items-center justify-between gap-3 flex-wrap shrink-0">
-          <div>
-            <h1 className="text-lg font-extrabold text-zinc-900">Suivi des participantes</h1>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              {participants.length} en cours · {archived.length} archivées
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={addDemo}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Simuler inscription
-            </button>
-            <button
-              onClick={reset}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 text-xs font-semibold hover:bg-zinc-200 transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Réinitialiser
-            </button>
-          </div>
-        </div>
+        <PageHeader
+          title="Participantes"
+          subtitle={`${participants.length} en cours · ${archived.length} archivées`}
+          tabs={[
+            { id: "listing", label: "Listing", icon: List, count: initialParticipants.length },
+            { id: "suivi", label: "Suivi", icon: GitBranch, count: participants.length },
+            { id: "workshop", label: "Workshop", icon: Users },
+            { id: "postevent", label: "Post-Event", icon: MessageSquare },
+          ]}
+          activeTab={activeTab}
+          onTabChange={(id) => { setActiveTab(id); setSelectedId(null); }}
+          actions={
+            <>
+              <button
+                onClick={addDemo}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Simuler inscription
+              </button>
+              <button
+                onClick={reset}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 text-xs font-semibold hover:bg-zinc-200 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Réinitialiser
+              </button>
+            </>
+          }
+        />
 
-        {/* Columns */}
+        {/* ── Listing tab ── */}
+        {activeTab === "listing" && (
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-100 bg-zinc-50">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">#</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Participante</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Statut</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Inscrite le</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Dernière action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-50">
+                  {[...initialParticipants]
+                    .sort((a, b) => new Date(a.enrolledAt).getTime() - new Date(b.enrolledAt).getTime())
+                    .map((p, i) => {
+                      const last = p.history.at(-1);
+                      const [labelTitle] = (last?.label ?? "Inscription").split(" · ");
+                      const statusColors: Record<KanbanStatus, string> = {
+                        attente_j7: "bg-zinc-100 text-zinc-600",
+                        attente_j2: "bg-blue-50 text-blue-700",
+                        confirmee: "bg-violet-50 text-violet-700",
+                      };
+                      const statusLabels: Record<KanbanStatus, string> = {
+                        attente_j7: "Confirmation J-7",
+                        attente_j2: "Confirmation J-2",
+                        confirmee: "Attendue Jour J",
+                      };
+                      return (
+                        <tr key={p.id} className="hover:bg-zinc-50 transition-colors">
+                          <td className="px-4 py-3 text-xs text-zinc-400">{i + 1}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${avatarColor(p.id)}`}>
+                                {initials(p)}
+                              </div>
+                              <span className="font-medium text-zinc-900">{p.firstName} {p.lastName}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusColors[p.status]}`}>
+                              {statusLabels[p.status]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-zinc-500">
+                            {new Date(p.enrolledAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-zinc-500">{labelTitle}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Workshop tab ── */}
+        {activeTab === "workshop" && (
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center">
+              <p className="text-3xl mb-3">👥</p>
+              <p className="text-sm font-semibold text-zinc-700">Groupes · Intervenantes · Émargement</p>
+              <p className="text-xs text-zinc-400 mt-1 max-w-xs">
+                Formation des groupes et émargement Jour J. Préparable en amont, finalisé le jour de l'événement.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Post-Event tab ── */}
+        {activeTab === "postevent" && (
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center">
+              <p className="text-3xl mb-3">📋</p>
+              <p className="text-sm font-semibold text-zinc-700">Post-Event · Feedbacks</p>
+              <p className="text-xs text-zinc-400 mt-1">
+                Disponible après le Jour J — les feedbacks apparaîtront ici une fois l'émargement terminé.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Suivi tab (Kanban) ── */}
+        {activeTab === "suivi" && (
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
           <div className="flex gap-4 h-full p-6 min-w-max md:min-w-0">
             {cols.map((col) => (
@@ -330,6 +423,7 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
             ))}
           </div>
         </div>
+        )}
       </div>
 
       {/* ── Side panel — desktop: pushes kanban, mobile: overlay ── */}
