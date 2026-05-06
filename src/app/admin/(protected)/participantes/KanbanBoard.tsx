@@ -150,6 +150,20 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
   }, []);
 
   const selected = participants.find((p) => p.id === selectedId) ?? null;
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+
+  const toggleCheck = useCallback((id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearChecked = () => setCheckedIds(new Set());
+
+  const checkedParticipants = participants.filter((p) => checkedIds.has(p.id));
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -347,33 +361,51 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
                     const [labelTitle, labelDesc] = (last?.label ?? "Inscription").split(" · ");
                     const lastTime = last ? new Date(last.ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
                     const lastDate = last ? new Date(last.ts).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "";
+                    const isChecked = checkedIds.has(p.id);
                     return (
-                      <button
+                      <div
                         key={p.id}
-                        onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
-                        className={`w-full text-left bg-white border rounded-xl p-3 transition-all hover:shadow-sm ${
+                        className={`relative bg-white border rounded-xl p-3 transition-all hover:shadow-sm ${
                           p.id === selectedId
                             ? "border-orange-300 shadow-sm ring-1 ring-orange-200"
+                            : isChecked
+                            ? "border-orange-200 bg-orange-50/40"
                             : "border-zinc-200 hover:border-zinc-300"
                         }`}
                       >
-                        <div className="flex items-start gap-2.5">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${avatarColor(p.id)}`}>
-                            {initials(p)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <p className="text-sm font-semibold text-zinc-900 truncate">
-                                {p.firstName} {p.lastName}
-                                {p.isDemo && <span className="ml-1.5 text-[10px] font-normal text-orange-400">démo</span>}
-                              </p>
-                              <span className="text-[10px] text-zinc-300 shrink-0">{lastDate} {lastTime}</span>
+                        {/* Checkbox */}
+                        <button
+                          onClick={(e) => toggleCheck(p.id, e)}
+                          className={`absolute top-2.5 right-2.5 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                            isChecked ? "bg-orange-500 border-orange-500" : "border-zinc-300 bg-white hover:border-orange-400"
+                          }`}
+                        >
+                          {isChecked && <span className="text-white text-[10px] font-bold leading-none">✓</span>}
+                        </button>
+
+                        {/* Card content */}
+                        <button
+                          className="w-full text-left"
+                          onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
+                        >
+                          <div className="flex items-start gap-2.5 pr-6">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${avatarColor(p.id)}`}>
+                              {initials(p)}
                             </div>
-                            <p className="text-[11px] font-medium text-zinc-500 truncate mt-0.5">{labelTitle}</p>
-                            {labelDesc && <p className="text-[10px] text-zinc-400 truncate">{labelDesc}</p>}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <p className="text-sm font-semibold text-zinc-900 truncate">
+                                  {p.firstName} {p.lastName}
+                                  {p.isDemo && <span className="ml-1.5 text-[10px] font-normal text-orange-400">démo</span>}
+                                </p>
+                                <span className="text-[10px] text-zinc-300 shrink-0">{lastDate}</span>
+                              </div>
+                              <p className="text-[11px] font-medium text-zinc-500 truncate mt-0.5">{labelTitle}</p>
+                              {labelDesc && <p className="text-[10px] text-zinc-400 truncate">{labelDesc}</p>}
+                            </div>
                           </div>
-                        </div>
-                      </button>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -383,6 +415,42 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
         </div>
         )}
       </div>
+
+      {/* ── Barre flottante multi-select ── */}
+      {checkedIds.size > 0 && activeTab === "suivi" && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3 min-w-[320px] max-w-[520px]">
+          <span className="text-sm font-semibold shrink-0">
+            {checkedIds.size} sélectionnée{checkedIds.size > 1 ? "s" : ""}
+          </span>
+          <div className="flex gap-2 flex-1 flex-wrap">
+            {checkedParticipants.some((p) => p.status === "attente_j7") && (
+              <button
+                onClick={() => { showToast(`Email J-7 simulé pour ${checkedIds.size} participante(s)`); clearChecked(); }}
+                className="px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold transition-colors"
+              >
+                ✉️ Envoyer J-7
+              </button>
+            )}
+            {checkedParticipants.some((p) => p.status === "attente_j2") && (
+              <button
+                onClick={() => { showToast(`Email J-2 simulé pour ${checkedIds.size} participante(s)`); clearChecked(); }}
+                className="px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-xs font-semibold transition-colors"
+              >
+                ✉️ Envoyer J-2
+              </button>
+            )}
+            {checkedParticipants.some((p) => p.status === "confirmee") && (
+              <button
+                onClick={() => { showToast(`Confirmation Jour J simulée`); clearChecked(); }}
+                className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition-colors"
+              >
+                ✅ Confirmer Jour J
+              </button>
+            )}
+          </div>
+          <button onClick={clearChecked} className="text-zinc-400 hover:text-white text-lg leading-none shrink-0">✕</button>
+        </div>
+      )}
 
       {/* ── Side panel — desktop: pushes kanban, mobile: overlay ── */}
       {selected && (

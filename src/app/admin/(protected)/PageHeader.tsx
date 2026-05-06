@@ -40,7 +40,7 @@ export default function PageHeader({
       </div>
 
       {tabs && tabs.length > 0 && (
-        <div className="flex">
+        <div className="flex w-full">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -49,7 +49,7 @@ export default function PageHeader({
                 key={tab.id}
                 onClick={() => onTabChange?.(tab.id)}
                 title={tab.label}
-                className={`flex items-center gap-1.5 px-3 md:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 md:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   isActive
                     ? "border-orange-500 text-orange-600"
                     : "border-transparent text-zinc-500 hover:text-zinc-800 hover:border-zinc-300"

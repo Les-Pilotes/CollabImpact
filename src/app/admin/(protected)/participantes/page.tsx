@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import KanbanBoard, { type ParticipantRow } from "./KanbanBoard";
+import { capitalizeName } from "@/lib/normalize";
 
 const EVENT_ID = "seed-event-cite-audacieuse";
 
@@ -81,8 +82,8 @@ export default async function ParticipantesPage() {
 
     return {
       id: e.id,
-      firstName: e.user.firstName,
-      lastName: e.user.lastName,
+      firstName: capitalizeName(e.user.firstName),
+      lastName: capitalizeName(e.user.lastName),
       email: e.user.email,
       phone: e.user.phone ?? null,
       city: e.user.city ?? null,
