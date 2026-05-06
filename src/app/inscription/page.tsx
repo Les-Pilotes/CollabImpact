@@ -574,7 +574,7 @@ function FormField({
     <div>
       <label className="block text-sm font-semibold text-zinc-900 mb-2">
         {label}
-        {required && '*' in label ? '' : ''}
+        {required && <span className="text-orange-500 ml-0.5">*</span>}
       </label>
       {type === 'textarea' ? (
         <textarea
