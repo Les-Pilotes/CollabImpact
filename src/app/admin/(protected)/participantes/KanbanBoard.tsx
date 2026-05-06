@@ -551,7 +551,7 @@ const INTERVENANTES = [
   { id: "gaelle",   name: "Gaëlle",   domain: "Assurance",     color: "bg-orange-50 text-orange-700 border-orange-200" },
 ];
 
-function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarColor, initials }: {
+function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initials }: {
   participants: ParticipantRow[];
   archived: ParticipantRow[];
   emargState: Record<string, string>;
@@ -560,11 +560,12 @@ function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarCo
   initials: (p: ParticipantRow) => string;
 }) {
   const [mode, setMode] = useState<"groupes" | "emargement">("groupes");
+  const [picking, setPicking] = useState<string | null>(null); // participant ID being moved
 
-  // Auto-assign: distribute confirmées evenly across intervenantes
   const eligible = participants.filter((p) =>
     ["confirmee", "attente_j2", "attente_j7"].includes(p.status)
   );
+
   const [groups, setGroups] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     eligible.forEach((p, i) => {
@@ -573,24 +574,34 @@ function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarCo
     return initial;
   });
 
-  const assignGroup = (participantId: string, intervenanteId: string) => {
-    setGroups((prev) => ({ ...prev, [participantId]: intervenanteId }));
+  const handleParticipantTap = (id: string) => {
+    setPicking((prev) => (prev === id ? null : id));
   };
 
-  // Emargement list: confirmées, sorted alphabetically
+  const handleGroupTap = (intervenanteId: string) => {
+    if (!picking) return;
+    setGroups((prev) => ({ ...prev, [picking]: intervenanteId }));
+    setPicking(null);
+  };
+
+  const pickingParticipant = picking ? eligible.find((p) => p.id === picking) : null;
+
   const emargList = [...participants.filter((p) =>
     ["confirmee", "attente_j2"].includes(p.status)
   )].sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName));
+
   const present = Object.values(emargState).filter((v) => v === "present").length;
   const absent = Object.values(emargState).filter((v) => v === "absent").length;
-  const remaining = emargList.filter((p) => emargState[p.id] === "pending" || !emargState[p.id]).length;
+  const remaining = emargList.filter((p) => !emargState[p.id] || emargState[p.id] === "pending").length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden" onClick={(e) => {
+      if ((e.target as HTMLElement).closest("[data-group],[data-participant]") === null) setPicking(null);
+    }}>
       {/* Mode switcher */}
-      <div className="px-6 pt-4 pb-0 flex items-center gap-2 shrink-0">
+      <div className="px-4 md:px-6 pt-4 pb-3 flex items-center gap-2 shrink-0 border-b border-zinc-100">
         <button
-          onClick={() => setMode("groupes")}
+          onClick={() => { setMode("groupes"); setPicking(null); }}
           className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
             mode === "groupes" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
           }`}
@@ -598,7 +609,7 @@ function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarCo
           Groupes
         </button>
         <button
-          onClick={() => setMode("emargement")}
+          onClick={() => { setMode("emargement"); setPicking(null); }}
           className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
             mode === "emargement" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
           }`}
@@ -607,58 +618,76 @@ function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarCo
         </button>
       </div>
 
+      {/* Pick banner */}
+      {picking && pickingParticipant && (
+        <div className="bg-orange-500 text-white px-4 py-2.5 flex items-center justify-between shrink-0">
+          <span className="text-sm font-semibold">
+            Assigner {pickingParticipant.firstName} {pickingParticipant.lastName} → choisis un groupe
+          </span>
+          <button onClick={() => setPicking(null)} className="text-white/70 hover:text-white text-lg leading-none">✕</button>
+        </div>
+      )}
+
       {/* Groupes view */}
       {mode === "groupes" && (
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
           {INTERVENANTES.map((inv) => {
             const members = eligible.filter((p) => groups[p.id] === inv.id);
+            const isTarget = !!picking;
             return (
-              <div key={inv.id} className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-                <div className="px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
+              <div
+                key={inv.id}
+                data-group
+                onClick={() => handleGroupTap(inv.id)}
+                className={`bg-white rounded-xl overflow-hidden transition-all ${
+                  isTarget
+                    ? "border-2 border-orange-400 cursor-pointer shadow-sm"
+                    : "border border-zinc-200"
+                }`}
+              >
+                {/* Group header */}
+                <div className={`px-4 py-3 flex items-center justify-between ${isTarget ? "bg-orange-50" : "border-b border-zinc-100"}`}>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-zinc-900">{inv.name}</span>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${inv.color}`}>
                       {inv.domain}
                     </span>
+                    {isTarget && <span className="text-xs text-orange-500 font-medium">← assigner ici</span>}
                   </div>
                   <span className="text-xs font-semibold text-zinc-400">{members.length}</span>
                 </div>
-                <div className="divide-y divide-zinc-50">
-                  {members.length === 0 && (
-                    <p className="px-4 py-3 text-xs text-zinc-300">Aucune participante assignée</p>
-                  )}
-                  {members.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between px-4 py-2.5 gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
+
+                {/* Members */}
+                {!isTarget && (
+                  <div className="divide-y divide-zinc-50">
+                    {members.length === 0 && (
+                      <p className="px-4 py-2.5 text-xs text-zinc-300">Aucune participante</p>
+                    )}
+                    {members.map((p) => (
+                      <div
+                        key={p.id}
+                        data-participant
+                        onClick={(e) => { e.stopPropagation(); handleParticipantTap(p.id); }}
+                        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
+                          picking === p.id
+                            ? "bg-orange-50 ring-2 ring-inset ring-orange-300"
+                            : "hover:bg-zinc-50"
+                        }`}
+                      >
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${avatarColor(p.id)}`}>
                           {initials(p)}
                         </div>
-                        <span className="text-sm text-zinc-800 truncate">{p.firstName} {p.lastName}</span>
+                        <span className="text-sm text-zinc-800 flex-1 truncate">{p.firstName} {p.lastName}</span>
+                        <span className="text-[10px] text-zinc-400">
+                          {picking === p.id ? "sélectionnée ✓" : "déplacer →"}
+                        </span>
                       </div>
-                      <select
-                        value={groups[p.id] ?? ""}
-                        onChange={(e) => assignGroup(p.id, e.target.value)}
-                        className="text-xs border border-zinc-200 rounded-lg px-2 py-1 text-zinc-600 bg-white shrink-0 max-w-[120px]"
-                      >
-                        {INTERVENANTES.map((i) => (
-                          <option key={i.id} value={i.id}>{i.name} · {i.domain}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
-
-          {eligible.filter((p) => !groups[p.id]).length > 0 && (
-            <div className="bg-zinc-50 border border-dashed border-zinc-300 rounded-xl p-4">
-              <p className="text-xs font-semibold text-zinc-400 mb-2">Non assignées</p>
-              {eligible.filter((p) => !groups[p.id]).map((p) => (
-                <div key={p.id} className="text-sm text-zinc-600 py-1">{p.firstName} {p.lastName}</div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -686,33 +715,33 @@ function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarCo
               return (
                 <div
                   key={p.id}
-                  className={`flex items-center justify-between px-6 py-3 transition-colors ${
+                  className={`flex items-center justify-between px-4 md:px-6 py-3 transition-colors ${
                     st === "present" ? "bg-green-50" : st === "absent" ? "bg-red-50" : ""
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${avatarColor(p.id)}`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(p.id)}`}>
                       {initials(p)}
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-zinc-900">{p.firstName} {p.lastName}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-zinc-900 truncate">{p.firstName} {p.lastName}</p>
                       <p className="text-[10px] text-zinc-400">
                         {INTERVENANTES.find((inv) => inv.id === groups[p.id])?.name ?? "—"} · {INTERVENANTES.find((inv) => inv.id === groups[p.id])?.domain ?? "—"}
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <button
                       disabled={st === "present"}
                       onClick={() => onMarkEmarg(p.id, "present")}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-40 disabled:cursor-default transition-colors"
+                      className="px-3 py-2 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-40 disabled:cursor-default transition-colors min-w-[72px] text-center"
                     >
                       Présente
                     </button>
                     <button
                       disabled={st === "absent"}
                       onClick={() => onMarkEmarg(p.id, "absent")}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-default transition-colors"
+                      className="px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-default transition-colors min-w-[72px] text-center"
                     >
                       Absente
                     </button>
@@ -720,7 +749,6 @@ function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarCo
                 </div>
               );
             })}
-
             {emargList.length === 0 && (
               <div className="px-6 py-12 text-center text-zinc-400 text-sm">
                 Aucune participante confirmée pour le Jour J.
