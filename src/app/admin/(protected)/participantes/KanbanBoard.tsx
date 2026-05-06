@@ -551,6 +551,41 @@ const INTERVENANTES = [
   { id: "gaelle",   name: "Gaëlle",   domain: "Assurance",     color: "bg-orange-50 text-orange-700 border-orange-200" },
 ];
 
+function EmargRow({ p, st, groups, onMarkEmarg, avatarColor, initials }: {
+  p: ParticipantRow; st: string;
+  groups: Record<string, string>;
+  onMarkEmarg: (id: string, st: string) => void;
+  avatarColor: (id: string) => string;
+  initials: (p: ParticipantRow) => string;
+}) {
+  const inv = INTERVENANTES.find((i) => i.id === groups[p.id]);
+  return (
+    <div className={`flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-50 transition-colors ${
+      st === "present" ? "bg-green-50/50" : st === "absent" ? "bg-red-50/50" : ""
+    }`}>
+      <div className="flex items-center gap-3 min-w-0">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(p.id)}`}>
+          {initials(p)}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-zinc-900 truncate">{p.firstName} {p.lastName}</p>
+          <p className="text-[10px] text-zinc-400">{inv ? `${inv.name} · ${inv.domain}` : "—"}</p>
+        </div>
+      </div>
+      <div className="flex gap-2 shrink-0">
+        <button disabled={st === "present"} onClick={() => onMarkEmarg(p.id, "present")}
+          className="px-3 py-2 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-40 disabled:cursor-default transition-colors min-w-[72px] text-center">
+          Présente
+        </button>
+        <button disabled={st === "absent"} onClick={() => onMarkEmarg(p.id, "absent")}
+          className="px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-default transition-colors min-w-[72px] text-center">
+          Absente
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initials }: {
   participants: ParticipantRow[];
   archived: ParticipantRow[];
@@ -630,7 +665,7 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
 
       {/* Groupes view */}
       {mode === "groupes" && (
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-3 content-start auto-rows-min">
           {INTERVENANTES.map((inv) => {
             const members = eligible.filter((p) => groups[p.id] === inv.id);
             const isTarget = !!picking;
@@ -709,52 +744,47 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
             </div>
           </div>
 
-          <div className="divide-y divide-zinc-50">
-            {emargList.map((p) => {
-              const st = emargState[p.id] ?? "pending";
-              return (
-                <div
-                  key={p.id}
-                  className={`flex items-center justify-between px-4 md:px-6 py-3 transition-colors ${
-                    st === "present" ? "bg-green-50" : st === "absent" ? "bg-red-50" : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(p.id)}`}>
-                      {initials(p)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-zinc-900 truncate">{p.firstName} {p.lastName}</p>
-                      <p className="text-[10px] text-zinc-400">
-                        {INTERVENANTES.find((inv) => inv.id === groups[p.id])?.name ?? "—"} · {INTERVENANTES.find((inv) => inv.id === groups[p.id])?.domain ?? "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      disabled={st === "present"}
-                      onClick={() => onMarkEmarg(p.id, "present")}
-                      className="px-3 py-2 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-40 disabled:cursor-default transition-colors min-w-[72px] text-center"
-                    >
-                      Présente
-                    </button>
-                    <button
-                      disabled={st === "absent"}
-                      onClick={() => onMarkEmarg(p.id, "absent")}
-                      className="px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-default transition-colors min-w-[72px] text-center"
-                    >
-                      Absente
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {emargList.length === 0 && (
-              <div className="px-6 py-12 text-center text-zinc-400 text-sm">
-                Aucune participante confirmée pour le Jour J.
+          {emargList.length === 0 && (
+            <div className="px-6 py-12 text-center text-zinc-400 text-sm">
+              Aucune participante confirmée pour le Jour J.
+            </div>
+          )}
+
+          {/* Section : en attente */}
+          {emargList.filter((p) => !emargState[p.id] || emargState[p.id] === "pending").length > 0 && (
+            <>
+              <div className="px-4 md:px-6 py-2 bg-zinc-50 border-y border-zinc-100 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                En attente — {emargList.filter((p) => !emargState[p.id] || emargState[p.id] === "pending").length}
               </div>
-            )}
-          </div>
+              {emargList.filter((p) => !emargState[p.id] || emargState[p.id] === "pending").map((p) => (
+                <EmargRow key={p.id} p={p} st="pending" groups={groups} onMarkEmarg={onMarkEmarg} avatarColor={avatarColor} initials={initials} />
+              ))}
+            </>
+          )}
+
+          {/* Section : présentes */}
+          {emargList.filter((p) => emargState[p.id] === "present").length > 0 && (
+            <>
+              <div className="px-4 md:px-6 py-2 bg-green-50 border-y border-green-100 text-[10px] font-bold uppercase tracking-wider text-green-600">
+                Présentes — {emargList.filter((p) => emargState[p.id] === "present").length}
+              </div>
+              {emargList.filter((p) => emargState[p.id] === "present").map((p) => (
+                <EmargRow key={p.id} p={p} st="present" groups={groups} onMarkEmarg={onMarkEmarg} avatarColor={avatarColor} initials={initials} />
+              ))}
+            </>
+          )}
+
+          {/* Section : absentes */}
+          {emargList.filter((p) => emargState[p.id] === "absent").length > 0 && (
+            <>
+              <div className="px-4 md:px-6 py-2 bg-red-50 border-y border-red-100 text-[10px] font-bold uppercase tracking-wider text-red-500">
+                Absentes — {emargList.filter((p) => emargState[p.id] === "absent").length}
+              </div>
+              {emargList.filter((p) => emargState[p.id] === "absent").map((p) => (
+                <EmargRow key={p.id} p={p} st="absent" groups={groups} onMarkEmarg={onMarkEmarg} avatarColor={avatarColor} initials={initials} />
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
