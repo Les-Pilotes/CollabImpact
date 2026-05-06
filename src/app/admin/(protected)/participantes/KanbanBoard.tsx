@@ -143,6 +143,11 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
   const [toast, setToast] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("listing");
+  const [emargState, setEmargState] = useState<Record<string, string>>({});
+
+  const markEmarg = useCallback((id: string, st: string) => {
+    setEmargState((prev) => ({ ...prev, [id]: st }));
+  }, []);
 
   const selected = participants.find((p) => p.id === selectedId) ?? null;
 
@@ -290,15 +295,14 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
 
         {/* ── Workshop tab ── */}
         {activeTab === "workshop" && (
-          <div className="flex-1 flex items-center justify-center p-6">
-            <div className="text-center">
-              <p className="text-3xl mb-3">👥</p>
-              <p className="text-sm font-semibold text-zinc-700">Groupes · Intervenantes · Émargement</p>
-              <p className="text-xs text-zinc-400 mt-1 max-w-xs">
-                Formation des groupes et émargement Jour J. Préparable en amont, finalisé le jour de l'événement.
-              </p>
-            </div>
-          </div>
+          <WorkshopTab
+            participants={participants}
+            archived={archived}
+            emargState={emargState}
+            onMarkEmarg={markEmarg}
+            avatarColor={avatarColor}
+            initials={initials}
+          />
         )}
 
         {/* ── Post-Event tab ── */}
@@ -536,6 +540,202 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
   );
 }
 
+// ─── Workshop tab component ───────────────────────────────────────────────────
+
+const INTERVENANTES = [
+  { id: "emna",     name: "Emna",     domain: "Informatique", color: "bg-teal-50 text-teal-700 border-teal-200" },
+  { id: "fabienne", name: "Fabienne", domain: "Marketing",    color: "bg-amber-50 text-amber-700 border-amber-200" },
+  { id: "sophie",   name: "Sophie",   domain: "DRH",          color: "bg-blue-50 text-blue-700 border-blue-200" },
+  { id: "imane",    name: "Imane",    domain: "Banque",        color: "bg-violet-50 text-violet-700 border-violet-200" },
+  { id: "sonia",    name: "Sonia",    domain: "Gestion",       color: "bg-zinc-100 text-zinc-600 border-zinc-200" },
+  { id: "gaelle",   name: "Gaëlle",   domain: "Assurance",     color: "bg-orange-50 text-orange-700 border-orange-200" },
+];
+
+function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarColor, initials }: {
+  participants: ParticipantRow[];
+  archived: ParticipantRow[];
+  emargState: Record<string, string>;
+  onMarkEmarg: (id: string, st: string) => void;
+  avatarColor: (id: string) => string;
+  initials: (p: ParticipantRow) => string;
+}) {
+  const [mode, setMode] = useState<"groupes" | "emargement">("groupes");
+
+  // Auto-assign: distribute confirmées evenly across intervenantes
+  const eligible = participants.filter((p) =>
+    ["confirmee", "attente_j2", "attente_j7"].includes(p.status)
+  );
+  const [groups, setGroups] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    eligible.forEach((p, i) => {
+      initial[p.id] = INTERVENANTES[i % INTERVENANTES.length].id;
+    });
+    return initial;
+  });
+
+  const reassign = (participantId: string) => {
+    setGroups((prev) => {
+      const current = prev[participantId] ?? INTERVENANTES[0].id;
+      const idx = INTERVENANTES.findIndex((i) => i.id === current);
+      const next = INTERVENANTES[(idx + 1) % INTERVENANTES.length].id;
+      return { ...prev, [participantId]: next };
+    });
+  };
+
+  // Emargement list: confirmées + walk-ins
+  const emargList = participants.filter((p) =>
+    ["confirmee", "attente_j2"].includes(p.status)
+  );
+  const present = Object.values(emargState).filter((v) => v === "present").length;
+  const absent = Object.values(emargState).filter((v) => v === "absent").length;
+  const remaining = emargList.filter((p) => emargState[p.id] === "pending" || !emargState[p.id]).length;
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Mode switcher */}
+      <div className="px-6 pt-4 pb-0 flex items-center gap-2 shrink-0">
+        <button
+          onClick={() => setMode("groupes")}
+          className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+            mode === "groupes" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+          }`}
+        >
+          Groupes
+        </button>
+        <button
+          onClick={() => setMode("emargement")}
+          className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+            mode === "emargement" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+          }`}
+        >
+          Émargement
+        </button>
+      </div>
+
+      {/* Groupes view */}
+      {mode === "groupes" && (
+        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 content-start">
+          {INTERVENANTES.map((inv) => {
+            const members = eligible.filter((p) => groups[p.id] === inv.id);
+            return (
+              <div key={inv.id} className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+                <div className={`px-4 py-3 border-b border-zinc-100 flex items-center justify-between`}>
+                  <div>
+                    <span className="font-bold text-sm text-zinc-900">{inv.name}</span>
+                    <span className={`ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${inv.color}`}>
+                      {inv.domain}
+                    </span>
+                  </div>
+                  <span className="text-xs text-zinc-400">{members.length}</span>
+                </div>
+                <div className="divide-y divide-zinc-50">
+                  {members.length === 0 && (
+                    <p className="px-4 py-3 text-xs text-zinc-300">Aucune participante assignée</p>
+                  )}
+                  {members.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${avatarColor(p.id)}`}>
+                          {initials(p)}
+                        </div>
+                        <span className="text-sm text-zinc-800">{p.firstName} {p.lastName}</span>
+                      </div>
+                      <button
+                        onClick={() => reassign(p.id)}
+                        className="text-[10px] text-zinc-400 hover:text-zinc-700 px-2 py-0.5 rounded hover:bg-zinc-100 transition-colors"
+                        title="Changer de groupe"
+                      >
+                        ↔
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {eligible.filter((p) => !groups[p.id]).length > 0 && (
+            <div className="bg-zinc-50 border border-dashed border-zinc-300 rounded-xl p-4">
+              <p className="text-xs font-semibold text-zinc-400 mb-2">Non assignées</p>
+              {eligible.filter((p) => !groups[p.id]).map((p) => (
+                <div key={p.id} className="text-sm text-zinc-600 py-1">{p.firstName} {p.lastName}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Émargement view */}
+      {mode === "emargement" && (
+        <div className="flex-1 overflow-y-auto">
+          <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-3 flex items-center gap-6 z-10">
+            <div className="text-center">
+              <div className="text-xl font-bold text-green-600">{present}</div>
+              <div className="text-[10px] text-zinc-400">présentes</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-red-500">{absent}</div>
+              <div className="text-[10px] text-zinc-400">absentes</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-zinc-400">{remaining}</div>
+              <div className="text-[10px] text-zinc-400">à venir</div>
+            </div>
+          </div>
+
+          <div className="divide-y divide-zinc-50">
+            {emargList.map((p) => {
+              const st = emargState[p.id] ?? "pending";
+              return (
+                <div
+                  key={p.id}
+                  className={`flex items-center justify-between px-6 py-3 transition-colors ${
+                    st === "present" ? "bg-green-50" : st === "absent" ? "bg-red-50" : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${avatarColor(p.id)}`}>
+                      {initials(p)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-900">{p.firstName} {p.lastName}</p>
+                      <p className="text-[10px] text-zinc-400">
+                        {INTERVENANTES.find((inv) => inv.id === groups[p.id])?.name ?? "—"} · {INTERVENANTES.find((inv) => inv.id === groups[p.id])?.domain ?? "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={st === "present"}
+                      onClick={() => onMarkEmarg(p.id, "present")}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-40 disabled:cursor-default transition-colors"
+                    >
+                      Présente
+                    </button>
+                    <button
+                      disabled={st === "absent"}
+                      onClick={() => onMarkEmarg(p.id, "absent")}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-default transition-colors"
+                    >
+                      Absente
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {emargList.length === 0 && (
+              <div className="px-6 py-12 text-center text-zinc-400 text-sm">
+                Aucune participante confirmée pour le Jour J.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Listing tab component ────────────────────────────────────────────────────
 
 function archivedStage(p: ParticipantRow): string {
@@ -661,7 +861,7 @@ function ListingTab({ initialParticipants, archived, avatarColor, initials }: {
                   <table className="w-full text-sm">
                     <tbody className="divide-y divide-zinc-50">
                       {items.map((p, i) => (
-                        <ListingRow key={p.id} p={p} i={i} avatarColor={avatarColor} initials={initials} />
+                        <ListingRow key={"arch-" + p.id} p={p} i={i} avatarColor={avatarColor} initials={initials} />
                       ))}
                     </tbody>
                   </table>
