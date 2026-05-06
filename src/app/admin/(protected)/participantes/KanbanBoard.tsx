@@ -573,19 +573,14 @@ function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarCo
     return initial;
   });
 
-  const reassign = (participantId: string) => {
-    setGroups((prev) => {
-      const current = prev[participantId] ?? INTERVENANTES[0].id;
-      const idx = INTERVENANTES.findIndex((i) => i.id === current);
-      const next = INTERVENANTES[(idx + 1) % INTERVENANTES.length].id;
-      return { ...prev, [participantId]: next };
-    });
+  const assignGroup = (participantId: string, intervenanteId: string) => {
+    setGroups((prev) => ({ ...prev, [participantId]: intervenanteId }));
   };
 
-  // Emargement list: confirmées + walk-ins
-  const emargList = participants.filter((p) =>
+  // Emargement list: confirmées, sorted alphabetically
+  const emargList = [...participants.filter((p) =>
     ["confirmee", "attente_j2"].includes(p.status)
-  );
+  )].sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName));
   const present = Object.values(emargState).filter((v) => v === "present").length;
   const absent = Object.values(emargState).filter((v) => v === "absent").length;
   const remaining = emargList.filter((p) => emargState[p.id] === "pending" || !emargState[p.id]).length;
@@ -614,39 +609,41 @@ function WorkshopTab({ participants, archived, emargState, onMarkEmarg, avatarCo
 
       {/* Groupes view */}
       {mode === "groupes" && (
-        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 content-start">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
           {INTERVENANTES.map((inv) => {
             const members = eligible.filter((p) => groups[p.id] === inv.id);
             return (
               <div key={inv.id} className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-                <div className={`px-4 py-3 border-b border-zinc-100 flex items-center justify-between`}>
-                  <div>
+                <div className="px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-zinc-900">{inv.name}</span>
-                    <span className={`ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${inv.color}`}>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${inv.color}`}>
                       {inv.domain}
                     </span>
                   </div>
-                  <span className="text-xs text-zinc-400">{members.length}</span>
+                  <span className="text-xs font-semibold text-zinc-400">{members.length}</span>
                 </div>
                 <div className="divide-y divide-zinc-50">
                   {members.length === 0 && (
                     <p className="px-4 py-3 text-xs text-zinc-300">Aucune participante assignée</p>
                   )}
                   {members.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${avatarColor(p.id)}`}>
+                    <div key={p.id} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${avatarColor(p.id)}`}>
                           {initials(p)}
                         </div>
-                        <span className="text-sm text-zinc-800">{p.firstName} {p.lastName}</span>
+                        <span className="text-sm text-zinc-800 truncate">{p.firstName} {p.lastName}</span>
                       </div>
-                      <button
-                        onClick={() => reassign(p.id)}
-                        className="text-[10px] text-zinc-400 hover:text-zinc-700 px-2 py-0.5 rounded hover:bg-zinc-100 transition-colors"
-                        title="Changer de groupe"
+                      <select
+                        value={groups[p.id] ?? ""}
+                        onChange={(e) => assignGroup(p.id, e.target.value)}
+                        className="text-xs border border-zinc-200 rounded-lg px-2 py-1 text-zinc-600 bg-white shrink-0 max-w-[120px]"
                       >
-                        ↔
-                      </button>
+                        {INTERVENANTES.map((i) => (
+                          <option key={i.id} value={i.id}>{i.name} · {i.domain}</option>
+                        ))}
+                      </select>
                     </div>
                   ))}
                 </div>
