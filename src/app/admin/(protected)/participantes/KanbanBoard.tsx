@@ -961,10 +961,25 @@ function ListingTab({ initialParticipants, archived, avatarColor, initials }: {
   initials: (p: ParticipantRow) => string;
 }) {
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [sortField, setSortField] = useState<"enrolledAt" | "name">("enrolledAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  const sorted = [...initialParticipants].sort(
-    (a, b) => new Date(a.enrolledAt).getTime() - new Date(b.enrolledAt).getTime()
-  );
+  function toggleSort(field: "enrolledAt" | "name") {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  }
+
+  const sorted = [...initialParticipants].sort((a, b) => {
+    const cmp =
+      sortField === "enrolledAt"
+        ? new Date(a.enrolledAt).getTime() - new Date(b.enrolledAt).getTime()
+        : (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName);
+    return sortDir === "asc" ? cmp : -cmp;
+  });
 
   const stageOrder = ["Avant contact", "Confirmation J-7", "Confirmation J-2", "Jour J"];
   const groupedArchived = stageOrder
@@ -975,6 +990,7 @@ function ListingTab({ initialParticipants, archived, avatarColor, initials }: {
     .filter((g) => g.items.length > 0);
 
   const thCls = "text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider";
+  const thSortCls = "text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-zinc-100 transition-colors";
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -984,9 +1000,21 @@ function ListingTab({ initialParticipants, archived, avatarColor, initials }: {
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50">
               <th className={thCls}>#</th>
-              <th className={thCls}>Participante</th>
+              <th
+                className={thSortCls + (sortField === "name" ? " text-zinc-800" : " text-zinc-500")}
+                onClick={() => toggleSort("name")}
+              >
+                Participante{" "}
+                {sortField === "name" ? (sortDir === "asc" ? "↑" : "↓") : <span className="opacity-30">↕</span>}
+              </th>
               <th className={thCls}>Statut</th>
-              <th className={thCls}>Inscrite le</th>
+              <th
+                className={thSortCls + (sortField === "enrolledAt" ? " text-zinc-800" : " text-zinc-500")}
+                onClick={() => toggleSort("enrolledAt")}
+              >
+                Inscrite le{" "}
+                {sortField === "enrolledAt" ? (sortDir === "asc" ? "↑" : "↓") : <span className="opacity-30">↕</span>}
+              </th>
               <th className={thCls}>Dernière action</th>
             </tr>
           </thead>
