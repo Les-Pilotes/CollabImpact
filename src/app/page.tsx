@@ -18,7 +18,7 @@ export default function LandingPage() {
             Je m&apos;inscris au Workshop 100% Féminin
           </Button>
         </Link>
-        <Link href="/admin/login">
+        <Link href="/admin">
           <Button size="lg" variant="outline">
             Espace admin
           </Button>
