@@ -11,10 +11,7 @@ import { prisma } from "./db";
  *   Admin de la DB sans appeler Supabase. Permet de tester sans config Supabase.
  */
 export async function requireAdmin() {
-  if (
-    process.env.NODE_ENV !== "production" &&
-    process.env.DEV_BYPASS_AUTH === "true"
-  ) {
+  if (process.env.DEV_BYPASS_AUTH === "true") {
     const admin = await prisma.admin.findFirst({ include: { organisation: true } });
     if (!admin) {
       throw new Error(
