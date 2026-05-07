@@ -6,10 +6,10 @@ export default function LandingPage() {
     <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-8 text-center">
       <div className="space-y-2">
         <h1 className="text-4xl font-extrabold text-zinc-900">
-          CollabImpact — Les Pilotes
+          Workshop 100% Féminin by Les Pilotes
         </h1>
         <p className="text-lg text-zinc-500">
-          La plateforme des immersions professionnelles
+          Une journée d&apos;immersion professionnelle pour explorer ton avenir
         </p>
       </div>
       <div className="flex flex-col sm:flex-row gap-4 mt-4">
