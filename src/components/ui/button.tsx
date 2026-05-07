@@ -11,7 +11,7 @@ const buttonVariants = cva(
         default:
           "bg-[var(--brand-orange)] text-white shadow hover:brightness-110 active:scale-[0.98]",
         gradient:
-          "bg-gradient-to-r from-[#ffe959] to-[#ff914d] text-zinc-900 font-bold shadow hover:brightness-105 active:scale-[0.98]",
+          "bg-gradient-to-r from-[#ffe959] to-[#ff914d] text-white font-bold shadow hover:brightness-105 active:scale-[0.98]",
         outline:
           "border-2 border-[var(--brand-orange)] text-[var(--brand-orange)] bg-transparent hover:bg-[var(--brand-orange)] hover:text-white active:scale-[0.98]",
         ghost:
