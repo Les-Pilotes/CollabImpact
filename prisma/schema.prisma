@@ -79,10 +79,10 @@ model Organisation {
 
   users       User[]
   admins      Admin[]
-  events           Event[]
-  enrollments      Enrollment[]
-  speakers         Speaker[]
-  partnerCompanies PartnerCompany[]
+  events      Event[]
+  enrollments Enrollment[]
+  speakers    Speaker[]
+  // V3: partnerCompanies PartnerCompany[]
 }
 
 // Administrateur du dashboard (identifié par email Supabase Auth).
@@ -148,7 +148,11 @@ model Event {
 
   enrollments    Enrollment[]
   tasks          Task[]
-  // V3: speakers Speaker[], groups Group[], formConfig FormConfig?, feedbackConfig FeedbackConfig?, partnerCompany PartnerCompany?
+  speakers       Speaker[]
+  groups         Group[]
+  formConfig     FormConfig?
+  feedbackConfig FeedbackConfig?
+  // V3 (requires migration): partnerCompany PartnerCompany?
 
   @@map("immersion")
   @@index([organisationId])
@@ -278,7 +282,7 @@ model Group {
   name        String
   order       Int        @default(0)
 
-  // V3: enrollments Enrollment[]
+  // V3 (requires groupId on Enrollment + migration): enrollments Enrollment[]
 
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -321,24 +325,4 @@ model FeedbackConfig {
   updatedAt DateTime @updatedAt
 }
 
-/// Entreprise partenaire (pour les events de type IMMERSION)
-model PartnerCompany {
-  id             String       @id @default(cuid())
-  organisationId String
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
-
-  name         String
-  logoUrl      String?
-  website      String?
-  contactName  String?
-  contactEmail String?
-  contactPhone String?
-
-  // V3: events Event[]
-
-  deletedAt    DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-
-  @@index([organisationId])
-}
+// V3: model PartnerCompany (requires partnerCompanyId FK on Event + migration)
