@@ -31,7 +31,7 @@ enum EventType {
   IMPULSION
 }
 
-enum EventStatus {
+enum ImmersionStatus {
   brouillon
   publie
   complet
@@ -136,7 +136,7 @@ model Event {
 
   type        EventType    @default(FEMININ)
   name        String
-  status      EventStatus  @default(brouillon)
+  status      ImmersionStatus  @default(brouillon)
   address     String
   date        DateTime
   capacity    Int
@@ -155,6 +155,7 @@ model Event {
   partnerCompanyId  String?
   partnerCompany    PartnerCompany? @relation(fields: [partnerCompanyId], references: [id])
 
+  @@map("immersion")
   @@index([organisationId])
   @@index([date])
   @@index([status])
@@ -167,7 +168,7 @@ model Enrollment {
   organisationId String
   organisation   Organisation     @relation(fields: [organisationId], references: [id])
 
-  eventId String
+  eventId String  @map("immersionId")
   event   Event @relation(fields: [eventId], references: [id])
   userId      String
   user        User      @relation(fields: [userId], references: [id])
