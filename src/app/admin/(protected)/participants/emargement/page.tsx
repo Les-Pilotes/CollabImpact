@@ -6,7 +6,7 @@ import { EmargementList } from './EmargementList';
 
 export const metadata = { title: 'Émargement — Admin' };
 
-const IMMERSION_ID = 'seed-event-cite-audacieuse';
+const EVENT_ID = 'seed-event-cite-audacieuse';
 
 const TERMINAL_STATUSES: EnrollmentStatus[] = [
   EnrollmentStatus.absente,
@@ -16,15 +16,15 @@ const TERMINAL_STATUSES: EnrollmentStatus[] = [
 export default async function EmargementPage() {
   await requireAdmin();
 
-  const immersion = await prisma.immersion.findUnique({
-    where: { id: IMMERSION_ID },
+  const immersion = await prisma.event.findUnique({
+    where: { id: EVENT_ID },
     select: { name: true, date: true },
   });
 
   // Prefer confirmee_j2 enrollments; fallback to all non-terminal
   let enrollments = await prisma.enrollment.findMany({
     where: {
-      immersionId: IMMERSION_ID,
+      eventId: EVENT_ID,
       deletedAt: null,
       status: EnrollmentStatus.confirmee_j2,
     },
@@ -36,7 +36,7 @@ export default async function EmargementPage() {
   if (enrollments.length === 0) {
     enrollments = await prisma.enrollment.findMany({
       where: {
-        immersionId: IMMERSION_ID,
+        eventId: EVENT_ID,
         deletedAt: null,
         status: { notIn: TERMINAL_STATUSES },
       },

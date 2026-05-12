@@ -31,7 +31,7 @@ enum EventType {
   IMPULSION
 }
 
-enum ImmersionStatus {
+enum EventStatus {
   brouillon
   publie
   complet
@@ -61,6 +61,12 @@ enum TaskPhase {
   POST_EVENT
 }
 
+enum SpeakerStatus {
+  invitee
+  brief_envoye
+  confirmee
+}
+
 // =====================
 // Entities
 // =====================
@@ -73,8 +79,10 @@ model Organisation {
 
   users       User[]
   admins      Admin[]
-  immersions  Immersion[]
-  enrollments Enrollment[]
+  events           Event[]
+  enrollments      Enrollment[]
+  speakers         Speaker[]
+  partnerCompanies PartnerCompany[]
 }
 
 // Administrateur du dashboard (identifié par email Supabase Auth).
@@ -120,15 +128,15 @@ model User {
   @@index([email])
 }
 
-// Un évent (workshop, immersion…) — aliasé "Immersion" pour compatibilité v1.
-model Immersion {
+// Un évent (workshop, immersion…).
+model Event {
   id             String          @id @default(cuid())
   organisationId String
   organisation   Organisation    @relation(fields: [organisationId], references: [id])
 
-  type        EventType       @default(FEMININ)
+  type        EventType    @default(FEMININ)
   name        String
-  status      ImmersionStatus @default(brouillon)
+  status      EventStatus  @default(brouillon)
   address     String
   date        DateTime
   capacity    Int
@@ -138,12 +146,19 @@ model Immersion {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  enrollments Enrollment[]
-  tasks       Task[]
+  enrollments       Enrollment[]
+  tasks             Task[]
+  speakers          Speaker[]
+  groups            Group[]
+  formConfig        FormConfig?
+  feedbackConfig    FeedbackConfig?
+  partnerCompanyId  String?
+  partnerCompany    PartnerCompany? @relation(fields: [partnerCompanyId], references: [id])
 
   @@index([organisationId])
   @@index([date])
   @@index([status])
+  @@index([partnerCompanyId])
 }
 
 // Inscription d'une participante à un évent.
@@ -152,8 +167,8 @@ model Enrollment {
   organisationId String
   organisation   Organisation     @relation(fields: [organisationId], references: [id])
 
-  immersionId String
-  immersion   Immersion @relation(fields: [immersionId], references: [id])
+  eventId String
+  event   Event @relation(fields: [eventId], references: [id])
   userId      String
   user        User      @relation(fields: [userId], references: [id])
 
@@ -176,11 +191,15 @@ model Enrollment {
 
   feedback Feedback?
 
-  @@unique([immersionId, userId])
+  groupId    String?
+  group      Group?   @relation(fields: [groupId], references: [id])
+
+  @@unique([eventId, userId])
   @@index([organisationId])
-  @@index([immersionId])
+  @@index([eventId])
   @@index([userId])
   @@index([status])
+  @@index([groupId])
 }
 
 // Réponse feedback post-évent.
@@ -205,7 +224,7 @@ model Feedback {
 model Task {
   id      String    @id @default(cuid())
   eventId String
-  event   Immersion @relation(fields: [eventId], references: [id])
+  event   Event @relation(fields: [eventId], references: [id])
 
   phase       TaskPhase
   title       String
@@ -217,4 +236,117 @@ model Task {
   createdAt   DateTime  @default(now())
 
   @@index([eventId, phase])
+}
+
+/// Intervenante — professionnelle invitée à un workshop
+model Speaker {
+  id             String        @id @default(cuid())
+  organisationId String
+  organisation   Organisation  @relation(fields: [organisationId], references: [id])
+
+  firstName      String
+  lastName       String
+  jobTitle       String?
+  company        String?
+  domain         String?       // ex: "Informatique", "Marketing"
+  bio            String?
+  photoUrl       String?
+
+  status         SpeakerStatus @default(invitee)
+
+  profileToken   String        @unique @default(cuid())
+  feedbackToken  String        @unique @default(cuid())
+
+  profileSubmittedAt  DateTime?
+  feedbackSubmittedAt DateTime?
+
+  eventId        String
+  event          Event         @relation(fields: [eventId], references: [id])
+
+  group          Group?
+
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([organisationId])
+  @@index([eventId])
+  @@index([status])
+}
+
+/// Groupe workshop — une intervenante + N participantes
+model Group {
+  id          String     @id @default(cuid())
+  eventId     String
+  event       Event      @relation(fields: [eventId], references: [id])
+
+  speakerId   String?    @unique
+  speaker     Speaker?   @relation(fields: [speakerId], references: [id])
+
+  name        String
+  order       Int        @default(0)
+
+  enrollments Enrollment[]
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([eventId])
+}
+
+/// Configuration du formulaire d'inscription d'un event
+model FormConfig {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  event       Event     @relation(fields: [eventId], references: [id])
+
+  phoneEnabled     Boolean @default(true)
+  birthDateEnabled Boolean @default(true)
+  cityEnabled      Boolean @default(true)
+  sourceEnabled    Boolean @default(true)
+
+  // Format: [{ "id": "cuid", "label": "...", "type": "text|select", "required": bool, "options": [...] }]
+  customFields     Json    @default("[]")
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+/// Configuration du formulaire de feedback post-event
+model FeedbackConfig {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  event       Event     @relation(fields: [eventId], references: [id])
+
+  satisfactionEnabled    Boolean @default(true)
+  highlightsEnabled      Boolean @default(true)
+  favoriteSpeakerEnabled Boolean @default(true)
+  recommendEnabled       Boolean @default(true)
+
+  customFields Json @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Entreprise partenaire (pour les events de type IMMERSION)
+model PartnerCompany {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+
+  name         String
+  logoUrl      String?
+  website      String?
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+
+  events       Event[]
+
+  deletedAt    DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([organisationId])
 }

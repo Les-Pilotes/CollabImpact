@@ -5,15 +5,15 @@ import { AppelView } from './AppelView';
 
 export const metadata = { title: 'Mode appel, admin' };
 
-const IMMERSION_ID = 'seed-event-cite-audacieuse';
+const EVENT_ID = 'seed-event-cite-audacieuse';
 
 export default async function AppelsPage() {
   await requireAdmin();
 
   // Priority 1: inscrit, ordered by enrolledAt asc
   const p1 = await prisma.enrollment.findFirst({
-    where: { immersionId: IMMERSION_ID, deletedAt: null, status: 'inscrit' },
-    include: { user: true, immersion: true },
+    where: { eventId: EVENT_ID, deletedAt: null, status: 'inscrit' },
+    include: { user: true, event: true },
     orderBy: { enrolledAt: 'asc' },
   });
 
@@ -22,12 +22,12 @@ export default async function AppelsPage() {
     ? null
     : await prisma.enrollment.findFirst({
         where: {
-          immersionId: IMMERSION_ID,
+          eventId: EVENT_ID,
           deletedAt: null,
           status: 'contactee',
           j7SentAt: null,
         },
-        include: { user: true, immersion: true },
+        include: { user: true, event: true },
         orderBy: { enrolledAt: 'asc' },
       });
 
@@ -37,12 +37,12 @@ export default async function AppelsPage() {
       ? null
       : await prisma.enrollment.findFirst({
           where: {
-            immersionId: IMMERSION_ID,
+            eventId: EVENT_ID,
             deletedAt: null,
             status: 'contactee',
             j7SentAt: { not: null },
           },
-          include: { user: true, immersion: true },
+          include: { user: true, event: true },
           orderBy: { j7SentAt: 'asc' },
         });
 
@@ -52,12 +52,12 @@ export default async function AppelsPage() {
       ? null
       : await prisma.enrollment.findFirst({
           where: {
-            immersionId: IMMERSION_ID,
+            eventId: EVENT_ID,
             deletedAt: null,
             status: 'confirmee_j7',
             j2SentAt: null,
           },
-          include: { user: true, immersion: true },
+          include: { user: true, event: true },
           orderBy: { enrolledAt: 'asc' },
         });
 
@@ -66,11 +66,11 @@ export default async function AppelsPage() {
   // Count totals across all 4 buckets
   const [c1, c2, c3, c4] = await Promise.all([
     prisma.enrollment.count({
-      where: { immersionId: IMMERSION_ID, deletedAt: null, status: 'inscrit' },
+      where: { eventId: EVENT_ID, deletedAt: null, status: 'inscrit' },
     }),
     prisma.enrollment.count({
       where: {
-        immersionId: IMMERSION_ID,
+        eventId: EVENT_ID,
         deletedAt: null,
         status: 'contactee',
         j7SentAt: null,
@@ -78,7 +78,7 @@ export default async function AppelsPage() {
     }),
     prisma.enrollment.count({
       where: {
-        immersionId: IMMERSION_ID,
+        eventId: EVENT_ID,
         deletedAt: null,
         status: 'contactee',
         j7SentAt: { not: null },
@@ -86,7 +86,7 @@ export default async function AppelsPage() {
     }),
     prisma.enrollment.count({
       where: {
-        immersionId: IMMERSION_ID,
+        eventId: EVENT_ID,
         deletedAt: null,
         status: 'confirmee_j7',
         j2SentAt: null,
@@ -128,7 +128,7 @@ export default async function AppelsPage() {
         city={next.user.city ?? null}
         enrolledAt={next.enrolledAt.toISOString()}
         totalInQueue={totalInQueue}
-        immersionName={next.immersion.name}
+        immersionName={next.event.name}
       />
     </div>
   );

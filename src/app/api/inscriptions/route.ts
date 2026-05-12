@@ -6,7 +6,7 @@ import InscriptionConfirmation from "@/lib/email/templates/InscriptionConfirmati
 import React from "react";
 
 const ORG_ID = "seed-org-lespilotes";
-const IMMERSION_ID = "seed-event-cite-audacieuse";
+const EVENT_ID = "seed-event-cite-audacieuse";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -51,14 +51,14 @@ export async function POST(request: Request) {
 
     const enrollment = await prisma.enrollment.upsert({
       where: {
-        immersionId_userId: {
-          immersionId: IMMERSION_ID,
+        eventId_userId: {
+          eventId: EVENT_ID,
           userId: user.id,
         },
       },
       create: {
         organisationId: ORG_ID,
-        immersionId: IMMERSION_ID,
+        eventId: EVENT_ID,
         userId: user.id,
         source: input.source,
       },

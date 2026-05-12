@@ -4,13 +4,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LayoutDashboard, Users, CheckSquare, BarChart2, ClipboardList, Terminal, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Users, CheckSquare, BarChart2, ClipboardList, Terminal, ChevronLeft, ChevronRight } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
 const NAV = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/events", label: "Evenements", icon: Calendar },
   { href: "/admin/participantes", label: "Participantes", icon: Users },
-  { href: "/admin/taches", label: "Tâches", icon: CheckSquare },
+  { href: "/admin/taches", label: "Taches", icon: CheckSquare },
   { href: "/admin/impact", label: "Impact", icon: BarChart2 },
   { href: "/inscription", label: "Formulaire", icon: ClipboardList },
 ];
@@ -53,8 +53,7 @@ export default function Sidebar({ adminName, adminEmail, devMode }: Props) {
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-0.5">
         {NAV.map(({ href, label, icon: Icon }) => {
-          const isActive =
-            href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+          const isActive = pathname.startsWith(href);
 
           return (
             <Link

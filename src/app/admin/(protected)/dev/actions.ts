@@ -36,7 +36,7 @@ export async function seedParticipants(count: number = 20): Promise<{ ok: boolea
 
     const enrollmentData: {
       organisationId: string
-      immersionId: string
+      eventId: string
       userId: string
       status: typeof status
       attendedAt?: Date
@@ -45,7 +45,7 @@ export async function seedParticipants(count: number = 20): Promise<{ ok: boolea
       feedbackSentAt?: Date
     } = {
       organisationId: ORG_ID,
-      immersionId: EVENT_ID,
+      eventId: EVENT_ID,
       userId: user.id,
       status,
     }
@@ -59,7 +59,7 @@ export async function seedParticipants(count: number = 20): Promise<{ ok: boolea
     }
 
     const enrollment = await prisma.enrollment.upsert({
-      where: { immersionId_userId: { immersionId: EVENT_ID, userId: user.id } },
+      where: { eventId_userId: { eventId: EVENT_ID, userId: user.id } },
       create: enrollmentData,
       update: {},
     })
@@ -129,7 +129,7 @@ export async function timeTravel(target: 'j7' | 'j2' | 'jour_j' | 'j_plus_1'): P
       break
   }
 
-  await prisma.immersion.update({
+  await prisma.event.update({
     where: { id: EVENT_ID },
     data: { date: newDate },
   })
@@ -145,7 +145,7 @@ export async function markRandomAttendance(
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
-      immersionId: EVENT_ID,
+      eventId: EVENT_ID,
       status: 'confirmee_j2',
     },
     take: presentCount + absentCount,
@@ -187,7 +187,7 @@ export async function submitFakesFeedbacks(count: number = 8): Promise<{ ok: boo
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
-      immersionId: EVENT_ID,
+      eventId: EVENT_ID,
       status: 'presente',
     },
     take: count,
@@ -236,10 +236,10 @@ export async function resetDevData(): Promise<{ ok: boolean }> {
 
   await prisma.$transaction([
     prisma.feedback.deleteMany({
-      where: { enrollment: { immersionId: EVENT_ID } },
+      where: { enrollment: { eventId: EVENT_ID } },
     }),
     prisma.enrollment.deleteMany({
-      where: { immersionId: EVENT_ID },
+      where: { eventId: EVENT_ID },
     }),
     prisma.user.deleteMany({
       where: {
@@ -284,10 +284,10 @@ export async function seedOneInscrite(): Promise<{ ok: boolean; name: string }> 
   })
 
   await prisma.enrollment.upsert({
-    where: { immersionId_userId: { immersionId: EVENT_ID, userId: user.id } },
+    where: { eventId_userId: { eventId: EVENT_ID, userId: user.id } },
     create: {
       organisationId: ORG_ID,
-      immersionId: EVENT_ID,
+      eventId: EVENT_ID,
       userId: user.id,
       status: 'inscrit',
     },
@@ -315,7 +315,7 @@ export async function seedOneMarie(): Promise<{ ok: boolean; status: string }> {
   })
 
   const existing = await prisma.enrollment.findUnique({
-    where: { immersionId_userId: { immersionId: EVENT_ID, userId: user.id } },
+    where: { eventId_userId: { eventId: EVENT_ID, userId: user.id } },
   })
 
   if (existing) {
@@ -325,7 +325,7 @@ export async function seedOneMarie(): Promise<{ ok: boolean; status: string }> {
   await prisma.enrollment.create({
     data: {
       organisationId: ORG_ID,
-      immersionId: EVENT_ID,
+      eventId: EVENT_ID,
       userId: user.id,
       status: 'inscrit',
     },
@@ -343,7 +343,7 @@ export async function advanceMarie(): Promise<{ ok: boolean; from: string; to: s
   }
 
   const enrollment = await prisma.enrollment.findUnique({
-    where: { immersionId_userId: { immersionId: EVENT_ID, userId: marie.id } },
+    where: { eventId_userId: { eventId: EVENT_ID, userId: marie.id } },
   })
 
   if (!enrollment) {
@@ -412,7 +412,7 @@ export async function resetMarie(): Promise<{ ok: boolean }> {
   if (!marie) return { ok: true }
 
   const enrollment = await prisma.enrollment.findUnique({
-    where: { immersionId_userId: { immersionId: EVENT_ID, userId: marie.id } },
+    where: { eventId_userId: { eventId: EVENT_ID, userId: marie.id } },
   })
   if (!enrollment) return { ok: true }
 

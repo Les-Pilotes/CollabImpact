@@ -13,20 +13,20 @@ export async function GET(request: NextRequest) {
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
-      immersionId: EVENT_ID,
+      eventId: EVENT_ID,
       status: { in: ["inscrit", "contactee"] },
       j7SentAt: null,
       deletedAt: null,
     },
     include: {
       user: true,
-      immersion: true,
+      event: true,
     },
   });
 
   let sent = 0;
   for (const enrollment of enrollments) {
-    const dateLabel = enrollment.immersion.date.toLocaleDateString("fr-FR", {
+    const dateLabel = enrollment.event.date.toLocaleDateString("fr-FR", {
       weekday: "long",
       day: "numeric",
       month: "long",
@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
       subject: `Confirme ta venue — J-7`,
       react: React.createElement(J7Reminder, {
         firstName: enrollment.user.firstName,
-        immersionName: enrollment.immersion.name,
-        companyName: enrollment.immersion.address,
+        immersionName: enrollment.event.name,
+        companyName: enrollment.event.address,
         dateLabel,
         confirmUrl: `${process.env.APP_URL ?? "http://localhost:3000"}/inscription/confirm`,
       }),

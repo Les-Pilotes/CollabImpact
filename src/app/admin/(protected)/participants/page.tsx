@@ -7,7 +7,7 @@ import { InlineActions } from './InlineActions';
 
 export const metadata = { title: 'Participantes, admin' };
 
-const IMMERSION_ID = 'seed-event-cite-audacieuse';
+const EVENT_ID = 'seed-event-cite-audacieuse';
 
 type Group = {
   key: string;
@@ -81,7 +81,7 @@ export default async function ParticipantsPage({
   const activeGroup = GROUPS.find((g) => g.key === groupFilter);
 
   const allEnrollments = await prisma.enrollment.findMany({
-    where: { immersionId: IMMERSION_ID, deletedAt: null },
+    where: { eventId: EVENT_ID, deletedAt: null },
     select: { status: true },
   });
 
@@ -94,17 +94,17 @@ export default async function ParticipantsPage({
     return g.statuses.reduce((sum, s) => sum + (countByStatus[s] ?? 0), 0);
   }
 
-  const immersion = await prisma.immersion.findUnique({
-    where: { id: IMMERSION_ID },
+  const eventRecord = await prisma.event.findUnique({
+    where: { id: EVENT_ID },
     select: { date: true },
   });
-  const eventDate = immersion ? new Date(immersion.date) : new Date(0);
+  const eventDate = eventRecord ? new Date(eventRecord.date) : new Date(0);
   const diffDays = Math.abs(Date.now() - eventDate.getTime()) / 86_400_000;
   const isEventDay = diffDays <= 1.5;
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
-      immersionId: IMMERSION_ID,
+      eventId: EVENT_ID,
       deletedAt: null,
       ...(activeGroup ? { status: { in: activeGroup.statuses } } : {}),
     },

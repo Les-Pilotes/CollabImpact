@@ -14,14 +14,14 @@ export async function GET(request: NextRequest) {
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
-      immersionId: EVENT_ID,
+      eventId: EVENT_ID,
       status: "presente",
       OR: [{ feedbackToken: null }, { feedbackSentAt: null }],
       deletedAt: null,
     },
     include: {
       user: true,
-      immersion: true,
+      event: true,
     },
   });
 
@@ -37,10 +37,10 @@ export async function GET(request: NextRequest) {
 
     await sendEmail({
       to: enrollment.user.email,
-      subject: `Ton avis sur ${enrollment.immersion.name}`,
+      subject: `Ton avis sur ${enrollment.event.name}`,
       react: React.createElement(FeedbackInvite, {
         firstName: enrollment.user.firstName,
-        immersionName: enrollment.immersion.name,
+        immersionName: enrollment.event.name,
         feedbackUrl,
       }),
     });

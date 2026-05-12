@@ -25,7 +25,7 @@ export default async function ParticipantesPage() {
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
-      immersionId: EVENT_ID,
+      eventId: EVENT_ID,
       deletedAt: null,
       status: { notIn: ["desistement", "absente", "presente", "feedback_recu"] },
     },

@@ -42,7 +42,7 @@ export default async function ParticipantDetailPage({
     where: { id: enrollmentId },
     include: {
       user: true,
-      immersion: true,
+      event: true,
       feedback: true,
     },
   });
@@ -51,10 +51,10 @@ export default async function ParticipantDetailPage({
     notFound();
   }
 
-  const { user, immersion, feedback } = enrollment;
+  const { user, event, feedback } = enrollment;
 
   // Check if event is today ± 1 day
-  const eventDate = new Date(immersion.date);
+  const eventDate = new Date(event.date);
   const now = new Date();
   const diffMs = Math.abs(now.getTime() - eventDate.getTime());
   const diffDays = diffMs / (1000 * 60 * 60 * 24);

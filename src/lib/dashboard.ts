@@ -47,7 +47,7 @@ const ZEROED_KPI: KpiData = {
 // =====================
 
 export async function getKpis(eventId: string): Promise<KpiData> {
-  const event = await prisma.immersion.findUnique({
+  const event = await prisma.event.findUnique({
     where: { id: eventId },
     include: {
       enrollments: {
@@ -111,7 +111,7 @@ export async function getNextActions(eventId: string): Promise<NextAction[]> {
   const actions: NextAction[] = [];
 
   const [event, tasks] = await Promise.all([
-    prisma.immersion.findUnique({
+    prisma.event.findUnique({
       where: { id: eventId },
       include: {
         enrollments: {

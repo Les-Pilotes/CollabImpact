@@ -28,7 +28,7 @@ export default async function FeedbackPage({
     where: { id: verification.enrollmentId },
     include: {
       user: true,
-      immersion: true,
+      event: true,
       feedback: true,
     },
   });
@@ -64,7 +64,7 @@ export default async function FeedbackPage({
         <FeedbackForm
           token={token}
           firstName={enrollment.user.firstName}
-          immersionName={enrollment.immersion.name}
+          immersionName={enrollment.event.name}
         />
       </div>
     </main>

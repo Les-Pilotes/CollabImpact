@@ -78,7 +78,7 @@ export async function sendManualReminder(
   try {
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { user: true, immersion: true },
+      include: { user: true, event: true },
     });
 
     if (!enrollment) {
@@ -87,7 +87,7 @@ export async function sendManualReminder(
 
     const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
     const confirmUrl = `${appUrl}/confirm/${enrollmentId}`;
-    const dateLabel = enrollment.immersion.date.toLocaleDateString('fr-FR', {
+    const dateLabel = enrollment.event.date.toLocaleDateString('fr-FR', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
@@ -96,11 +96,11 @@ export async function sendManualReminder(
 
     await sendEmail({
       to: enrollment.user.email,
-      subject: `Rappel J-7 — ${enrollment.immersion.name}`,
+      subject: `Rappel J-7 — ${enrollment.event.name}`,
       react: React.createElement(J7Reminder, {
         firstName: enrollment.user.firstName,
-        immersionName: enrollment.immersion.name,
-        companyName: enrollment.immersion.name,
+        immersionName: enrollment.event.name,
+        companyName: enrollment.event.name,
         dateLabel,
         confirmUrl,
       }),
@@ -156,7 +156,7 @@ export async function sendJ2Reminder(
   try {
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { user: true, immersion: true },
+      include: { user: true, event: true },
     });
 
     if (!enrollment) {
@@ -165,7 +165,7 @@ export async function sendJ2Reminder(
 
     const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
     const confirmUrl = `${appUrl}/confirm/${enrollmentId}`;
-    const dateLabel = enrollment.immersion.date.toLocaleDateString('fr-FR', {
+    const dateLabel = enrollment.event.date.toLocaleDateString('fr-FR', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
@@ -174,12 +174,12 @@ export async function sendJ2Reminder(
 
     await sendEmail({
       to: enrollment.user.email,
-      subject: `Rappel J-2 — ${enrollment.immersion.name}`,
+      subject: `Rappel J-2 — ${enrollment.event.name}`,
       react: React.createElement(J2Reminder, {
         firstName: enrollment.user.firstName,
-        immersionName: enrollment.immersion.name,
+        immersionName: enrollment.event.name,
         dateLabel,
-        address: enrollment.immersion.address,
+        address: enrollment.event.address,
         confirmUrl,
       }),
     });
@@ -237,7 +237,7 @@ export async function sendFeedbackInvite(
   try {
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { user: true, immersion: true },
+      include: { user: true, event: true },
     });
 
     if (!enrollment) {
@@ -258,10 +258,10 @@ export async function sendFeedbackInvite(
 
     await sendEmail({
       to: enrollment.user.email,
-      subject: `Ton avis sur ${enrollment.immersion.name}`,
+      subject: `Ton avis sur ${enrollment.event.name}`,
       react: React.createElement(FeedbackInvite, {
         firstName: enrollment.user.firstName,
-        immersionName: enrollment.immersion.name,
+        immersionName: enrollment.event.name,
         feedbackUrl,
       }),
     });
