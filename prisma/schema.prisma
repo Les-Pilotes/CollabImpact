@@ -146,20 +146,14 @@ model Event {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  enrollments       Enrollment[]
-  tasks             Task[]
-  speakers          Speaker[]
-  groups            Group[]
-  formConfig        FormConfig?
-  feedbackConfig    FeedbackConfig?
-  partnerCompanyId  String?
-  partnerCompany    PartnerCompany? @relation(fields: [partnerCompanyId], references: [id])
+  enrollments    Enrollment[]
+  tasks          Task[]
+  // V3: speakers Speaker[], groups Group[], formConfig FormConfig?, feedbackConfig FeedbackConfig?, partnerCompany PartnerCompany?
 
   @@map("immersion")
   @@index([organisationId])
   @@index([date])
   @@index([status])
-  @@index([partnerCompanyId])
 }
 
 // Inscription d'une participante à un évent.
@@ -191,16 +185,13 @@ model Enrollment {
   updatedAt  DateTime  @updatedAt
 
   feedback Feedback?
-
-  groupId    String?
-  group      Group?   @relation(fields: [groupId], references: [id])
+  // V3: groupId String?, group Group?
 
   @@unique([eventId, userId])
   @@index([organisationId])
   @@index([eventId])
   @@index([userId])
   @@index([status])
-  @@index([groupId])
 }
 
 // Réponse feedback post-évent.
@@ -287,7 +278,7 @@ model Group {
   name        String
   order       Int        @default(0)
 
-  enrollments Enrollment[]
+  // V3: enrollments Enrollment[]
 
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -343,7 +334,7 @@ model PartnerCompany {
   contactEmail String?
   contactPhone String?
 
-  events       Event[]
+  // V3: events Event[]
 
   deletedAt    DateTime?
   createdAt    DateTime     @default(now())
