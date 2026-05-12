@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  const immersions = await prisma.immersion.findMany();
+  const immersions = await prisma.event.findMany();
   const users = await prisma.user.findMany();
   console.log();
   console.log();
