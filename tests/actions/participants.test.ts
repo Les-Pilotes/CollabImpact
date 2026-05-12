@@ -96,7 +96,7 @@ describe('participants server actions', () => {
         firstName: 'Marie',
         lastName: 'Dupont',
       },
-      immersion: {
+      event: {
         id: 'seed-event-cite-audacieuse',
         name: 'Cité Audacieuse',
         date: new Date('2026-05-10'),

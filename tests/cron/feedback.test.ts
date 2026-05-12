@@ -38,7 +38,7 @@ const mockCreateToken = vi.mocked(createFeedbackToken);
 const makeEnrollment = (id: string) => ({
   id,
   userId: "user-1",
-  immersionId: "seed-event-cite-audacieuse",
+  eventId: "seed-event-cite-audacieuse",
   organisationId: "seed-org-lespilotes",
   status: "presente" as const,
   mode: "individuel" as const,
@@ -70,7 +70,7 @@ const makeEnrollment = (id: string) => ({
     createdAt: new Date(),
     updatedAt: new Date(),
   },
-  immersion: {
+  event: {
     id: "seed-event-cite-audacieuse",
     organisationId: "seed-org-lespilotes",
     type: "FEMININ" as const,

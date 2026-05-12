@@ -56,7 +56,7 @@ beforeEach(() => {
   enrollmentUpsert.mockResolvedValue({
     id: "enroll-1",
     userId: "user-1",
-    immersionId: "seed-event-cite-audacieuse",
+    eventId: "seed-event-cite-audacieuse",
     organisationId: "seed-org-lespilotes",
     status: "inscrit" as const,
     mode: "individuel" as const,

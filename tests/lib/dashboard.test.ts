@@ -4,7 +4,7 @@ import type { KpiData, TaskProgress, NextAction } from "@/lib/dashboard";
 // Mock prisma before importing dashboard
 vi.mock("@/lib/db", () => ({
   prisma: {
-    immersion: {
+    event: {
       findUnique: vi.fn(),
     },
     task: {
@@ -64,7 +64,7 @@ describe("getKpis", () => {
       makeEnrollment("e8", "desistement"),
     ];
 
-    mockPrisma.immersion.findUnique.mockResolvedValue({
+    mockPrisma.event.findUnique.mockResolvedValue({
       ...baseEvent,
       enrollments,
     });
@@ -81,7 +81,7 @@ describe("getKpis", () => {
   });
 
   it("returns zeroed KpiData when event does not exist", async () => {
-    mockPrisma.immersion.findUnique.mockResolvedValue(null);
+    mockPrisma.event.findUnique.mockResolvedValue(null);
 
     const kpis: KpiData = await getKpis("nonexistent-event");
 
@@ -136,7 +136,7 @@ describe("getNextActions", () => {
 
   it("returns urgency:high action when feedbacks are pending after event", async () => {
     // Event is in the past — attended but no feedback
-    mockPrisma.immersion.findUnique.mockResolvedValue({
+    mockPrisma.event.findUnique.mockResolvedValue({
       ...baseEvent,
       date: new Date("2026-04-30T09:00:00Z"), // 4 days ago
       enrollments: [
@@ -162,7 +162,7 @@ describe("getNextActions", () => {
       { id: "t2", phase: "WORKSHOP", dueAt: new Date("2026-05-02"), doneAt: null },
     ]);
 
-    mockPrisma.immersion.findUnique.mockResolvedValue({
+    mockPrisma.event.findUnique.mockResolvedValue({
       ...baseEvent,
       enrollments: [],
     });
@@ -177,7 +177,7 @@ describe("getNextActions", () => {
 
   it("returns empty array when everything is done", async () => {
     // Event in the future (> 9 days), no attendees, no overdue tasks
-    mockPrisma.immersion.findUnique.mockResolvedValue({
+    mockPrisma.event.findUnique.mockResolvedValue({
       ...baseEvent,
       date: new Date("2026-06-01T09:00:00Z"), // 28 days away
       enrollments: [
