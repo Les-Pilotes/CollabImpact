@@ -40,7 +40,7 @@ async function main() {
     update: {},
   });
 
-  const event = await prisma.immersion.upsert({
+  const event = await prisma.event.upsert({
     where: { id: EVENT_ID },
     create: {
       id: EVENT_ID,
@@ -309,10 +309,10 @@ async function main() {
     });
 
     await prisma.enrollment.upsert({
-      where: { immersionId_userId: { immersionId: EVENT_ID, userId: user.id } },
+      where: { eventId_userId: { eventId: EVENT_ID, userId: user.id } },
       create: {
         organisationId: ORG_ID,
-        immersionId: EVENT_ID,
+        eventId: EVENT_ID,
         userId: user.id,
         status: p.status,
         source: p.source,
