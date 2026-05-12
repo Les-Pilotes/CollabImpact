@@ -154,7 +154,7 @@ model Event {
   feedbackConfig FeedbackConfig?
   // V3 (requires migration): partnerCompany PartnerCompany?
 
-  @@map("immersion")
+  @@map("Immersion")
   @@index([organisationId])
   @@index([date])
   @@index([status])

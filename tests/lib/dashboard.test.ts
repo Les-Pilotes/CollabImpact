@@ -17,8 +17,8 @@ vi.mock("@/lib/db", () => ({
 import { getKpis, getTaskProgress, getNextActions } from "@/lib/dashboard";
 import { prisma } from "@/lib/db";
 
-const mockPrisma = prisma as {
-  immersion: { findUnique: ReturnType<typeof vi.fn> };
+const mockPrisma = prisma as unknown as {
+  event: { findUnique: ReturnType<typeof vi.fn> };
   task: { findMany: ReturnType<typeof vi.fn> };
 };
 
