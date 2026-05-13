@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
 import Image from "next/image";
+import { Toaster } from "sonner";
 import AdminSignOutButton from "./AdminSignOutButton";
 import Sidebar from "./Sidebar";
 
@@ -34,6 +35,8 @@ export default async function AdminLayout({
       <main className="flex-1 min-w-0 md:p-10 p-4 pt-16 md:pt-10 overflow-y-auto">
         {children}
       </main>
+
+      <Toaster position="bottom-right" richColors closeButton />
     </div>
   );
 }
