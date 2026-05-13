@@ -4,6 +4,7 @@ import { assertCronRequest } from "@/lib/cron";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/client";
 import { createActionToken } from "@/lib/tokens";
+import { getAppUrl } from "@/lib/app-url";
 import J7Reminder from "@/lib/email/templates/J7Reminder";
 
 export async function GET(request: NextRequest) {
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     include: { user: true, event: true },
   });
 
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   let sent = 0;
 
   for (const enrollment of enrollments) {

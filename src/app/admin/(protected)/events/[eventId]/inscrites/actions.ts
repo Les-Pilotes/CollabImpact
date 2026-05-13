@@ -4,6 +4,7 @@ import { EnrollmentStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { createFeedbackToken, createActionToken } from '@/lib/tokens';
+import { getAppUrl } from '@/lib/app-url';
 import { sendEmail } from '@/lib/email/client';
 import J7Reminder from '@/lib/email/templates/J7Reminder';
 import J2Reminder from '@/lib/email/templates/J2Reminder';
@@ -85,7 +86,7 @@ export async function sendManualReminder(
       return { ok: false, error: 'Inscription introuvable.' };
     }
 
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+    const appUrl = getAppUrl();
     const confirmToken = createActionToken(enrollmentId, 'confirm');
     const declineToken = createActionToken(enrollmentId, 'decline');
     const confirmUrl = `${appUrl}/confirm/${confirmToken}`;
@@ -173,7 +174,7 @@ export async function sendJ2Reminder(
       return { ok: false, error: 'Inscription introuvable.' };
     }
 
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+    const appUrl = getAppUrl();
     const confirmToken = createActionToken(enrollmentId, 'confirm');
     const declineToken = createActionToken(enrollmentId, 'decline');
     const confirmUrl = `${appUrl}/confirm/${confirmToken}`;
@@ -265,7 +266,7 @@ export async function sendFeedbackInvite(
     }
 
     const token = createFeedbackToken(enrollmentId);
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+    const appUrl = getAppUrl();
     const feedbackUrl = `${appUrl}/feedback/${token}`;
 
     await prisma.enrollment.update({
