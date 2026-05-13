@@ -6,25 +6,28 @@ import { EmargementList } from './EmargementList';
 
 export const metadata = { title: 'Émargement — Admin' };
 
-const EVENT_ID = 'seed-event-cite-audacieuse';
-
 const TERMINAL_STATUSES: EnrollmentStatus[] = [
   EnrollmentStatus.absente,
   EnrollmentStatus.desistement,
 ];
 
-export default async function EmargementPage() {
+export default async function EmargementPage({
+  params,
+}: {
+  params: Promise<{ eventId: string }>;
+}) {
   await requireAdmin();
+  const { eventId } = await params;
 
-  const immersion = await prisma.event.findUnique({
-    where: { id: EVENT_ID },
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
     select: { name: true, date: true },
   });
 
   // Prefer confirmee_j2 enrollments; fallback to all non-terminal
   let enrollments = await prisma.enrollment.findMany({
     where: {
-      eventId: EVENT_ID,
+      eventId,
       deletedAt: null,
       status: EnrollmentStatus.confirmee_j2,
     },
@@ -36,7 +39,7 @@ export default async function EmargementPage() {
   if (enrollments.length === 0) {
     enrollments = await prisma.enrollment.findMany({
       where: {
-        eventId: EVENT_ID,
+        eventId,
         deletedAt: null,
         status: { notIn: TERMINAL_STATUSES },
       },
@@ -45,8 +48,8 @@ export default async function EmargementPage() {
     });
   }
 
-  const eventDateLabel = immersion
-    ? new Date(immersion.date).toLocaleDateString('fr-FR', {
+  const eventDateLabel = event
+    ? new Date(event.date).toLocaleDateString('fr-FR', {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
@@ -60,7 +63,7 @@ export default async function EmargementPage() {
       <div className="sticky top-0 bg-zinc-50 pt-2 pb-3 z-10">
         <div className="flex items-center justify-between mb-1">
           <Link
-            href="/admin/participants"
+            href={`/admin/events/${eventId}/inscrites`}
             className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
           >
             ← Retour
@@ -69,9 +72,9 @@ export default async function EmargementPage() {
         <h1 className="text-xl font-extrabold text-zinc-900 leading-tight">
           Émargement
         </h1>
-        {immersion && (
+        {event && (
           <p className="text-sm text-zinc-500 mt-0.5">
-            {immersion.name} — {eventDateLabel}
+            {event.name} — {eventDateLabel}
           </p>
         )}
       </div>

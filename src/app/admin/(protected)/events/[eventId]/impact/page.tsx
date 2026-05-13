@@ -1,10 +1,26 @@
-export default function EventImpactPage() {
+import { requireAdmin } from "@/lib/auth";
+import PageHeader from "../../../PageHeader";
+
+export const metadata = { title: "Mesure d'impact — Admin" };
+
+export default async function ImpactPage() {
+  await requireAdmin();
+
   return (
-    <div className="py-8 text-center space-y-4">
-      <p className="text-stone-500 text-sm">Cette section sera migree dans le contexte multi-evenements en V3.</p>
-      <a href="/admin/impact" className="text-orange-600 hover:underline text-sm">
-        Acceder a la vue actuelle →
-      </a>
+    <div className="flex flex-col h-full -m-4 md:-m-10 overflow-hidden">
+      <PageHeader
+        title="Mesure d'impact"
+        subtitle="Synthèse des feedbacks et indicateurs post-événement"
+      />
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-4xl mb-4">📊</p>
+          <p className="text-sm font-semibold text-zinc-700">À venir après le Jour J</p>
+          <p className="text-xs text-zinc-400 mt-1 max-w-xs">
+            Les feedbacks, notes moyennes et verbatims des participantes apparaîtront ici une fois l&apos;événement terminé.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

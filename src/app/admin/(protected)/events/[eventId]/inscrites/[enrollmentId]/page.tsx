@@ -32,11 +32,11 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
 export default async function ParticipantDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ eventId: string; enrollmentId: string }>;
 }) {
   await requireAdmin();
 
-  const { id: enrollmentId } = await params;
+  const { eventId, enrollmentId } = await params;
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
@@ -64,10 +64,10 @@ export default async function ParticipantDetailPage({
     <div className="space-y-6 max-w-2xl">
       {/* Back link */}
       <Link
-        href="/admin/participants"
+        href={`/admin/events/${eventId}/inscrites`}
         className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
       >
-        ← Retour aux participantes
+        ← Retour aux inscrites
       </Link>
 
       {/* Header */}

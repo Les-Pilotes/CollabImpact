@@ -12,15 +12,14 @@ const PHASE_LABELS: Record<TaskPhase, string> = {
   POST_EVENT: 'Post-Event',
 };
 
-const EVENT_ID = 'seed-event-cite-audacieuse';
-
 interface TaskColumnProps {
   tasks: Task[];
   phase: TaskPhase;
   adminEmail: string;
+  eventId: string;
 }
 
-export function TaskColumn({ tasks, phase, adminEmail }: TaskColumnProps) {
+export function TaskColumn({ tasks, phase, adminEmail, eventId }: TaskColumnProps) {
   const doneCount = tasks.filter((t) => !!t.doneAt).length;
   const total = tasks.length;
   const allDone = total > 0 && doneCount === total;
@@ -59,7 +58,7 @@ export function TaskColumn({ tasks, phase, adminEmail }: TaskColumnProps) {
       </div>
 
       {/* Add task */}
-      <NewTaskButton phase={phase} eventId={EVENT_ID} />
+      <NewTaskButton phase={phase} eventId={eventId} />
     </div>
   );
 }

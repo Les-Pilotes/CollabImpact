@@ -5,9 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { InlineActions } from './InlineActions';
 
-export const metadata = { title: 'Participantes, admin' };
-
-const EVENT_ID = 'seed-event-cite-audacieuse';
+export const metadata = { title: 'Inscrites, admin' };
 
 type Group = {
   key: string;
@@ -38,7 +36,15 @@ type Enrollment = {
   };
 };
 
-function EnrollmentRow({ enrollment, isEventDay }: { enrollment: Enrollment; isEventDay: boolean }) {
+function EnrollmentRow({
+  enrollment,
+  isEventDay,
+  eventId,
+}: {
+  enrollment: Enrollment;
+  isEventDay: boolean;
+  eventId: string;
+}) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 transition-colors">
       <div className="flex-1 min-w-0">
@@ -59,7 +65,7 @@ function EnrollmentRow({ enrollment, isEventDay }: { enrollment: Enrollment; isE
           feedbackSentAt={enrollment.feedbackSentAt}
         />
         <Link
-          href={`/admin/participants/${enrollment.id}`}
+          href={`/admin/events/${eventId}/inscrites/${enrollment.id}`}
           className="text-xs font-medium text-zinc-400 hover:text-zinc-700 hover:underline whitespace-nowrap"
         >
           Voir
@@ -70,18 +76,21 @@ function EnrollmentRow({ enrollment, isEventDay }: { enrollment: Enrollment; isE
 }
 
 export default async function ParticipantsPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ eventId: string }>;
   searchParams: Promise<Record<string, string>>;
 }) {
   await requireAdmin();
 
-  const params = await searchParams;
-  const groupFilter = params.group as string | undefined;
+  const { eventId } = await params;
+  const sp = await searchParams;
+  const groupFilter = sp.group as string | undefined;
   const activeGroup = GROUPS.find((g) => g.key === groupFilter);
 
   const allEnrollments = await prisma.enrollment.findMany({
-    where: { eventId: EVENT_ID, deletedAt: null },
+    where: { eventId, deletedAt: null },
     select: { status: true },
   });
 
@@ -95,7 +104,7 @@ export default async function ParticipantsPage({
   }
 
   const eventRecord = await prisma.event.findUnique({
-    where: { id: EVENT_ID },
+    where: { id: eventId },
     select: { date: true },
   });
   const eventDate = eventRecord ? new Date(eventRecord.date) : new Date(0);
@@ -104,7 +113,7 @@ export default async function ParticipantsPage({
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
-      eventId: EVENT_ID,
+      eventId,
       deletedAt: null,
       ...(activeGroup ? { status: { in: activeGroup.statuses } } : {}),
     },
@@ -122,14 +131,14 @@ export default async function ParticipantsPage({
           </p>
         </div>
         <Button asChild size="sm" variant="outline">
-          <Link href="/admin/participants/emargement">Émargement</Link>
+          <Link href={`/admin/events/${eventId}/inscrites/emargement`}>Émargement</Link>
         </Button>
       </div>
 
       {/* Filter chips */}
       <div className="flex flex-wrap gap-2">
         <Link
-          href="/admin/participants"
+          href={`/admin/events/${eventId}/inscrites`}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
             !groupFilter ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
           }`}
@@ -143,7 +152,7 @@ export default async function ParticipantsPage({
           return (
             <Link
               key={group.key}
-              href={`/admin/participants?group=${group.key}`}
+              href={`/admin/events/${eventId}/inscrites?group=${group.key}`}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 groupFilter === group.key
                   ? 'bg-zinc-900 text-white'
@@ -171,7 +180,7 @@ export default async function ParticipantsPage({
                 </div>
                 <div className="divide-y divide-zinc-100">
                   {rows.map((enrollment) => (
-                    <EnrollmentRow key={enrollment.id} enrollment={enrollment} isEventDay={isEventDay} />
+                    <EnrollmentRow key={enrollment.id} enrollment={enrollment} isEventDay={isEventDay} eventId={eventId} />
                   ))}
                 </div>
               </div>
@@ -193,7 +202,7 @@ export default async function ParticipantsPage({
           ) : (
             <div className="divide-y divide-zinc-100">
               {enrollments.map((enrollment) => (
-                <EnrollmentRow key={enrollment.id} enrollment={enrollment} isEventDay={isEventDay} />
+                <EnrollmentRow key={enrollment.id} enrollment={enrollment} isEventDay={isEventDay} eventId={eventId} />
               ))}
             </div>
           )}

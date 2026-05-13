@@ -12,7 +12,7 @@ import {
   markConfirmeeJ2,
   markDesistement,
   sendManualReminder,
-} from '../participants/actions';
+} from '../inscrites/actions';
 
 const STATUS_LABELS: Record<string, string> = {
   inscrit: 'Inscrite',
@@ -37,6 +37,7 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
 };
 
 type Props = {
+  eventId: string;
   enrollmentId: string;
   status: string;
   j7SentAt: string | null;
@@ -53,6 +54,7 @@ type Props = {
 };
 
 export function AppelView({
+  eventId,
   enrollmentId,
   status,
   j7SentAt,
@@ -213,10 +215,10 @@ export function AppelView({
             <div className="space-y-3">
               <p className="text-sm text-stone-500">Aucune action requise.</p>
               <Link
-                href="/admin/participants"
+                href={`/admin/events/${eventId}/inscrites`}
                 className="block text-sm font-medium text-[var(--brand-orange)] hover:underline"
               >
-                Voir toutes les participantes
+                Voir toutes les inscrites
               </Link>
             </div>
           )}
@@ -238,10 +240,10 @@ export function AppelView({
       {/* Footer */}
       <div>
         <Link
-          href="/admin/participants"
+          href={`/admin/events/${eventId}/inscrites`}
           className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
         >
-          {"<- Voir toutes les participantes"}
+          {"<- Voir toutes les inscrites"}
         </Link>
       </div>
     </div>
