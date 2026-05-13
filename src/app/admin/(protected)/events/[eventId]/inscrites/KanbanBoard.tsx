@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare } from "lucide-react";
-import PageHeader from "../PageHeader";
+import PageHeader from "../../../PageHeader";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

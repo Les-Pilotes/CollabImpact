@@ -147,7 +147,7 @@ export async function getNextActions(eventId: string): Promise<NextAction[]> {
   if (notYetConfirmed > 0 && daysUntilEvent <= 9 && daysUntilEvent >= 0) {
     actions.push({
       label: `${notYetConfirmed} participante${notYetConfirmed > 1 ? "s" : ""} pas encore confirmée${notYetConfirmed > 1 ? "s" : ""}`,
-      href: "/admin/participants?filter=non_confirmees",
+      href: `/admin/events/${eventId}/inscrites`,
       urgency: daysUntilEvent <= 3 ? "high" : "medium",
     });
   }
@@ -162,7 +162,7 @@ export async function getNextActions(eventId: string): Promise<NextAction[]> {
   if (attended > 0 && pendingFeedbacks > 0) {
     actions.push({
       label: `${pendingFeedbacks} feedback${pendingFeedbacks > 1 ? "s" : ""} en attente`,
-      href: "/admin/participants?filter=feedback_attente",
+      href: `/admin/events/${eventId}/inscrites`,
       urgency: "medium",
     });
   }
@@ -171,7 +171,7 @@ export async function getNextActions(eventId: string): Promise<NextAction[]> {
   if (tasks.length > 0) {
     actions.push({
       label: `${tasks.length} tâche${tasks.length > 1 ? "s" : ""} en retard`,
-      href: "/admin/taches?filter=en_retard",
+      href: `/admin/events/${eventId}/taches`,
       urgency: "high",
     });
   }

@@ -5,14 +5,17 @@ import { AppelView } from './AppelView';
 
 export const metadata = { title: 'Mode appel, admin' };
 
-const EVENT_ID = 'seed-event-cite-audacieuse';
-
-export default async function AppelsPage() {
+export default async function AppelsPage({
+  params,
+}: {
+  params: Promise<{ eventId: string }>;
+}) {
   await requireAdmin();
+  const { eventId } = await params;
 
   // Priority 1: inscrit, ordered by enrolledAt asc
   const p1 = await prisma.enrollment.findFirst({
-    where: { eventId: EVENT_ID, deletedAt: null, status: 'inscrit' },
+    where: { eventId, deletedAt: null, status: 'inscrit' },
     include: { user: true, event: true },
     orderBy: { enrolledAt: 'asc' },
   });
@@ -22,7 +25,7 @@ export default async function AppelsPage() {
     ? null
     : await prisma.enrollment.findFirst({
         where: {
-          eventId: EVENT_ID,
+          eventId,
           deletedAt: null,
           status: 'contactee',
           j7SentAt: null,
@@ -37,7 +40,7 @@ export default async function AppelsPage() {
       ? null
       : await prisma.enrollment.findFirst({
           where: {
-            eventId: EVENT_ID,
+            eventId,
             deletedAt: null,
             status: 'contactee',
             j7SentAt: { not: null },
@@ -52,7 +55,7 @@ export default async function AppelsPage() {
       ? null
       : await prisma.enrollment.findFirst({
           where: {
-            eventId: EVENT_ID,
+            eventId,
             deletedAt: null,
             status: 'confirmee_j7',
             j2SentAt: null,
@@ -66,11 +69,11 @@ export default async function AppelsPage() {
   // Count totals across all 4 buckets
   const [c1, c2, c3, c4] = await Promise.all([
     prisma.enrollment.count({
-      where: { eventId: EVENT_ID, deletedAt: null, status: 'inscrit' },
+      where: { eventId, deletedAt: null, status: 'inscrit' },
     }),
     prisma.enrollment.count({
       where: {
-        eventId: EVENT_ID,
+        eventId,
         deletedAt: null,
         status: 'contactee',
         j7SentAt: null,
@@ -78,7 +81,7 @@ export default async function AppelsPage() {
     }),
     prisma.enrollment.count({
       where: {
-        eventId: EVENT_ID,
+        eventId,
         deletedAt: null,
         status: 'contactee',
         j7SentAt: { not: null },
@@ -86,7 +89,7 @@ export default async function AppelsPage() {
     }),
     prisma.enrollment.count({
       where: {
-        eventId: EVENT_ID,
+        eventId,
         deletedAt: null,
         status: 'confirmee_j7',
         j2SentAt: null,
@@ -104,10 +107,10 @@ export default async function AppelsPage() {
           Toutes les participantes ont été contactées ou confirmées.
         </p>
         <Link
-          href="/admin/participants"
+          href={`/admin/events/${eventId}/inscrites`}
           className="inline-block text-sm font-medium text-[var(--brand-orange)] hover:underline"
         >
-          {"<- Voir toutes les participantes"}
+          {"<- Voir toutes les inscrites"}
         </Link>
       </div>
     );
@@ -116,6 +119,7 @@ export default async function AppelsPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6 py-8 px-4">
       <AppelView
+        eventId={eventId}
         enrollmentId={next.id}
         status={next.status}
         j7SentAt={next.j7SentAt ? next.j7SentAt.toISOString() : null}

@@ -3,8 +3,6 @@ import { prisma } from "@/lib/db";
 import KanbanBoard, { type ParticipantRow } from "./KanbanBoard";
 import { capitalizeName } from "@/lib/normalize";
 
-const EVENT_ID = "seed-event-cite-audacieuse";
-
 function mapStatus(s: string): ParticipantRow["status"] {
   if (s === "confirmee_j7") return "attente_j2";
   if (s === "confirmee_j2") return "confirmee";
@@ -20,12 +18,17 @@ function relativeTime(date: Date): string {
   return `il y a ${Math.floor(h / 24)}j`;
 }
 
-export default async function ParticipantesPage() {
+export default async function ParticipantesPage({
+  params,
+}: {
+  params: Promise<{ eventId: string }>;
+}) {
   await requireAdmin();
+  const { eventId } = await params;
 
   const enrollments = await prisma.enrollment.findMany({
     where: {
-      eventId: EVENT_ID,
+      eventId,
       deletedAt: null,
       status: { notIn: ["desistement", "absente", "presente", "feedback_recu"] },
     },

@@ -153,7 +153,7 @@ describe("getNextActions", () => {
     );
     expect(feedbackAction).toBeDefined();
     expect(feedbackAction!.urgency).toBe("medium");
-    expect(feedbackAction!.href).toContain("feedback_attente");
+    expect(feedbackAction!.href).toContain("/inscrites");
   });
 
   it("returns urgency:high action for overdue tasks", async () => {

@@ -8,19 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const EVENT_TYPES = [
-  { value: "FEMININ", label: "Workshop 100% Feminin" },
-  { value: "IMMERSION", label: "Immersion professionnelle" },
-  { value: "ATELIER", label: "Atelier" },
-  { value: "IMPULSION", label: "Impulsion" },
-];
-
 export default function NewEventPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: "",
-    type: "FEMININ",
     date: "",
     time: "09:30",
     address: "",
@@ -28,7 +20,7 @@ export default function NewEventPage() {
     description: "",
   });
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
@@ -59,23 +51,9 @@ export default function NewEventPage() {
           <h2 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">Informations</h2>
 
           <div className="space-y-2">
-            <Label htmlFor="name">Nom de l&apos;evenement</Label>
-            <Input id="name" name="name" value={form.name} onChange={handleChange} placeholder="Workshop 100% Feminin — Edition 7" required />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="type">Type de programme</Label>
-            <select
-              id="type"
-              name="type"
-              value={form.type}
-              onChange={handleChange}
-              className="w-full border border-stone-200 rounded-md px-3 py-2 text-sm bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            >
-              {EVENT_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+            <Label htmlFor="name">Nom de l&apos;événement</Label>
+            <Input id="name" name="name" value={form.name} onChange={handleChange} placeholder="Workshop 100% Féminin — Edition 7" required />
+            <p className="text-xs text-stone-400">Workshop 100% Féminin par défaut.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
