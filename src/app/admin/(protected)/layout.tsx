@@ -12,9 +12,6 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const { admin } = await requireAdmin();
-  const devMode =
-    process.env.ENABLE_DEV_PAGE === "true" ||
-    process.env.NODE_ENV !== "production";
 
   return (
     <div className="h-screen bg-stone-50 flex overflow-hidden">
@@ -22,7 +19,6 @@ export default async function AdminLayout({
       <Sidebar
         adminName={admin.firstName ?? admin.email.split("@")[0]}
         adminEmail={admin.email}
-        devMode={devMode}
       />
 
       {/* Mobile top bar */}
