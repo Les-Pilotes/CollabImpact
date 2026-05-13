@@ -95,6 +95,7 @@ export default async function ParticipantesPage({
       status: mapStatus(e.status),
       j7EmailSent: !!e.j7SentAt,
       j2EmailSent: !!e.j2SentAt,
+      droitsImageStatus: e.droitsImageStatus,
       history,
     };
   });

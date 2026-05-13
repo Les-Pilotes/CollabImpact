@@ -55,6 +55,13 @@ enum EnrollmentMode {
   via_referent
 }
 
+enum DroitsImageStatus {
+  pending
+  accepted
+  refused
+  minor_parental_pending
+}
+
 enum TaskPhase {
   PREPARATION
   WORKSHOP
@@ -113,10 +120,22 @@ model User {
   email            String  @unique
   phone            String?
   birthDate        DateTime? @db.Date
+  gender           String?  // "Fille" | "Garçon"
   city             String?
   source           String?  // "whatsapp" | "instagram" | "classe" | "conseiller" | "autre" | "bouche_a_oreille"
   reliabilityScore Int     @default(0)
   emailVerified    Boolean @default(false)
+
+  // Couche Orientation — updated on inscription, refreshed if stale > 6 months
+  niveauScolaire        String?  // "3ème" | "2nde" | "1ère" | "Terminale" | "BTS" | "Licence" | "Master" | "Autres"
+  niveauScolaireAutre   String?
+  etablissement         String?
+  region                String?  // "Île-De-France" | "Hauts-de-France" | "Auvergne-Rhône-Alpes" | "Provence-Alpes-Côte d'Azur" | "Pays de la Loire"
+  projetPro             String?
+  motivation            String[] @default([])  // multi-select serialized
+  motivationDetail      String?
+  commentConnu          String?
+  orientationUpdatedAt  DateTime?
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -126,6 +145,7 @@ model User {
 
   @@index([organisationId])
   @@index([email])
+  @@index([phone])
 }
 
 // Un évent (workshop, immersion…).
@@ -183,6 +203,15 @@ model Enrollment {
 
   feedbackToken  String?   @unique
   feedbackSentAt DateTime?
+
+  // Couche Événement — answered at inscription, specific to this enrollment
+  droitsImageStatus  DroitsImageStatus @default(pending)
+  droitsImageSignedAt DateTime?
+  droitsImageSignature String?         // digital signature: full name typed by the majeure
+  regime             String[] @default([])  // multi-select: ["Végétarien", "Sans gluten", ...]
+  accessibilite      String?
+  accompagnateur     Boolean   @default(false)
+  commentaire        String?
 
   deletedAt  DateTime?
   enrolledAt DateTime  @default(now())

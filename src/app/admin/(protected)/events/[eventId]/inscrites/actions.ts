@@ -3,7 +3,7 @@
 import { EnrollmentStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
-import { createFeedbackToken } from '@/lib/tokens';
+import { createFeedbackToken, createActionToken } from '@/lib/tokens';
 import { sendEmail } from '@/lib/email/client';
 import J7Reminder from '@/lib/email/templates/J7Reminder';
 import J2Reminder from '@/lib/email/templates/J2Reminder';
@@ -86,13 +86,21 @@ export async function sendManualReminder(
     }
 
     const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
-    const confirmUrl = `${appUrl}/confirm/${enrollmentId}`;
+    const confirmToken = createActionToken(enrollmentId, 'confirm');
+    const declineToken = createActionToken(enrollmentId, 'decline');
+    const confirmUrl = `${appUrl}/confirm/${confirmToken}`;
+    const declineUrl = `${appUrl}/decline/${declineToken}`;
     const dateLabel = enrollment.event.date.toLocaleDateString('fr-FR', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     });
+    const isMinor = enrollment.user.birthDate
+      ? (enrollment.event.date.getTime() - enrollment.user.birthDate.getTime()) /
+          (1000 * 60 * 60 * 24 * 365.25) <
+        18
+      : false;
 
     await sendEmail({
       to: enrollment.user.email,
@@ -103,6 +111,8 @@ export async function sendManualReminder(
         companyName: enrollment.event.name,
         dateLabel,
         confirmUrl,
+        declineUrl,
+        isMinor,
       }),
     });
 
@@ -164,13 +174,21 @@ export async function sendJ2Reminder(
     }
 
     const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
-    const confirmUrl = `${appUrl}/confirm/${enrollmentId}`;
+    const confirmToken = createActionToken(enrollmentId, 'confirm');
+    const declineToken = createActionToken(enrollmentId, 'decline');
+    const confirmUrl = `${appUrl}/confirm/${confirmToken}`;
+    const declineUrl = `${appUrl}/decline/${declineToken}`;
     const dateLabel = enrollment.event.date.toLocaleDateString('fr-FR', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     });
+    const isMinor = enrollment.user.birthDate
+      ? (enrollment.event.date.getTime() - enrollment.user.birthDate.getTime()) /
+          (1000 * 60 * 60 * 24 * 365.25) <
+        18
+      : false;
 
     await sendEmail({
       to: enrollment.user.email,
@@ -181,6 +199,8 @@ export async function sendJ2Reminder(
         dateLabel,
         address: enrollment.event.address,
         confirmUrl,
+        declineUrl,
+        isMinor,
       }),
     });
 

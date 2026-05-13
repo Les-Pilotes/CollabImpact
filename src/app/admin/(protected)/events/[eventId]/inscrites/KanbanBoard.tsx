@@ -16,6 +16,8 @@ export type HistoryItem = {
   relTime: string;
 };
 
+export type DroitsImageStatus = "pending" | "accepted" | "refused" | "minor_parental_pending";
+
 export type ParticipantRow = {
   id: string;
   firstName: string;
@@ -28,6 +30,7 @@ export type ParticipantRow = {
   status: KanbanStatus;
   j7EmailSent?: boolean;
   j2EmailSent?: boolean;
+  droitsImageStatus?: DroitsImageStatus;
   history: HistoryItem[];
   isDemo?: boolean;
   archivedAs?: "desistee" | "presente" | "absente";
@@ -329,7 +332,7 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
               <p className="text-3xl mb-3">📋</p>
               <p className="text-sm font-semibold text-zinc-700">Post-Event · Feedbacks</p>
               <p className="text-xs text-zinc-400 mt-1">
-                Disponible après le Jour J — les feedbacks apparaîtront ici une fois l'émargement terminé.
+                Disponible après le Jour J — les feedbacks apparaîtront ici une fois l&apos;émargement terminé.
               </p>
             </div>
           </div>
@@ -402,6 +405,14 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
                               </div>
                               <p className="text-[11px] font-medium text-zinc-500 truncate mt-0.5">{labelTitle}</p>
                               {labelDesc && <p className="text-[10px] text-zinc-400 truncate">{labelDesc}</p>}
+                              {p.droitsImageStatus === "minor_parental_pending" && (
+                                <span
+                                  className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800"
+                                  title="Autorisation parentale en attente"
+                                >
+                                  📄 Mineure
+                                </span>
+                              )}
                             </div>
                           </div>
                         </button>
