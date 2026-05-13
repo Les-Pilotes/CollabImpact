@@ -56,7 +56,7 @@ export default async function EventParametresPage({
       />
 
       <section className="space-y-3 pt-4 border-t border-stone-200">
-        <h2 className="text-sm font-semibold text-stone-900">Formulaire d&apos;inscription</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">Formulaire d&apos;inscription</h2>
         <p className="text-sm text-stone-500 max-w-[60ch]">
           La configuration du formulaire (couches actives, champs custom, ordre) arrive dans
           une prochaine itération. Pour l&apos;instant, les 3 couches (Fondamentale,

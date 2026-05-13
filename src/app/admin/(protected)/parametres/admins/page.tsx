@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { ArrowLeft, Shield, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, Shield, Users } from "lucide-react";
 import AdminsListClient from "./AdminsListClient";
 
 export const metadata = { title: "Administrateurs" };
@@ -56,20 +56,13 @@ export default async function AdminsPage() {
         </div>
       )}
 
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-stone-50 border border-stone-200 text-sm">
-        <ShieldCheck className="w-5 h-5 text-stone-500 shrink-0 mt-0.5" />
-        <div className="text-xs text-stone-600 space-y-1">
-          <p>
-            <strong className="text-stone-900">Comment ça marche :</strong> ajouter un email
-            ici autorise cette personne à se connecter via magic link sur{" "}
-            <code className="font-mono bg-white px-1 py-0.5 rounded">/admin/login</code>.
-          </p>
-          <p>
-            Un <strong>super-admin</strong> peut gérer les autres admins. Un{" "}
-            <strong>admin</strong> a accès au dashboard sans pouvoir CRUD les permissions.
-          </p>
-        </div>
-      </div>
+      <p className="text-xs text-stone-500 leading-relaxed">
+        Ajouter un email ici autorise cette personne à se connecter par magic link sur{" "}
+        <code className="font-mono text-stone-700">/admin/login</code>. Les{" "}
+        <strong className="text-[var(--brand-orange)]">super-admins</strong> peuvent gérer
+        les admins ; les <strong>admins</strong> ont accès au dashboard sans droits CRUD sur
+        les permissions.
+      </p>
 
       <AdminsListClient
         admins={admins.map((a) => ({

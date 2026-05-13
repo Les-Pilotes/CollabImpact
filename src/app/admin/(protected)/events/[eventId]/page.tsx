@@ -122,7 +122,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-stone-900">Avancement</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">Avancement</h2>
         <dl className="space-y-3">
           {taskProgress.map(({ phase, total, done }) => {
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -141,7 +141,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
 
       {nextActions.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-stone-900">A faire</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">À faire</h2>
           <ul className="divide-y divide-stone-200 border-y border-stone-200">
             {nextActions.map((action, i) => (
               <li key={i}>
@@ -156,7 +156,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
       )}
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-stone-900">Dernieres inscriptions</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">Dernières inscriptions</h2>
         {recentEnrollments.length === 0 ? (
           <p className="text-sm text-stone-500">Aucune inscription pour l&apos;instant.</p>
         ) : (

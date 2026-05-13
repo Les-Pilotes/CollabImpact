@@ -19,6 +19,7 @@ import { ALLOWED_TRANSITIONS } from "@/lib/validation/event";
 type Step = {
   id: ImmersionStatus;
   label: string;
+  shortLabel: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
 };
@@ -28,25 +29,29 @@ const STEPS: Step[] = [
   {
     id: ImmersionStatus.brouillon,
     label: "Brouillon",
-    description: "Inscriptions fermées, l’événement n’est pas visible publiquement.",
+    shortLabel: "Brouillon",
+    description: "Inscriptions fermées, l'événement n'est pas visible publiquement.",
     icon: Circle,
   },
   {
     id: ImmersionStatus.publie,
     label: "En préparation",
+    shortLabel: "Préparation",
     description: "Inscriptions ouvertes — le lien public est actif.",
     icon: Send,
   },
   {
     id: ImmersionStatus.termine,
     label: "Finalisé",
-    description: "L’événement a eu lieu. Les feedbacks peuvent être collectés.",
+    shortLabel: "Finalisé",
+    description: "L'événement a eu lieu. Les feedbacks peuvent être collectés.",
     icon: CheckCircle2,
   },
   {
     id: ImmersionStatus.archive,
     label: "Archivé",
-    description: "Sorti des listes actives. Reste consultable dans l’onglet Archivés.",
+    shortLabel: "Archivé",
+    description: "Sorti des listes actives. Reste consultable dans l'onglet Archivés.",
     icon: Archive,
   },
 ];
@@ -79,20 +84,39 @@ export default function LifecycleBar({ eventId, status, isComplet, isEnCours }: 
       toast.error("Transition non autorisée depuis ce statut.");
       return;
     }
-    // Confirm destructive / terminal transitions
-    if (target === ImmersionStatus.archive || target === ImmersionStatus.termine) {
+    // Confirm only the truly destructive transition (archive).
+    // Finalisé is reversible (we allow termine → publie), so a toast with
+    // undo is enough — keeps the flow lighter.
+    if (target === ImmersionStatus.archive) {
       setConfirmTarget(target);
       return;
     }
-    doTransition(target);
+    doTransition(target, status);
   }
 
-  function doTransition(target: ImmersionStatus) {
+  function doTransition(target: ImmersionStatus, previous: ImmersionStatus) {
     startTransition(async () => {
       const result = await transitionEventStatus(eventId, target);
       if (result.ok) {
         const step = STEPS.find((s) => s.id === target);
-        toast.success(`Statut → ${step?.label ?? target}`);
+        // Offer an inline undo for Finalisé (the only non-archive
+        // transition with real consequences — closes inscriptions).
+        const undoable =
+          target === ImmersionStatus.termine && previous === ImmersionStatus.publie;
+        if (undoable) {
+          toast.success(`Statut → ${step?.label ?? target}`, {
+            action: {
+              label: "Annuler",
+              onClick: () => {
+                transitionEventStatus(eventId, previous).then((r) => {
+                  if (r.ok) toast.success("Annulé");
+                });
+              },
+            },
+          });
+        } else {
+          toast.success(`Statut → ${step?.label ?? target}`);
+        }
         setConfirmTarget(null);
       } else {
         toast.error(result.error);
@@ -109,19 +133,22 @@ export default function LifecycleBar({ eventId, status, isComplet, isEnCours }: 
           const isCurrent = currentIdx === idx;
           const isPast = currentIdx > idx;
           const isAllowed = step.id === status || allowedTargets.includes(step.id);
+          const disabled = isPending || !isAllowed;
           return (
             <button
               key={step.id}
               type="button"
               onClick={() => attemptTransition(step.id)}
-              disabled={isPending || !isAllowed}
+              disabled={disabled}
+              aria-disabled={disabled}
+              aria-current={isCurrent ? "step" : undefined}
               title={step.description}
               className={`
                 flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold
                 transition-all duration-200 min-w-0
                 ${
                   isCurrent
-                    ? "bg-white text-orange-600 shadow-sm ring-1 ring-orange-200"
+                    ? "bg-white text-[var(--brand-orange)] shadow-sm ring-1 ring-orange-200"
                     : isPast
                       ? "text-stone-700 hover:bg-white/60"
                       : isAllowed
@@ -131,7 +158,8 @@ export default function LifecycleBar({ eventId, status, isComplet, isEnCours }: 
               `}
             >
               <StepIcon className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{step.label}</span>
+              <span className="truncate hidden sm:inline">{step.label}</span>
+              <span className="truncate sm:hidden">{step.shortLabel}</span>
             </button>
           );
         })}
@@ -162,14 +190,12 @@ export default function LifecycleBar({ eventId, status, isComplet, isEnCours }: 
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-500" />
-              {confirmTarget === ImmersionStatus.archive
-                ? "Archiver cet événement ?"
-                : "Marquer comme finalisé ?"}
+              Archiver cet événement ?
             </DialogTitle>
             <DialogDescription>
-              {confirmTarget === ImmersionStatus.archive
-                ? "Il disparaîtra de la liste principale et sera visible uniquement dans l'onglet Archivés. Les inscriptions et données restent intactes — tu peux toujours restaurer plus tard."
-                : "L'événement passera en statut Finalisé. Les inscriptions ne seront plus possibles. Tu pourras toujours collecter les feedbacks et consulter les analyses d'impact."}
+              Il disparaîtra de la liste principale et sera visible uniquement dans
+              l&apos;onglet Archivés. Les inscriptions et données restent intactes, tu peux
+              toujours restaurer plus tard.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -183,8 +209,8 @@ export default function LifecycleBar({ eventId, status, isComplet, isEnCours }: 
             </Button>
             <Button
               type="button"
-              variant={confirmTarget === ImmersionStatus.archive ? "destructive" : "default"}
-              onClick={() => confirmTarget && doTransition(confirmTarget)}
+              variant="destructive"
+              onClick={() => confirmTarget && doTransition(confirmTarget, status)}
               disabled={isPending}
             >
               {isPending ? "…" : "Confirmer"}

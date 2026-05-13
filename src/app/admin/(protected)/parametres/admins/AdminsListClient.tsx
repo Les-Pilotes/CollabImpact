@@ -122,7 +122,7 @@ function AdminRow({
       <div
         className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
           admin.role === "SUPER_ADMIN"
-            ? "bg-orange-100 text-orange-700"
+            ? "bg-orange-100 text-[var(--brand-orange)] ring-2 ring-[var(--brand-orange)]/30 ring-offset-2 ring-offset-white"
             : "bg-stone-200 text-stone-700"
         }`}
       >
@@ -133,11 +133,11 @@ function AdminRow({
           <p className="font-semibold text-stone-900 truncate">
             {fullName}
             {isCurrent && (
-              <span className="ml-2 text-[11px] font-medium text-orange-600">· toi</span>
+              <span className="ml-2 text-[11px] font-medium text-[var(--brand-orange)]">· toi</span>
             )}
           </p>
           {admin.role === "SUPER_ADMIN" && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded">
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wide text-white bg-[var(--brand-orange)] px-1.5 py-0.5 rounded">
               <ShieldCheck className="w-3 h-3" /> Super
             </span>
           )}

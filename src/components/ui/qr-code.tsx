@@ -29,7 +29,8 @@ export function QrCode({ value, size = 192, className, branded = true }: Props) 
         size={size}
         level="M"
         marginSize={0}
-        fgColor={branded ? "#ff7a1a" : "#000000"}
+        // Matches --brand-orange in src/app/globals.css. Keep in sync if the var changes.
+        fgColor={branded ? "#ff914d" : "#1c1917"}
         bgColor="#ffffff"
       />
     </div>

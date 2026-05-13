@@ -176,7 +176,7 @@ export default function NewEventPage() {
             {isPending ? "Création…" : "Créer l'événement"}
           </Button>
           <Link href="/admin/events">
-            <Button type="button" variant="outline">Annuler</Button>
+            <Button type="button" variant="outline">Retour</Button>
           </Link>
         </div>
       </form>

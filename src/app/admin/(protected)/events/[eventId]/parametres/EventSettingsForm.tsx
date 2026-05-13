@@ -76,7 +76,7 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-stone-900">Informations</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">Informations</h2>
 
         <div className="space-y-1.5">
           <Label htmlFor="name">Nom</Label>
@@ -171,8 +171,8 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
 
       <section className="space-y-4 pt-4 border-t border-stone-200">
         <div>
-          <h2 className="text-sm font-semibold text-stone-900">Communications</h2>
-          <p className="text-xs text-stone-500 mt-0.5">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">Communications</h2>
+          <p className="text-xs text-stone-500 mt-1.5 max-w-prose">
             Personnalisation des emails envoyés aux participantes (confirmation, J-7, J-2,
             feedback).
           </p>
@@ -215,10 +215,13 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
         </div>
       </section>
 
-      <div className="flex items-center justify-end gap-3 pt-2 sticky bottom-0 bg-stone-50 -mx-4 px-4 py-3 -mb-10 border-t border-stone-200">
-        {isDirty && (
-          <p className="text-xs text-stone-500 mr-auto">Tu as des modifications non enregistrées</p>
+      <div className="flex items-center gap-3 pt-6 border-t border-stone-200">
+        {isDirty ? (
+          <p className="text-xs text-stone-500">Modifications non enregistrées</p>
+        ) : (
+          <p className="text-xs text-emerald-600">✓ À jour</p>
         )}
+        <div className="flex-1" />
         <Button type="submit" disabled={isPending || !isDirty}>
           {isPending ? "Enregistrement…" : "Enregistrer"}
         </Button>
