@@ -2,8 +2,9 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getKpis, getTaskProgress, getNextActions } from "@/lib/dashboard";
 import { Badge } from "@/components/ui/badge";
+import LifecycleBar from "./LifecycleBar";
 
-export const metadata = { title: "Apercu" };
+export const metadata = { title: "Aperçu" };
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" | "muted" | "outline" }> = {
   inscrit: { label: "Inscrite", variant: "muted" },
@@ -38,7 +39,11 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
   await requireAdmin();
   const { eventId } = await params;
 
-  const [kpis, taskProgress, nextActions] = await Promise.all([
+  const [event, kpis, taskProgress, nextActions] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id: eventId },
+      select: { status: true, date: true, capacity: true },
+    }),
     getKpis(eventId),
     getTaskProgress(eventId),
     getNextActions(eventId),
@@ -50,6 +55,15 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
     take: 5,
     include: { user: { select: { firstName: true, lastName: true } } },
   });
+
+  const isComplet = event ? kpis.totalEnrolled >= event.capacity && event.capacity > 0 : false;
+  const today = new Date();
+  const isSameDay =
+    event &&
+    event.date.getFullYear() === today.getFullYear() &&
+    event.date.getMonth() === today.getMonth() &&
+    event.date.getDate() === today.getDate();
+  const isEnCours = !!isSameDay;
 
   const countdown = getCountdown(kpis.eventDate);
   const fillPct = kpis.capacity > 0 ? Math.round((kpis.totalEnrolled / kpis.capacity) * 100) : 0;
@@ -63,11 +77,22 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
         <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${COUNTDOWN_TONE[countdown.tone]}`}>
           {countdown.text}{kpis.eventAddress ? ` · ${kpis.eventAddress}` : ""}
         </p>
-        <h1 className="text-3xl font-bold leading-tight text-stone-900">{kpis.eventName || "Evenement"}</h1>
+        <h1 className="text-3xl font-bold leading-tight text-stone-900">{kpis.eventName || "Événement"}</h1>
         {kpis.eventDate.getTime() !== new Date(0).getTime() && (
           <p className="text-sm text-stone-500">{formatDate(kpis.eventDate)}</p>
         )}
       </header>
+
+      {event && (
+        <section>
+          <LifecycleBar
+            eventId={eventId}
+            status={event.status}
+            isComplet={isComplet}
+            isEnCours={isEnCours}
+          />
+        </section>
+      )}
 
       <section>
         <p className="text-base leading-relaxed text-stone-700 max-w-[68ch]">
