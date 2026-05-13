@@ -100,5 +100,5 @@ export default async function ParticipantesPage({
     };
   });
 
-  return <KanbanBoard initialParticipants={participants} />;
+  return <KanbanBoard initialParticipants={participants} eventId={eventId} />;
 }

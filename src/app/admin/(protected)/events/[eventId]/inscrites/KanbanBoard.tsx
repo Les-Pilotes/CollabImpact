@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare } from "lucide-react";
+import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download } from "lucide-react";
 import PageHeader from "../../../PageHeader";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -138,7 +138,13 @@ function avatarColor(id: string) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function KanbanBoard({ initialParticipants }: { initialParticipants: ParticipantRow[] }) {
+export default function KanbanBoard({
+  initialParticipants,
+  eventId,
+}: {
+  initialParticipants: ParticipantRow[];
+  eventId: string;
+}) {
   const [participants, setParticipants] = useState<ParticipantRow[]>(initialParticipants);
   const [archived, setArchived] = useState<ParticipantRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -285,6 +291,15 @@ export default function KanbanBoard({ initialParticipants }: { initialParticipan
           onTabChange={(id) => { setActiveTab(id); setSelectedId(null); }}
           actions={
             <>
+              <a
+                href={`/api/events/${eventId}/export`}
+                download
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
+                title="Télécharger toutes les inscriptions au format CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exporter CSV
+              </a>
               <button
                 onClick={addDemo}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 transition-colors"
