@@ -1,8 +1,10 @@
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getKpis, getTaskProgress, getNextActions } from "@/lib/dashboard";
+import { getAppUrl } from "@/lib/app-url";
 import { Badge } from "@/components/ui/badge";
 import LifecycleBar from "./LifecycleBar";
+import SharePanel from "./SharePanel";
 
 export const metadata = { title: "Aperçu" };
 
@@ -92,6 +94,17 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
             isEnCours={isEnCours}
           />
         </section>
+      )}
+
+      {event && (
+        <SharePanel
+          inscriptionUrl={`${getAppUrl()}/inscription/${eventId}`}
+          eventName={kpis.eventName}
+          eventDate={formatDate(event.date)}
+          isPublished={
+            event.status !== "brouillon" && event.status !== "archive"
+          }
+        />
       )}
 
       <section>
