@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       await sendEmail({
         to: enrollment.user.email,
         subject: `Dernière confirmation — ${enrollment.event.name}`,
+        replyTo: enrollment.event.replyToEmail ?? undefined,
         react: React.createElement(J2Reminder, {
           firstName: enrollment.user.firstName,
           immersionName: enrollment.event.name,

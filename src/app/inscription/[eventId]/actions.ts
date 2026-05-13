@@ -161,6 +161,7 @@ export async function submitInscription(
         date: true,
         address: true,
         organisationId: true,
+        replyToEmail: true,
       },
     });
     if (!event) {
@@ -246,6 +247,7 @@ export async function submitInscription(
       await sendEmail({
         to: user.email,
         subject: `Ton inscription à ${event.name} est confirmée !`,
+        replyTo: event.replyToEmail ?? undefined,
         react: React.createElement(InscriptionConfirmation, {
           firstName: user.firstName,
           eventName: event.name,

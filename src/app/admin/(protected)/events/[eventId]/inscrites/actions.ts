@@ -106,6 +106,7 @@ export async function sendManualReminder(
     await sendEmail({
       to: enrollment.user.email,
       subject: `Rappel J-7 — ${enrollment.event.name}`,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(J7Reminder, {
         firstName: enrollment.user.firstName,
         immersionName: enrollment.event.name,
@@ -194,6 +195,7 @@ export async function sendJ2Reminder(
     await sendEmail({
       to: enrollment.user.email,
       subject: `Rappel J-2 — ${enrollment.event.name}`,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(J2Reminder, {
         firstName: enrollment.user.firstName,
         immersionName: enrollment.event.name,
@@ -280,6 +282,7 @@ export async function sendFeedbackInvite(
     await sendEmail({
       to: enrollment.user.email,
       subject: `Ton avis sur ${enrollment.event.name}`,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(FeedbackInvite, {
         firstName: enrollment.user.firstName,
         immersionName: enrollment.event.name,

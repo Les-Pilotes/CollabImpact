@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     await sendEmail({
       to: enrollment.user.email,
       subject: `Ton avis sur ${enrollment.event.name}`,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(FeedbackInvite, {
         firstName: enrollment.user.firstName,
         immersionName: enrollment.event.name,

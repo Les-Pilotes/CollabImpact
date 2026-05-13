@@ -14,13 +14,15 @@ type SendEmailParams = {
   to: string | string[];
   subject: string;
   react: React.ReactElement;
+  /** Override default reply-to (per-event customization). */
+  replyTo?: string;
 };
 
 /**
  * Envoie un email transactionnel. Non bloquant : log l'erreur et retourne
  * `{ sent: false }` pour que l'appelant décide quoi faire.
  */
-export async function sendEmail({ to, subject, react }: SendEmailParams) {
+export async function sendEmail({ to, subject, react, replyTo }: SendEmailParams) {
   if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY.startsWith("re_placeholder")) {
     // En dev sans clé : on no-op mais on log pour debug.
     console.info(`[email:noop] to=${Array.isArray(to) ? to.join(",") : to} subject="${subject}"`);
@@ -31,7 +33,7 @@ export async function sendEmail({ to, subject, react }: SendEmailParams) {
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
-      replyTo: EMAIL_REPLY_TO,
+      replyTo: replyTo || EMAIL_REPLY_TO,
       to,
       subject,
       react,
