@@ -145,9 +145,9 @@ export default function Sidebar({ adminName, adminEmail }: Props) {
           })}
         </div>
 
-        {/* Event mode: Paramètres pinned to bottom of nav */}
-        {inEventMode && (
-          <div className="mt-auto pt-3 border-t border-stone-800">
+        {/* Paramètres pinned to bottom (global or per-event) */}
+        <div className="mt-auto pt-3 border-t border-stone-800">
+          {inEventMode ? (
             <Link
               href={`/admin/events/${eventId}/parametres`}
               title={collapsed ? "Paramètres" : undefined}
@@ -162,8 +162,23 @@ export default function Sidebar({ adminName, adminEmail }: Props) {
               <Settings className="w-4 h-4 shrink-0" />
               {!collapsed && "Paramètres"}
             </Link>
-          </div>
-        )}
+          ) : (
+            <Link
+              href="/admin/parametres"
+              title={collapsed ? "Paramètres" : undefined}
+              className={`flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors ${
+                collapsed ? "justify-center" : ""
+              } ${
+                pathname.startsWith("/admin/parametres")
+                  ? "bg-stone-800 text-white"
+                  : "text-stone-400 hover:text-white hover:bg-stone-800/70"
+              }`}
+            >
+              <Settings className="w-4 h-4 shrink-0" />
+              {!collapsed && "Paramètres"}
+            </Link>
+          )}
+        </div>
       </nav>
 
       {/* Bottom: user + toggle */}
