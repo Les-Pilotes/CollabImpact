@@ -12,7 +12,13 @@ import { prisma } from "./db";
  */
 export async function requireAdmin() {
   if (process.env.DEV_BYPASS_AUTH === "true") {
-    const admin = await prisma.admin.findFirst({ include: { organisation: true } });
+    let admin;
+    try {
+      admin = await prisma.admin.findFirst({ include: { organisation: true } });
+    } catch (err) {
+      console.error("[requireAdmin] DB unreachable in DEV_BYPASS_AUTH mode:", err);
+      redirect("/admin/login?reason=db-error");
+    }
     if (!admin) {
       throw new Error(
         "DEV_BYPASS_AUTH actif mais aucun Admin en DB. Lance `pnpm db:seed`.",
@@ -34,10 +40,16 @@ export async function requireAdmin() {
     redirect("/admin/login");
   }
 
-  const admin = await prisma.admin.findUnique({
-    where: { email: userEmail.toLowerCase() },
-    include: { organisation: true },
-  });
+  let admin;
+  try {
+    admin = await prisma.admin.findUnique({
+      where: { email: userEmail.toLowerCase() },
+      include: { organisation: true },
+    });
+  } catch (err) {
+    console.error("[requireAdmin] DB unreachable when looking up admin:", err);
+    redirect("/admin/login?reason=db-error");
+  }
 
   if (!admin) {
     try {
