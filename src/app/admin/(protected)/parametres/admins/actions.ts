@@ -11,7 +11,10 @@ type Result =
   | { ok: false; error: string; fieldErrors?: Record<string, string[] | undefined> };
 
 const inviteSchema = z.object({
-  email: z.string().email("Email invalide"),
+  email: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z.string().email("Email invalide"),
+  ),
   firstName: z.string().min(1, "Prénom requis"),
   lastName: z.string().min(1, "Nom requis"),
   role: z.enum(["ADMIN", "SUPER_ADMIN"]),

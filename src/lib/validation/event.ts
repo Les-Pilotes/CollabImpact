@@ -20,10 +20,11 @@ export const createEventSchema = z.object({
 
 export const updateEventSchema = createEventSchema.extend({
   replyToEmail: z
-    .string()
-    .email("Email invalide")
-    .optional()
-    .or(z.literal("")),
+    .preprocess(
+      (v) => (typeof v === "string" ? v.trim() : v),
+      z.union([z.string().email("Email invalide"), z.literal("")]),
+    )
+    .optional(),
   emailSignature: z.string().optional(),
 });
 
