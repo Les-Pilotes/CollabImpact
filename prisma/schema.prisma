@@ -37,6 +37,12 @@ enum ImmersionStatus {
   complet
   en_cours
   termine
+  archive
+}
+
+enum AdminRole {
+  ADMIN
+  SUPER_ADMIN
 }
 
 enum EnrollmentStatus {
@@ -100,6 +106,7 @@ model Admin {
   email          String       @unique
   firstName      String?
   lastName       String?
+  role           AdminRole    @default(ADMIN)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   organisation   Organisation @relation(fields: [organisationId], references: [id])
@@ -162,6 +169,10 @@ model Event {
   capacity    Int
   description String?
 
+  // Per-event email customization
+  replyToEmail   String?
+  emailSignature String?
+
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -212,6 +223,9 @@ model Enrollment {
   accessibilite      String?
   accompagnateur     Boolean   @default(false)
   commentaire        String?
+
+  // Admin-only internal note (not visible to participante)
+  internalNote String?
 
   deletedAt  DateTime?
   enrolledAt DateTime  @default(now())

@@ -1,9 +1,12 @@
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getKpis, getTaskProgress, getNextActions } from "@/lib/dashboard";
+import { getAppUrl } from "@/lib/app-url";
 import { Badge } from "@/components/ui/badge";
+import LifecycleBar from "./LifecycleBar";
+import SharePanel from "./SharePanel";
 
-export const metadata = { title: "Apercu" };
+export const metadata = { title: "Aperçu" };
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" | "muted" | "outline" }> = {
   inscrit: { label: "Inscrite", variant: "muted" },
@@ -22,10 +25,16 @@ function formatDate(date: Date): string {
 function formatShortDate(date: Date): string {
   return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
 }
-function getCountdown(eventDate: Date) {
+function getCountdown(eventDate: Date, status?: string) {
   const now = new Date();
   const days = Math.floor((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (days < 0) return { text: "Termine", tone: "past" };
+  if (days < 0) {
+    // Date passed — wording reflects whether the admin has explicitly
+    // closed the event (Finalisé/Archivé) vs forgotten to update it.
+    if (status === "termine") return { text: "Finalisé", tone: "past" };
+    if (status === "archive") return { text: "Archivé", tone: "past" };
+    return { text: "Date passée · à mettre à jour", tone: "warn" };
+  }
   if (days === 0) return { text: "aujourd'hui", tone: "today" };
   if (days <= 3) return { text: `J-${days}`, tone: "soon" };
   if (days <= 7) return { text: `J-${days}`, tone: "warn" };
@@ -38,7 +47,11 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
   await requireAdmin();
   const { eventId } = await params;
 
-  const [kpis, taskProgress, nextActions] = await Promise.all([
+  const [event, kpis, taskProgress, nextActions] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id: eventId },
+      select: { status: true, date: true, capacity: true },
+    }),
     getKpis(eventId),
     getTaskProgress(eventId),
     getNextActions(eventId),
@@ -51,7 +64,16 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
     include: { user: { select: { firstName: true, lastName: true } } },
   });
 
-  const countdown = getCountdown(kpis.eventDate);
+  const isComplet = event ? kpis.totalEnrolled >= event.capacity && event.capacity > 0 : false;
+  const today = new Date();
+  const isSameDay =
+    event &&
+    event.date.getFullYear() === today.getFullYear() &&
+    event.date.getMonth() === today.getMonth() &&
+    event.date.getDate() === today.getDate();
+  const isEnCours = !!isSameDay;
+
+  const countdown = getCountdown(kpis.eventDate, event?.status);
   const fillPct = kpis.capacity > 0 ? Math.round((kpis.totalEnrolled / kpis.capacity) * 100) : 0;
   const confirmedPct = kpis.totalEnrolled > 0 ? Math.round((kpis.confirmed / kpis.totalEnrolled) * 100) : 0;
   const attendedPct = kpis.confirmed > 0 ? Math.round((kpis.attended / kpis.confirmed) * 100) : 0;
@@ -63,11 +85,33 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
         <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${COUNTDOWN_TONE[countdown.tone]}`}>
           {countdown.text}{kpis.eventAddress ? ` · ${kpis.eventAddress}` : ""}
         </p>
-        <h1 className="text-3xl font-bold leading-tight text-stone-900">{kpis.eventName || "Evenement"}</h1>
+        <h1 className="text-3xl font-bold leading-tight text-stone-900">{kpis.eventName || "Événement"}</h1>
         {kpis.eventDate.getTime() !== new Date(0).getTime() && (
           <p className="text-sm text-stone-500">{formatDate(kpis.eventDate)}</p>
         )}
       </header>
+
+      {event && (
+        <section>
+          <LifecycleBar
+            eventId={eventId}
+            status={event.status}
+            isComplet={isComplet}
+            isEnCours={isEnCours}
+          />
+        </section>
+      )}
+
+      {event && (
+        <SharePanel
+          inscriptionUrl={`${getAppUrl()}/inscription/${eventId}`}
+          eventName={kpis.eventName}
+          eventDate={formatDate(event.date)}
+          isPublished={
+            event.status !== "brouillon" && event.status !== "archive"
+          }
+        />
+      )}
 
       <section>
         <p className="text-base leading-relaxed text-stone-700 max-w-[68ch]">
@@ -84,7 +128,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-stone-900">Avancement</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">Avancement</h2>
         <dl className="space-y-3">
           {taskProgress.map(({ phase, total, done }) => {
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -103,7 +147,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
 
       {nextActions.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-stone-900">A faire</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">À faire</h2>
           <ul className="divide-y divide-stone-200 border-y border-stone-200">
             {nextActions.map((action, i) => (
               <li key={i}>
@@ -118,7 +162,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
       )}
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-stone-900">Dernieres inscriptions</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">Dernières inscriptions</h2>
         {recentEnrollments.length === 0 ? (
           <p className="text-sm text-stone-500">Aucune inscription pour l&apos;instant.</p>
         ) : (

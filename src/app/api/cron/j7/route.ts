@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       await sendEmail({
         to: enrollment.user.email,
         subject: `Confirme ta venue — ${enrollment.event.name}`,
+        replyTo: enrollment.event.replyToEmail ?? undefined,
         react: React.createElement(J7Reminder, {
           firstName: enrollment.user.firstName,
           immersionName: enrollment.event.name,

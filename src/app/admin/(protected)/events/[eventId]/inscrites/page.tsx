@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import KanbanBoard, { type ParticipantRow } from "./KanbanBoard";
 import { capitalizeName } from "@/lib/normalize";
+import { createCheckinToken } from "@/lib/tokens";
 
 function mapStatus(s: string): ParticipantRow["status"] {
   if (s === "confirmee_j7") return "attente_j2";
@@ -83,6 +84,11 @@ export default async function ParticipantesPage({
       });
     }
 
+    // Only confirmées get a personal QR — TTL is short, no need to generate
+    // tokens for participantes still in the J-7/J-2 funnel.
+    const checkinToken =
+      e.status === "confirmee_j2" ? createCheckinToken(e.id) : null;
+
     return {
       id: e.id,
       firstName: capitalizeName(e.user.firstName),
@@ -96,9 +102,17 @@ export default async function ParticipantesPage({
       j7EmailSent: !!e.j7SentAt,
       j2EmailSent: !!e.j2SentAt,
       droitsImageStatus: e.droitsImageStatus,
+      // Orientation fields (PR #3) — surfaced in the Workshop tab so the admin
+      // can compose groups based on niveau/projet/centres d'intérêt/région.
+      niveauScolaire: e.user.niveauScolaire ?? null,
+      niveauScolaireAutre: e.user.niveauScolaireAutre ?? null,
+      projetPro: e.user.projetPro ?? null,
+      motivation: e.user.motivation ?? [],
+      region: e.user.region ?? null,
+      checkinToken,
       history,
     };
   });
 
-  return <KanbanBoard initialParticipants={participants} />;
+  return <KanbanBoard initialParticipants={participants} eventId={eventId} />;
 }

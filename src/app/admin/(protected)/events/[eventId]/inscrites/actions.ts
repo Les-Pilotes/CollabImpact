@@ -106,6 +106,7 @@ export async function sendManualReminder(
     await sendEmail({
       to: enrollment.user.email,
       subject: `Rappel J-7 — ${enrollment.event.name}`,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(J7Reminder, {
         firstName: enrollment.user.firstName,
         immersionName: enrollment.event.name,
@@ -194,6 +195,7 @@ export async function sendJ2Reminder(
     await sendEmail({
       to: enrollment.user.email,
       subject: `Rappel J-2 — ${enrollment.event.name}`,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(J2Reminder, {
         firstName: enrollment.user.firstName,
         immersionName: enrollment.event.name,
@@ -232,18 +234,29 @@ export async function markConfirmeeJ2(enrollmentId: string): Promise<{ ok: boole
   }
 }
 
-export async function markDesistement(enrollmentId: string): Promise<{ ok: boolean }> {
+/**
+ * Mark désistement. Returns the previous status so the caller can offer Undo
+ * via a toast action.
+ */
+export async function markDesistement(
+  enrollmentId: string,
+): Promise<{ ok: true; previousStatus: EnrollmentStatus } | { ok: false; error: string }> {
   await requireAdmin();
-
   try {
+    const before = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      select: { status: true },
+    });
+    if (!before) return { ok: false, error: 'Inscription introuvable.' };
+
     await prisma.enrollment.update({
       where: { id: enrollmentId },
       data: { status: EnrollmentStatus.desistement },
     });
-    return { ok: true };
+    return { ok: true, previousStatus: before.status };
   } catch (err) {
     console.error('[markDesistement]', err);
-    return { ok: false };
+    return { ok: false, error: 'Erreur lors du désistement.' };
   }
 }
 
@@ -280,6 +293,7 @@ export async function sendFeedbackInvite(
     await sendEmail({
       to: enrollment.user.email,
       subject: `Ton avis sur ${enrollment.event.name}`,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(FeedbackInvite, {
         firstName: enrollment.user.firstName,
         immersionName: enrollment.event.name,
@@ -293,3 +307,63 @@ export async function sendFeedbackInvite(
     return { ok: false, error: "Erreur lors de l'envoi du feedback." };
   }
 }
+
+// ─── Undo / reversal actions ────────────────────────────────────────────────
+// All "destructive" admin actions surface an Annuler toast. These mutations
+// reverse the original action so the previous state can be restored.
+
+/**
+ * Mark the J-7 reminder as not sent (resets `j7SentAt`). Does NOT recall
+ * the actual email — that's not possible — but the system will consider the
+ * reminder un-sent, so future cron / manual triggers can fire again.
+ */
+export async function revertJ7Send(enrollmentId: string): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  try {
+    await prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: { j7SentAt: null },
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error('[revertJ7Send]', err);
+    return { ok: false };
+  }
+}
+
+export async function revertJ2Send(enrollmentId: string): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  try {
+    await prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: { j2SentAt: null },
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error('[revertJ2Send]', err);
+    return { ok: false };
+  }
+}
+
+/**
+ * Generic status revert. Caller passes the previous status captured before
+ * the original mutation. Used to power Annuler toasts on désistement,
+ * markPresente, markAbsente, etc.
+ */
+export async function revertStatus(
+  enrollmentId: string,
+  previousStatus: EnrollmentStatus,
+): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  try {
+    await prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: { status: previousStatus },
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error('[revertStatus]', err);
+    return { ok: false };
+  }
+}
+
