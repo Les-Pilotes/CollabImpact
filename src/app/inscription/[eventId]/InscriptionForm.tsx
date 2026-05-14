@@ -123,7 +123,28 @@ function Field({
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export default function InscriptionForm({ event }: { event: EventProps }) {
+type FormConfig = {
+  phoneEnabled: boolean;
+  birthDateEnabled: boolean;
+  cityEnabled: boolean;
+  sourceEnabled: boolean;
+};
+
+const DEFAULT_FORM_CONFIG: FormConfig = {
+  phoneEnabled: true,
+  birthDateEnabled: true,
+  cityEnabled: true,
+  sourceEnabled: true,
+};
+
+export default function InscriptionForm({
+  event,
+  formConfig,
+}: {
+  event: EventProps;
+  formConfig?: FormConfig | null;
+}) {
+  const fc = formConfig ?? DEFAULT_FORM_CONFIG;
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
   const [flow, setFlow] = useState<Flow>("unknown");
@@ -272,16 +293,16 @@ export default function InscriptionForm({ event }: { event: EventProps }) {
   const step1Valid =
     data.firstName.trim() &&
     data.lastName.trim() &&
-    data.phone.trim() &&
-    data.birthDate &&
-    data.city.trim();
+    (!fc.phoneEnabled || data.phone.trim()) &&
+    (!fc.birthDateEnabled || data.birthDate) &&
+    (!fc.cityEnabled || data.city.trim());
 
   const step2Valid =
     data.niveauScolaire &&
     data.region &&
     data.projetPro.trim() &&
     data.motivation.length > 0 &&
-    data.commentConnu.trim();
+    (!fc.sourceEnabled || data.commentConnu.trim());
 
   const step3Valid =
     // Pour majeure : doit accepter droits image + signer
@@ -405,6 +426,7 @@ export default function InscriptionForm({ event }: { event: EventProps }) {
         <Step1Fondamentale
           data={data}
           setField={setField}
+          fc={fc}
         />
       )}
 
@@ -414,6 +436,7 @@ export default function InscriptionForm({ event }: { event: EventProps }) {
           flow={flow}
           setField={setField}
           toggleMotivation={(v) => toggleArray("motivation", v)}
+          fc={fc}
         />
       )}
 
@@ -650,9 +673,11 @@ function StepVerify({
 function Step1Fondamentale({
   data,
   setField,
+  fc,
 }: {
   data: FormData;
   setField: <K extends keyof FormData>(k: K, v: FormData[K]) => void;
+  fc: FormConfig;
 }) {
   return (
     <div className="space-y-5">
@@ -684,23 +709,27 @@ function Step1Fondamentale({
           />
         </Field>
       </div>
-      <Field label="Téléphone" required hint="Au cas où on doive te joindre rapidement.">
-        <input
-          type="tel"
-          value={data.phone}
-          onChange={(e) => setField("phone", e.target.value)}
-          placeholder="06 12 34 56 78"
-          className={inputCls}
-        />
-      </Field>
-      <Field label="Date de naissance" required>
-        <input
-          type="date"
-          value={data.birthDate}
-          onChange={(e) => setField("birthDate", e.target.value)}
-          className={inputCls}
-        />
-      </Field>
+      {fc.phoneEnabled && (
+        <Field label="Téléphone" required hint="Au cas où on doive te joindre rapidement.">
+          <input
+            type="tel"
+            value={data.phone}
+            onChange={(e) => setField("phone", e.target.value)}
+            placeholder="06 12 34 56 78"
+            className={inputCls}
+          />
+        </Field>
+      )}
+      {fc.birthDateEnabled && (
+        <Field label="Date de naissance" required>
+          <input
+            type="date"
+            value={data.birthDate}
+            onChange={(e) => setField("birthDate", e.target.value)}
+            className={inputCls}
+          />
+        </Field>
+      )}
       <Field label="Tu es">
         <div className="grid grid-cols-3 gap-2">
           {(["Fille", "Garçon", "Autre"] as const).map((g) => (
@@ -719,14 +748,16 @@ function Step1Fondamentale({
           ))}
         </div>
       </Field>
-      <Field label="Ville de résidence" required>
-        <input
-          value={data.city}
-          onChange={(e) => setField("city", e.target.value)}
-          placeholder="Paris, Montreuil, Bobigny…"
-          className={inputCls}
-        />
-      </Field>
+      {fc.cityEnabled && (
+        <Field label="Ville de résidence" required>
+          <input
+            value={data.city}
+            onChange={(e) => setField("city", e.target.value)}
+            placeholder="Paris, Montreuil, Bobigny…"
+            className={inputCls}
+          />
+        </Field>
+      )}
     </div>
   );
 }
@@ -738,11 +769,13 @@ function Step2Orientation({
   flow,
   setField,
   toggleMotivation,
+  fc,
 }: {
   data: FormData;
   flow: Flow;
   setField: <K extends keyof FormData>(k: K, v: FormData[K]) => void;
   toggleMotivation: (v: string) => void;
+  fc: FormConfig;
 }) {
   const isStale = flow === "returning_stale";
   return (
@@ -842,18 +875,20 @@ function Step2Orientation({
           className={inputCls}
         />
       </Field>
-      <Field label="Comment as-tu connu Les Pilotes ?" required>
-        <select
-          value={data.commentConnu}
-          onChange={(e) => setField("commentConnu", e.target.value)}
-          className={inputCls}
-        >
-          <option value="">Sélectionne…</option>
-          {SOURCES.map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
-      </Field>
+      {fc.sourceEnabled && (
+        <Field label="Comment as-tu connu Les Pilotes ?" required>
+          <select
+            value={data.commentConnu}
+            onChange={(e) => setField("commentConnu", e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Sélectionne…</option>
+            {SOURCES.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+        </Field>
+      )}
     </div>
   );
 }

@@ -13,6 +13,11 @@ export const createEventSchema = z.object({
     .string()
     .regex(/^\d{2}:\d{2}$/, "Heure invalide (HH:mm)")
     .default("09:30"),
+  endTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "Heure invalide (HH:mm)")
+    .optional()
+    .or(z.literal("")),
   address: z.string().min(2, "Adresse requise"),
   capacity: z.coerce.number().int().positive("Capacité doit être positive"),
   description: z.string().optional(),

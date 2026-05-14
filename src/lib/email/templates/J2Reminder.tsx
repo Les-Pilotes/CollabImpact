@@ -2,33 +2,30 @@ import { Button, Heading, Section, Text } from "@react-email/components";
 import { BaseLayout } from "./BaseLayout";
 
 type Props = {
-  firstName: string;
+  heading: string;
+  body: string;
   immersionName: string;
-  dateLabel: string;
-  address: string;
   confirmUrl: string;
   declineUrl: string;
   isMinor?: boolean;
+  customNote?: string;
+  signature?: string;
 };
 
 export default function J2Reminder({
-  firstName,
+  heading,
+  body,
   immersionName,
-  dateLabel,
-  address,
   confirmUrl,
   declineUrl,
   isMinor,
+  customNote,
+  signature,
 }: Props) {
   return (
     <BaseLayout preview={`Dernière confirmation pour ${immersionName}`}>
-      <Heading as="h2">C&apos;est dans 2 jours, {firstName} !</Heading>
-      <Text>
-        Rendez-vous <strong>{dateLabel}</strong> pour <strong>{immersionName}</strong>.
-        <br />
-        📍 {address}
-      </Text>
-      <Text>Dernier check — un clic pour confirmer (ou te désister si imprévu) :</Text>
+      <Heading as="h2">{heading}</Heading>
+      <Text style={{ whiteSpace: "pre-line" }}>{body}</Text>
       <Section style={{ textAlign: "center", margin: "24px 0" }}>
         <Button href={confirmUrl} style={confirmButton}>
           ✓ Je serai là
@@ -54,9 +51,35 @@ export default function J2Reminder({
           </Text>
         </Section>
       )}
+      {customNote && (
+        <Section
+          style={{
+            backgroundColor: "#f5f5f4",
+            borderRadius: 6,
+            padding: "12px 16px",
+            margin: "16px 0",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              color: "#44403c",
+              margin: 0,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {customNote}
+          </Text>
+        </Section>
+      )}
       <Text style={{ fontSize: 13, color: "#71717a" }}>
         Si tu ne peux plus venir, préviens-nous tout de suite — ça libère une place pour quelqu&apos;un d&apos;autre.
       </Text>
+      {signature && (
+        <Text style={{ fontSize: 13, color: "#44403c", whiteSpace: "pre-line", marginTop: 24 }}>
+          {signature}
+        </Text>
+      )}
     </BaseLayout>
   );
 }
@@ -83,10 +106,9 @@ const declineButton: React.CSSProperties = {
 };
 
 J2Reminder.PreviewProps = {
-  firstName: "Amadou",
+  heading: "C'est dans 2 jours, Amadou !",
+  body: "Rendez-vous samedi 18 avril 2026 à 9h30 pour Workshop 100% Féminin.\n📍 9 rue de Vaugirard, 75006 Paris",
   immersionName: "Workshop 100% Féminin",
-  dateLabel: "samedi 18 avril 2026 à 9h30",
-  address: "9 rue de Vaugirard, 75006 Paris",
   confirmUrl: "https://example.com/confirm/abc",
   declineUrl: "https://example.com/decline/abc",
   isMinor: false,

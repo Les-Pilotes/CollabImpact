@@ -12,6 +12,7 @@ type Initial = {
   type: string;
   date: string;
   time: string;
+  endTime: string;
   address: string;
   capacity: number;
   description: string;
@@ -30,6 +31,7 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
     type: initial.type,
     date: initial.date,
     time: initial.time,
+    endTime: initial.endTime,
     address: initial.address,
     capacity: String(initial.capacity),
     description: initial.description,
@@ -57,6 +59,7 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
         type: form.type as "FEMININ" | "IMMERSION" | "ATELIER" | "IMPULSION",
         date: form.date,
         time: form.time,
+        endTime: form.endTime || undefined,
         address: form.address,
         capacity: Number(form.capacity),
         description: form.description || undefined,
@@ -64,7 +67,7 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
         emailSignature: form.emailSignature,
       });
       if (result.ok) {
-        toast.success("Paramètres enregistrés");
+        toast.success("Informations enregistrées");
         setIsDirty(false);
       } else {
         if (result.fieldErrors) setErrors(result.fieldErrors);
@@ -74,9 +77,9 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      <section className="space-y-4">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">Informations</h2>
+    <form onSubmit={handleSubmit} className="space-y-10">
+      <section className="space-y-5">
+        <SectionHeader title="Identité" hint="Comment l'événement est annoncé aux participantes." />
 
         <div className="space-y-1.5">
           <Label htmlFor="name">Nom</Label>
@@ -107,20 +110,42 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="description">Description</Label>
+          <textarea
+            id="description"
+            name="description"
+            value={form.description}
+            onChange={handleChange}
+            rows={4}
+            className="w-full border border-stone-200 rounded-md px-3 py-2 text-sm bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+            placeholder="Ce qui rend cette session unique, ce que la participante va vivre…"
+          />
+          <p className="text-xs text-stone-400">
+            Apparaît sur la page d&apos;inscription publique.
+          </p>
+        </div>
+      </section>
+
+      <section className="space-y-5">
+        <SectionHeader title="Quand et où" hint="Date, créneau horaire et lieu physique." />
+
+        <div className="space-y-1.5">
+          <Label htmlFor="date">Date</Label>
+          <Input
+            id="date"
+            name="date"
+            type="date"
+            value={form.date}
+            onChange={handleChange}
+            required
+            className="max-w-xs"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              name="date"
-              type="date"
-              value={form.date}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="time">Heure</Label>
+            <Label htmlFor="time">Début</Label>
             <Input
               id="time"
               name="time"
@@ -128,7 +153,20 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
               value={form.time}
               onChange={handleChange}
               required
+              className="w-32"
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="endTime">Fin</Label>
+            <Input
+              id="endTime"
+              name="endTime"
+              type="time"
+              value={form.endTime}
+              onChange={handleChange}
+              className="w-32"
+            />
+            <p className="text-xs text-stone-400">Optionnel</p>
           </div>
         </div>
 
@@ -140,6 +178,7 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
             value={form.address}
             onChange={handleChange}
             required
+            placeholder="9 rue de Vaugirard, 75006 Paris"
           />
         </div>
 
@@ -153,30 +192,20 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
             value={form.capacity}
             onChange={handleChange}
             required
+            className="w-32"
           />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="description">Description (optionnel)</Label>
-          <textarea
-            id="description"
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            rows={3}
-            className="w-full border border-stone-200 rounded-md px-3 py-2 text-sm bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
-          />
+          <p className="text-xs text-stone-400">
+            Nombre maximum de participantes. L&apos;inscription se ferme automatiquement
+            quand ce nombre est atteint.
+          </p>
         </div>
       </section>
 
-      <section className="space-y-4 pt-4 border-t border-stone-200">
-        <div>
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">Communications</h2>
-          <p className="text-xs text-stone-500 mt-1.5 max-w-prose">
-            Personnalisation des emails envoyés aux participantes (confirmation, J-7, J-2,
-            feedback).
-          </p>
-        </div>
+      <section className="space-y-5">
+        <SectionHeader
+          title="Communications"
+          hint="L&apos;adresse de réponse et la signature utilisées par défaut dans tous les emails."
+        />
 
         <div className="space-y-1.5">
           <Label htmlFor="replyToEmail">Reply-To</Label>
@@ -193,8 +222,8 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
             <p className="text-xs text-red-600">{errors.replyToEmail[0]}</p>
           )}
           <p className="text-xs text-stone-400">
-            Si une participante répond à un email, sa réponse arrive ici. Laisse vide pour
-            utiliser l&apos;email par défaut.
+            Si une participante répond, sa réponse arrive ici. Laisse vide pour utiliser
+            l&apos;email par défaut.
           </p>
         </div>
 
@@ -215,11 +244,11 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
         </div>
       </section>
 
-      <div className="flex items-center gap-3 pt-6 border-t border-stone-200">
+      <div className="flex items-center gap-3 pt-2">
         {isDirty ? (
           <p className="text-xs text-stone-500">Modifications non enregistrées</p>
         ) : (
-          <p className="text-xs text-emerald-600">✓ À jour</p>
+          <p className="text-xs text-emerald-600">À jour</p>
         )}
         <div className="flex-1" />
         <Button type="submit" disabled={isPending || !isDirty}>
@@ -227,5 +256,14 @@ export default function EventSettingsForm({ eventId, initial }: Props) {
         </Button>
       </div>
     </form>
+  );
+}
+
+function SectionHeader({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="pb-2 border-b border-stone-100">
+      <h3 className="text-sm font-semibold text-stone-900">{title}</h3>
+      {hint && <p className="text-xs text-stone-500 mt-1 max-w-prose">{hint}</p>}
+    </div>
   );
 }

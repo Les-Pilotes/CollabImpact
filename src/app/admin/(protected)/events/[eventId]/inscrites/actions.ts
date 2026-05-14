@@ -6,10 +6,34 @@ import { requireAdmin } from '@/lib/auth';
 import { createFeedbackToken, createActionToken } from '@/lib/tokens';
 import { getAppUrl } from '@/lib/app-url';
 import { sendEmail } from '@/lib/email/client';
+import { resolveEmail } from '@/lib/email/resolve';
 import J7Reminder from '@/lib/email/templates/J7Reminder';
 import J2Reminder from '@/lib/email/templates/J2Reminder';
 import FeedbackInvite from '@/lib/email/templates/FeedbackInvite';
 import React from 'react';
+
+function buildEmailVars(enrollment: {
+  user: { firstName: string };
+  event: { name: string; date: Date; address: string };
+}) {
+  const dateLabel = enrollment.event.date.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const timeLabel = enrollment.event.date.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return {
+    prenom: enrollment.user.firstName,
+    event: enrollment.event.name,
+    date: dateLabel,
+    horaire: timeLabel,
+    lieu: enrollment.event.address,
+  };
+}
 
 /**
  * Update enrollment status (admin manual control)
@@ -79,7 +103,7 @@ export async function sendManualReminder(
   try {
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { user: true, event: true },
+      include: { user: true, event: { include: { emailConfig: true } } },
     });
 
     if (!enrollment) {
@@ -89,32 +113,27 @@ export async function sendManualReminder(
     const appUrl = getAppUrl();
     const confirmToken = createActionToken(enrollmentId, 'confirm');
     const declineToken = createActionToken(enrollmentId, 'decline');
-    const confirmUrl = `${appUrl}/confirm/${confirmToken}`;
-    const declineUrl = `${appUrl}/decline/${declineToken}`;
-    const dateLabel = enrollment.event.date.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
     const isMinor = enrollment.user.birthDate
       ? (enrollment.event.date.getTime() - enrollment.user.birthDate.getTime()) /
           (1000 * 60 * 60 * 24 * 365.25) <
         18
       : false;
 
+    const resolved = resolveEmail('j7', enrollment.event.emailConfig, buildEmailVars(enrollment));
+
     await sendEmail({
       to: enrollment.user.email,
-      subject: `Rappel J-7 — ${enrollment.event.name}`,
+      subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(J7Reminder, {
-        firstName: enrollment.user.firstName,
+        heading: resolved.heading,
+        body: resolved.body,
         immersionName: enrollment.event.name,
-        companyName: enrollment.event.name,
-        dateLabel,
-        confirmUrl,
-        declineUrl,
+        confirmUrl: `${appUrl}/confirm/${confirmToken}`,
+        declineUrl: `${appUrl}/decline/${declineToken}`,
         isMinor,
+        customNote: resolved.note ?? undefined,
+        signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
 
@@ -168,7 +187,7 @@ export async function sendJ2Reminder(
   try {
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { user: true, event: true },
+      include: { user: true, event: { include: { emailConfig: true } } },
     });
 
     if (!enrollment) {
@@ -178,32 +197,27 @@ export async function sendJ2Reminder(
     const appUrl = getAppUrl();
     const confirmToken = createActionToken(enrollmentId, 'confirm');
     const declineToken = createActionToken(enrollmentId, 'decline');
-    const confirmUrl = `${appUrl}/confirm/${confirmToken}`;
-    const declineUrl = `${appUrl}/decline/${declineToken}`;
-    const dateLabel = enrollment.event.date.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
     const isMinor = enrollment.user.birthDate
       ? (enrollment.event.date.getTime() - enrollment.user.birthDate.getTime()) /
           (1000 * 60 * 60 * 24 * 365.25) <
         18
       : false;
 
+    const resolved = resolveEmail('j2', enrollment.event.emailConfig, buildEmailVars(enrollment));
+
     await sendEmail({
       to: enrollment.user.email,
-      subject: `Rappel J-2 — ${enrollment.event.name}`,
+      subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(J2Reminder, {
-        firstName: enrollment.user.firstName,
+        heading: resolved.heading,
+        body: resolved.body,
         immersionName: enrollment.event.name,
-        dateLabel,
-        address: enrollment.event.address,
-        confirmUrl,
-        declineUrl,
+        confirmUrl: `${appUrl}/confirm/${confirmToken}`,
+        declineUrl: `${appUrl}/decline/${declineToken}`,
         isMinor,
+        customNote: resolved.note ?? undefined,
+        signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
 
@@ -271,7 +285,7 @@ export async function sendFeedbackInvite(
   try {
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { user: true, event: true },
+      include: { user: true, event: { include: { emailConfig: true } } },
     });
 
     if (!enrollment) {
@@ -290,14 +304,19 @@ export async function sendFeedbackInvite(
       },
     });
 
+    const resolved = resolveEmail('feedback', enrollment.event.emailConfig, buildEmailVars(enrollment));
+
     await sendEmail({
       to: enrollment.user.email,
-      subject: `Ton avis sur ${enrollment.event.name}`,
+      subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(FeedbackInvite, {
-        firstName: enrollment.user.firstName,
+        heading: resolved.heading,
+        body: resolved.body,
         immersionName: enrollment.event.name,
         feedbackUrl,
+        customNote: resolved.note ?? undefined,
+        signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
 

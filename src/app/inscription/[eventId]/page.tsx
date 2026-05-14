@@ -35,6 +35,7 @@ export default async function InscriptionPage({
       capacity: true,
       description: true,
       status: true,
+      formConfig: true,
       _count: { select: { enrollments: { where: { deletedAt: null } } } },
     },
   });
@@ -59,6 +60,7 @@ export default async function InscriptionPage({
         isFull,
         isClosed,
       }}
+      formConfig={event.formConfig}
     />
   );
 }
