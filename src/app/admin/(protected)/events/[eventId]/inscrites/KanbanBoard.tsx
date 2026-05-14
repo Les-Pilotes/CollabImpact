@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download } from "lucide-react";
+import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer } from "lucide-react";
 import PageHeader from "../../../PageHeader";
+import { QrCode } from "@/components/ui/qr-code";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,15 @@ export type ParticipantRow = {
   j7EmailSent?: boolean;
   j2EmailSent?: boolean;
   droitsImageStatus?: DroitsImageStatus;
+  /** Orientation layer — populated from `User` (PR #3). Optional because
+   *  legacy / demo rows may not carry it. */
+  niveauScolaire?: string | null;
+  niveauScolaireAutre?: string | null;
+  projetPro?: string | null;
+  motivation?: string[];
+  region?: string | null;
+  /** Signed checkin token (QR Jour-J). Only present on `confirmee` rows. */
+  checkinToken?: string | null;
   history: HistoryItem[];
   isDemo?: boolean;
   archivedAs?: "desistee" | "presente" | "absente";
@@ -640,7 +650,14 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
   const [picking, setPicking] = useState<string | null>(null);   // tap-to-assign (mobile)
   const [draggingId, setDraggingId] = useState<string | null>(null); // drag (desktop)
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
+  const [qrParticipant, setQrParticipant] = useState<ParticipantRow | null>(null);
 
+  // Filter out participantes who dropped out (`desistement`) or were marked
+  // `absente` — they're already excluded at the parent fetch (`status notIn`),
+  // but we keep this guard explicit so the Workshop tab stays correct if the
+  // upstream filter ever loosens. Inscrit / contactée flow through as
+  // `attente_j7` (cf. mapStatus in page.tsx) and are included — useful to
+  // start drafting groups before everyone is confirmed.
   const eligible = participants.filter((p) =>
     ["confirmee", "attente_j2", "attente_j7"].includes(p.status)
   );
@@ -763,27 +780,18 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
                       <p className="px-4 py-2.5 text-xs text-zinc-300">Aucune participante</p>
                     )}
                     {members.map((p) => (
-                      <div
+                      <ParticipantOrientationRow
                         key={p.id}
-                        data-participant
-                        draggable
+                        p={p}
+                        avatarColor={avatarColor}
+                        initials={initials}
+                        draggingId={draggingId}
+                        picking={picking}
                         onDragStart={() => { setDraggingId(p.id); setPicking(null); }}
                         onDragEnd={() => { setDraggingId(null); setDragOverGroup(null); }}
-                        onClick={(e) => { e.stopPropagation(); handleParticipantTap(p.id); }}
-                        className={`flex items-center gap-3 px-4 py-2.5 transition-colors select-none ${
-                          draggingId === p.id
-                            ? "opacity-40 cursor-grabbing"
-                            : picking === p.id
-                            ? "bg-orange-50 ring-2 ring-inset ring-orange-300 cursor-pointer"
-                            : "hover:bg-zinc-50 cursor-grab"
-                        }`}
-                      >
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${avatarColor(p.id)}`}>
-                          {initials(p)}
-                        </div>
-                        <span className="text-sm text-zinc-800 flex-1 truncate">{p.firstName} {p.lastName}</span>
-                        <span className="text-[10px] text-zinc-300 hidden md:inline">⠿</span>
-                      </div>
+                        onTap={() => handleParticipantTap(p.id)}
+                        onOpenQr={() => setQrParticipant(p)}
+                      />
                     ))}
                   </div>
                 )}
@@ -854,6 +862,241 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
           )}
         </div>
       )}
+
+      {qrParticipant && (
+        <CheckinQrModal
+          participant={qrParticipant}
+          onClose={() => setQrParticipant(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Orientation row inside a group card ──────────────────────────────────────
+
+const NIVEAU_PILL = "bg-sky-50 text-sky-700 border-sky-200";
+const PROJET_PILL = "bg-emerald-50 text-emerald-700 border-emerald-200";
+const REGION_PILL = "bg-amber-50 text-amber-700 border-amber-200";
+const MOTIV_PILL = "bg-violet-50 text-violet-700 border-violet-200";
+
+function ParticipantOrientationRow({
+  p,
+  avatarColor,
+  initials,
+  draggingId,
+  picking,
+  onDragStart,
+  onDragEnd,
+  onTap,
+  onOpenQr,
+}: {
+  p: ParticipantRow;
+  avatarColor: (id: string) => string;
+  initials: (p: ParticipantRow) => string;
+  draggingId: string | null;
+  picking: string | null;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onTap: () => void;
+  onOpenQr: () => void;
+}) {
+  const niveau =
+    p.niveauScolaire === "Autres" && p.niveauScolaireAutre
+      ? p.niveauScolaireAutre
+      : p.niveauScolaire;
+  const motivations = p.motivation ?? [];
+  const hasQr = p.status === "confirmee" && !!p.checkinToken;
+
+  return (
+    <div
+      data-participant
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTap();
+      }}
+      className={`px-4 py-2.5 transition-colors select-none ${
+        draggingId === p.id
+          ? "opacity-40 cursor-grabbing"
+          : picking === p.id
+          ? "bg-orange-50 ring-2 ring-inset ring-orange-300 cursor-pointer"
+          : "hover:bg-zinc-50 cursor-grab"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${avatarColor(p.id)}`}
+        >
+          {initials(p)}
+        </div>
+        <span className="text-sm text-zinc-800 flex-1 truncate">
+          {p.firstName} {p.lastName}
+        </span>
+        {hasQr && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenQr();
+            }}
+            title="QR Jour J personnel"
+            className="text-zinc-400 hover:text-orange-500 transition-colors"
+          >
+            <QrCodeIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
+        <span className="text-[10px] text-zinc-300 hidden md:inline">⠿</span>
+      </div>
+
+      {(niveau || p.projetPro || p.region || motivations.length > 0) && (
+        <div className="flex flex-wrap gap-1 mt-1.5 pl-10">
+          {niveau && (
+            <span
+              className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${NIVEAU_PILL}`}
+              title="Niveau scolaire"
+            >
+              {niveau}
+            </span>
+          )}
+          {p.projetPro && (
+            <span
+              className={`text-[10px] font-medium px-1.5 py-0.5 rounded border max-w-[180px] truncate ${PROJET_PILL}`}
+              title={`Projet pro : ${p.projetPro}`}
+            >
+              {p.projetPro}
+            </span>
+          )}
+          {p.region && (
+            <span
+              className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${REGION_PILL}`}
+              title="Région"
+            >
+              {p.region}
+            </span>
+          )}
+          {motivations.slice(0, 3).map((m) => (
+            <span
+              key={m}
+              className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${MOTIV_PILL}`}
+              title="Motivation"
+            >
+              {m}
+            </span>
+          ))}
+          {motivations.length > 3 && (
+            <span className="text-[10px] text-zinc-400 px-1">
+              +{motivations.length - 3}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── QR Jour-J personnel modal ────────────────────────────────────────────────
+
+function CheckinQrModal({
+  participant,
+  onClose,
+}: {
+  participant: ParticipantRow;
+  onClose: () => void;
+}) {
+  const token = participant.checkinToken;
+  const url =
+    typeof window !== "undefined" && token
+      ? `${window.location.origin}/checkin/${token}`
+      : "";
+
+  const handlePrint = () => {
+    if (typeof window === "undefined") return;
+    window.print();
+  };
+
+  if (!token) {
+    return (
+      <div
+        className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <div
+          className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-sm text-zinc-600">
+            Le QR Jour J n&apos;est généré qu&apos;une fois la présence
+            confirmée (statut « Attendue Jour J »).
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 w-full px-3 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-xs font-semibold"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 print:shadow-none print:max-w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-500">
+              QR Jour J · personnel
+            </p>
+            <p className="text-base font-extrabold text-zinc-900 mt-0.5">
+              {participant.firstName} {participant.lastName}
+            </p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              Scan = check-in automatique (présente)
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-zinc-400 hover:text-zinc-700 print:hidden"
+            aria-label="Fermer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex justify-center">
+          <QrCode value={url} size={190} />
+        </div>
+
+        <p className="text-[10px] text-zinc-400 text-center break-all px-2">
+          {url}
+        </p>
+
+        <div className="flex gap-2 print:hidden">
+          <button
+            onClick={handlePrint}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            Imprimer
+          </button>
+          <button
+            disabled
+            title="À venir — envoi du QR par email"
+            className="flex-1 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-400 text-xs font-semibold cursor-not-allowed"
+          >
+            Envoyer par email
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

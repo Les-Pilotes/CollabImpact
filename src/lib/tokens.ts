@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 /**
- * Tokens HMAC signés. Deux usages :
+ * Tokens HMAC signés. Trois usages :
  *
  * 1. Feedback token — `createFeedbackToken` / `verifyFeedbackToken`
  *    Format : base64url(enrollmentId).base64url(expiryTs).base64url(hmac)
@@ -10,6 +10,11 @@ import crypto from "node:crypto";
  * 2. Action token — `createActionToken` / `verifyActionToken`
  *    Format : base64url(enrollmentId).base64url(action).base64url(expiryTs).base64url(hmac)
  *    Pour les boutons one-click dans les emails J-7 et J-2.
+ *    Pas stocké en base — auto-vérifiable via signature.
+ *
+ * 3. Checkin token — `createCheckinToken` / `verifyCheckinToken`
+ *    Format : base64url(enrollmentId).base64url("checkin").base64url(expiryTs).base64url(hmac)
+ *    Encodé dans le QR Jour-J personnel d'une participante. TTL court (~2 jours).
  *    Pas stocké en base — auto-vérifiable via signature.
  */
 
@@ -105,5 +110,54 @@ export function verifyActionToken(token: string): ActionTokenResult {
     valid: true,
     enrollmentId: Buffer.from(encId, "base64url").toString("utf8"),
     action,
+  };
+}
+
+// ─── Checkin tokens (QR Jour-J personnel) ───────────────────────────────────
+
+const CHECKIN_TTL_DAYS = 2; // QR personnel — valable J-1 / J / J+1
+const CHECKIN_TAG = "checkin";
+
+/**
+ * Émet un token signé qui sera encodé dans le QR Jour-J personnel.
+ * Le tag interne (`checkin`) garantit qu'on ne peut pas reuse un actionToken
+ * `confirm`/`decline` ici (et inversement).
+ */
+export function createCheckinToken(
+  enrollmentId: string,
+  ttlDays = CHECKIN_TTL_DAYS,
+): string {
+  const expiry = Date.now() + ttlDays * 24 * 60 * 60 * 1000;
+  const payload = `${b64url(enrollmentId)}.${b64url(CHECKIN_TAG)}.${b64url(String(expiry))}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+export type CheckinTokenResult =
+  | { valid: true; enrollmentId: string }
+  | { valid: false; reason: "malformed" | "bad_signature" | "expired" | "bad_tag" };
+
+export function verifyCheckinToken(token: string): CheckinTokenResult {
+  const parts = token.split(".");
+  if (parts.length !== 4) return { valid: false, reason: "malformed" };
+  const [encId, encTag, encExp, sig] = parts;
+  const payload = `${encId}.${encTag}.${encExp}`;
+  const expected = sign(payload);
+  if (
+    sig.length !== expected.length ||
+    !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))
+  ) {
+    return { valid: false, reason: "bad_signature" };
+  }
+  const tag = Buffer.from(encTag, "base64url").toString("utf8");
+  if (tag !== CHECKIN_TAG) {
+    return { valid: false, reason: "bad_tag" };
+  }
+  const expiry = Number(Buffer.from(encExp, "base64url").toString("utf8"));
+  if (!Number.isFinite(expiry) || Date.now() > expiry) {
+    return { valid: false, reason: "expired" };
+  }
+  return {
+    valid: true,
+    enrollmentId: Buffer.from(encId, "base64url").toString("utf8"),
   };
 }
