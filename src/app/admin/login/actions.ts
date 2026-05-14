@@ -34,6 +34,21 @@ function classifySupabaseError(message: string): "rate-limit" | "magic-error" {
   return "magic-error";
 }
 
+export async function signInWithGoogle() {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${getAppUrl()}/auth/callback`,
+      queryParams: { hd: "les-pilotes.fr" },
+    },
+  });
+  if (error || !data.url) {
+    redirect("/admin/login?reason=auth-unavailable");
+  }
+  redirect(data.url);
+}
+
 export async function sendMagicLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email || !email.includes("@")) {
