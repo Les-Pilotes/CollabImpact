@@ -4,6 +4,7 @@ import { assertCronRequest } from "@/lib/cron";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/client";
 import { createFeedbackToken } from "@/lib/tokens";
+import { getAppUrl } from "@/lib/app-url";
 import FeedbackInvite from "@/lib/email/templates/FeedbackInvite";
 
 const EVENT_ID = "seed-event-cite-audacieuse";
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
   let sent = 0;
   for (const enrollment of enrollments) {
     const token = createFeedbackToken(enrollment.id);
-    const feedbackUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/feedback/${token}`;
+    const feedbackUrl = `${getAppUrl()}/feedback/${token}`;
 
     await prisma.enrollment.update({
       where: { id: enrollment.id },
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
     await sendEmail({
       to: enrollment.user.email,
       subject: `Ton avis sur ${enrollment.event.name}`,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(FeedbackInvite, {
         firstName: enrollment.user.firstName,
         immersionName: enrollment.event.name,

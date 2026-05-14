@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useTransition, useState } from 'react';
+import React, { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { EnrollmentStatus } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +14,9 @@ import {
   sendJ2Reminder,
   markAttendance,
   sendFeedbackInvite,
+  revertJ7Send,
+  revertJ2Send,
+  revertStatus,
 } from '../actions';
 
 const STATUS_LABELS: Record<EnrollmentStatus, string> = {
@@ -47,21 +51,75 @@ export function ParticipantActions({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  function showMessage(type: 'success' | 'error', text: string) {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 4000);
-  }
-
-  function run(action: () => Promise<{ ok: boolean; error?: string }>, successText: string) {
+  /** Run a simple action with success/error toast, no undo. */
+  function run(
+    action: () => Promise<{ ok: boolean; error?: string }>,
+    successText: string,
+  ) {
     startTransition(async () => {
       const res = await action();
       if (res.ok) {
-        showMessage('success', successText);
+        toast.success(successText);
         router.refresh();
       } else {
-        showMessage('error', res.error ?? 'Une erreur est survenue.');
+        toast.error(res.error ?? 'Une erreur est survenue.');
+      }
+    });
+  }
+
+  /** Run a reversible action. The undo function is called from the toast. */
+  function runWithUndo(
+    action: () => Promise<{ ok: boolean; error?: string }>,
+    successText: string,
+    undoFn: () => Promise<{ ok: boolean }>,
+    undoText = 'Annulé',
+  ) {
+    startTransition(async () => {
+      const res = await action();
+      if (res.ok) {
+        toast.success(successText, {
+          action: {
+            label: 'Annuler',
+            onClick: () => {
+              undoFn().then((u) => {
+                if (u.ok) {
+                  toast.success(undoText);
+                  router.refresh();
+                }
+              });
+            },
+          },
+        });
+        router.refresh();
+      } else {
+        toast.error(res.error ?? 'Une erreur est survenue.');
+      }
+    });
+  }
+
+  /** Désistement returns the previous status — undo restores it. */
+  function runDesistement() {
+    startTransition(async () => {
+      const res = await markDesistement(enrollmentId);
+      if (res.ok) {
+        const prev = res.previousStatus;
+        toast.success('Désistement enregistré.', {
+          action: {
+            label: 'Annuler',
+            onClick: () => {
+              revertStatus(enrollmentId, prev).then((u) => {
+                if (u.ok) {
+                  toast.success('Désistement annulé');
+                  router.refresh();
+                }
+              });
+            },
+          },
+        });
+        router.refresh();
+      } else {
+        toast.error(res.error);
       }
     });
   }
@@ -78,11 +136,7 @@ export function ParticipantActions({
           >
             Marquer contactée
           </Button>
-          <Button
-            variant="ghost"
-            disabled={isPending}
-            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
-          >
+          <Button variant="ghost" disabled={isPending} onClick={runDesistement}>
             Désiste
           </Button>
         </div>
@@ -95,16 +149,17 @@ export function ParticipantActions({
           <Button
             disabled={isPending}
             onClick={() =>
-              run(() => sendManualReminder(enrollmentId), 'Message J-7 envoyé.')
+              runWithUndo(
+                () => sendManualReminder(enrollmentId),
+                'Email J-7 envoyé.',
+                () => revertJ7Send(enrollmentId),
+                'J-7 marqué comme non envoyé',
+              )
             }
           >
             Envoyer message J-7
           </Button>
-          <Button
-            variant="ghost"
-            disabled={isPending}
-            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
-          >
+          <Button variant="ghost" disabled={isPending} onClick={runDesistement}>
             Désiste
           </Button>
         </div>
@@ -124,11 +179,7 @@ export function ParticipantActions({
           <Button variant="outline" disabled>
             Pas de réponse
           </Button>
-          <Button
-            variant="ghost"
-            disabled={isPending}
-            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
-          >
+          <Button variant="ghost" disabled={isPending} onClick={runDesistement}>
             Désiste
           </Button>
         </div>
@@ -140,15 +191,18 @@ export function ParticipantActions({
         <div className="flex flex-wrap gap-2">
           <Button
             disabled={isPending}
-            onClick={() => run(() => sendJ2Reminder(enrollmentId), 'Message J-2 envoyé.')}
+            onClick={() =>
+              runWithUndo(
+                () => sendJ2Reminder(enrollmentId),
+                'Email J-2 envoyé.',
+                () => revertJ2Send(enrollmentId),
+                'J-2 marqué comme non envoyé',
+              )
+            }
           >
             Envoyer message J-2
           </Button>
-          <Button
-            variant="ghost"
-            disabled={isPending}
-            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
-          >
+          <Button variant="ghost" disabled={isPending} onClick={runDesistement}>
             Désiste
           </Button>
         </div>
@@ -165,11 +219,7 @@ export function ParticipantActions({
           >
             Elle a confirmé J-2
           </Button>
-          <Button
-            variant="ghost"
-            disabled={isPending}
-            onClick={() => run(() => markDesistement(enrollmentId), 'Désistement enregistré.')}
-          >
+          <Button variant="ghost" disabled={isPending} onClick={runDesistement}>
             Désiste
           </Button>
         </div>
@@ -178,23 +228,35 @@ export function ParticipantActions({
 
     if (s === 'confirmee_j2') {
       if (!isEventDay) {
-        return (
-          <p className="text-sm text-zinc-500">En attente du jour J</p>
-        );
+        return <p className="text-sm text-zinc-500">En attente du jour J</p>;
       }
       return (
         <div className="flex flex-wrap gap-2">
           <Button
             disabled={isPending}
             className="bg-green-600 hover:bg-green-700 text-white"
-            onClick={() => run(() => markAttendance(enrollmentId, true), 'Marquée présente.')}
+            onClick={() =>
+              runWithUndo(
+                () => markAttendance(enrollmentId, true),
+                'Marquée présente.',
+                () => revertStatus(enrollmentId, 'confirmee_j2'),
+                'Présence annulée',
+              )
+            }
           >
             Présente
           </Button>
           <Button
             variant="destructive"
             disabled={isPending}
-            onClick={() => run(() => markAttendance(enrollmentId, false), 'Marquée absente.')}
+            onClick={() =>
+              runWithUndo(
+                () => markAttendance(enrollmentId, false),
+                'Marquée absente.',
+                () => revertStatus(enrollmentId, 'confirmee_j2'),
+                'Absence annulée',
+              )
+            }
           >
             Absente
           </Button>
@@ -229,28 +291,10 @@ export function ParticipantActions({
     }
 
     // absente, desistement, feedback_recu — terminal states
-    return (
-      <p className="text-sm text-zinc-500">{STATUS_LABELS[s]}</p>
-    );
+    return <p className="text-sm text-zinc-500">{STATUS_LABELS[s]}</p>;
   }
 
-  // feedbackToken used only to suppress unused-var warning; the prop is kept for caller compat
   void feedbackToken;
 
-  return (
-    <div className="space-y-4">
-      {message && (
-        <div
-          className={`px-4 py-3 rounded-xl text-sm font-medium ${
-            message.type === 'success'
-              ? 'bg-green-50 text-green-700 border border-green-200'
-              : 'bg-red-50 text-red-700 border border-red-200'
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
-      {getContextualButtons()}
-    </div>
-  );
+  return <div className="space-y-4">{getContextualButtons()}</div>;
 }

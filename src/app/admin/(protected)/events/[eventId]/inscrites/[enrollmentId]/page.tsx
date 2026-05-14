@@ -1,33 +1,57 @@
-import { requireAdmin } from '@/lib/auth';
-import { prisma } from '@/lib/db';
-import { notFound } from 'next/navigation';
-import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ParticipantActions } from './ParticipantActions';
+import { requireAdmin } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { EnrollmentStatus } from "@prisma/client";
+import { ParticipantActions } from "./ParticipantActions";
+import { ParticipantSummary } from "./ParticipantSummary";
+import { OrientationLayer } from "./OrientationLayer";
+import { EventLayer } from "./EventLayer";
+import { Timeline, type TimelineEntry } from "./Timeline";
+import { InternalNote } from "./InternalNote";
+import { FeedbackCard } from "./FeedbackCard";
 
-export const metadata = { title: 'Participante — Admin' };
+export const metadata = { title: "Participante — Admin" };
 
-const STATUS_LABELS: Record<string, string> = {
-  inscrit: 'Inscrite',
-  contactee: 'Contactée',
-  confirmee_j7: 'Confirmée J-7',
-  confirmee_j2: 'Confirmée J-2',
-  presente: 'Présente',
-  absente: 'Absente',
-  desistement: 'Désistement',
-  feedback_recu: 'Feedback reçu',
+const STATUS_LABELS: Record<EnrollmentStatus, string> = {
+  inscrit: "Inscrite",
+  contactee: "Contactée",
+  confirmee_j7: "Confirmée J-7",
+  confirmee_j2: "Confirmée J-2",
+  presente: "Présente",
+  absente: "Absente",
+  desistement: "Désistement",
+  feedback_recu: "Feedback reçu",
 };
 
-const STATUS_BADGE_CLASSES: Record<string, string> = {
-  inscrit: 'bg-zinc-100 text-zinc-700',
-  contactee: 'bg-blue-100 text-blue-700',
-  confirmee_j7: 'bg-indigo-100 text-indigo-700',
-  confirmee_j2: 'bg-violet-100 text-violet-700',
-  presente: 'bg-green-100 text-green-700',
-  absente: 'bg-red-100 text-red-700',
-  desistement: 'bg-orange-100 text-orange-700',
-  feedback_recu: 'bg-emerald-100 text-emerald-700',
+type BadgeTone =
+  | "default"
+  | "warning"
+  | "success"
+  | "destructive"
+  | "muted"
+  | "secondary"
+  | "outline";
+
+const STATUS_TONE: Record<EnrollmentStatus, BadgeTone> = {
+  inscrit: "muted",
+  contactee: "secondary",
+  confirmee_j7: "outline",
+  confirmee_j2: "outline",
+  presente: "success",
+  absente: "destructive",
+  desistement: "warning",
+  feedback_recu: "success",
 };
+
+function computeAge(birthDate: Date, atDate: Date): number {
+  let age = atDate.getFullYear() - birthDate.getFullYear();
+  const m = atDate.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && atDate.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+  return age;
+}
 
 export default async function ParticipantDetailPage({
   params,
@@ -53,178 +77,221 @@ export default async function ParticipantDetailPage({
 
   const { user, event, feedback } = enrollment;
 
-  // Check if event is today ± 1 day
+  // Event-day window check (±1 day) for attendance buttons.
   const eventDate = new Date(event.date);
   const now = new Date();
   const diffMs = Math.abs(now.getTime() - eventDate.getTime());
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
   const isEventDay = diffDays <= 1;
 
+  // Age / minor detection — computed at the event date so a 17-yo enrolled
+  // today but turning 18 before the event is correctly counted as majeure.
+  const ageOnEventDay = user.birthDate
+    ? computeAge(new Date(user.birthDate), eventDate)
+    : null;
+  const isMinor = ageOnEventDay !== null && ageOnEventDay < 18;
+
+  // Timeline assembly — chronological events for this enrollment.
+  const timeline: TimelineEntry[] = [];
+  timeline.push({
+    id: "enroll",
+    kind: "neutral",
+    label: "Inscription",
+    detail: enrollment.source
+      ? `Source : ${enrollment.source}`
+      : undefined,
+    ts: enrollment.enrolledAt.getTime(),
+  });
+  if (enrollment.droitsImageSignedAt) {
+    const droitsLabel =
+      enrollment.droitsImageStatus === "accepted"
+        ? "Droits image acceptés"
+        : enrollment.droitsImageStatus === "refused"
+          ? "Droits image refusés"
+          : "Droits image — signature";
+    timeline.push({
+      id: "droits",
+      kind:
+        enrollment.droitsImageStatus === "accepted"
+          ? "success"
+          : enrollment.droitsImageStatus === "refused"
+            ? "danger"
+            : "neutral",
+      label: droitsLabel,
+      detail: enrollment.droitsImageSignature
+        ? `Signé par ${enrollment.droitsImageSignature}`
+        : undefined,
+      ts: enrollment.droitsImageSignedAt.getTime(),
+    });
+  }
+  if (enrollment.j7SentAt) {
+    timeline.push({
+      id: "j7",
+      kind: "email",
+      label: "Email J-7 envoyé",
+      ts: enrollment.j7SentAt.getTime(),
+    });
+  }
+  if (enrollment.status === "confirmee_j7" || enrollment.status === "confirmee_j2") {
+    timeline.push({
+      id: "conf_j7",
+      kind: "success",
+      label: "Confirmée J-7",
+      ts: (enrollment.j7SentAt?.getTime() ?? enrollment.enrolledAt.getTime()) + 3_600_000,
+    });
+  }
+  if (enrollment.j2SentAt) {
+    timeline.push({
+      id: "j2",
+      kind: "email",
+      label: "Email J-2 envoyé",
+      ts: enrollment.j2SentAt.getTime(),
+    });
+  }
+  if (enrollment.status === "confirmee_j2") {
+    timeline.push({
+      id: "conf_j2",
+      kind: "success",
+      label: "Confirmée J-2",
+      ts: (enrollment.j2SentAt?.getTime() ?? enrollment.enrolledAt.getTime()) + 3_600_000,
+    });
+  }
+  if (enrollment.attendedAt) {
+    timeline.push({
+      id: "att",
+      kind: "success",
+      label: "Présente — émargement Jour J",
+      ts: enrollment.attendedAt.getTime(),
+    });
+  }
+  if (enrollment.status === "absente" && !enrollment.attendedAt) {
+    timeline.push({
+      id: "absent",
+      kind: "danger",
+      label: "Marquée absente",
+      ts: enrollment.updatedAt.getTime(),
+    });
+  }
+  if (enrollment.status === "desistement") {
+    timeline.push({
+      id: "desist",
+      kind: "danger",
+      label: "Désistement",
+      ts: enrollment.updatedAt.getTime(),
+    });
+  }
+  if (enrollment.feedbackSentAt) {
+    timeline.push({
+      id: "fb_sent",
+      kind: "email",
+      label: "Invitation feedback envoyée",
+      ts: enrollment.feedbackSentAt.getTime(),
+    });
+  }
+  if (feedback) {
+    timeline.push({
+      id: "fb_recu",
+      kind: "success",
+      label: `Feedback reçu — note ${feedback.overallRating}/5`,
+      ts: feedback.submittedAt.getTime(),
+    });
+  }
+
+  const hasDietary = enrollment.regime.length > 0;
+  const hasAccessibility = !!enrollment.accessibilite && enrollment.accessibilite.trim().length > 0;
+
   return (
-    <div className="space-y-6 max-w-2xl">
-      {/* Back link */}
+    <div className="space-y-6">
       <Link
         href={`/admin/events/${eventId}/inscrites`}
-        className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+        className="inline-flex items-center text-sm text-stone-500 hover:text-stone-900 transition-colors"
       >
         ← Retour aux inscrites
       </Link>
 
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-extrabold text-zinc-900">
-          {user.firstName} {user.lastName}
-        </h1>
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[enrollment.status]}`}
-        >
-          {STATUS_LABELS[enrollment.status]}
-        </span>
-      </div>
-
-      {/* Participant info card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Informations personnelles</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-            <div>
-              <dt className="font-medium text-zinc-500">Email</dt>
-              <dd className="text-zinc-900 mt-0.5">{user.email}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-zinc-500">Téléphone</dt>
-              <dd className="text-zinc-900 mt-0.5">{user.phone ?? '—'}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-zinc-500">Ville</dt>
-              <dd className="text-zinc-900 mt-0.5">{user.city ?? '—'}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-zinc-500">Date de naissance</dt>
-              <dd className="text-zinc-900 mt-0.5">
-                {user.birthDate
-                  ? new Date(user.birthDate).toLocaleDateString('fr-FR', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })
-                  : '—'}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium text-zinc-500">Source</dt>
-              <dd className="text-zinc-900 mt-0.5">
-                {enrollment.source ?? user.source ?? '—'}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium text-zinc-500">Inscrite le</dt>
-              <dd className="text-zinc-900 mt-0.5">
-                {enrollment.enrolledAt.toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </dd>
-            </div>
-            {enrollment.referentName && (
-              <div>
-                <dt className="font-medium text-zinc-500">Référent</dt>
-                <dd className="text-zinc-900 mt-0.5">{enrollment.referentName}</dd>
-              </div>
-            )}
-            <div>
-              <dt className="font-medium text-zinc-500">Mode d&apos;inscription</dt>
-              <dd className="text-zinc-900 mt-0.5">
-                {enrollment.mode === 'via_referent' ? 'Via référent' : 'Individuel'}
-              </dd>
-            </div>
-          </dl>
-        </CardContent>
-      </Card>
-
-      {/* Actions card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ParticipantActions
-            enrollmentId={enrollment.id}
-            currentStatus={enrollment.status}
-            j7SentAt={enrollment.j7SentAt}
-            j2SentAt={enrollment.j2SentAt}
-            feedbackToken={enrollment.feedbackToken}
-            feedbackSentAt={enrollment.feedbackSentAt}
-            isEventDay={isEventDay}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
+        {/* Main column — scrolls independently on tall screens */}
+        <main className="space-y-6 min-w-0">
+          <ParticipantSummary
+            firstName={user.firstName}
+            lastName={user.lastName}
+            email={user.email}
+            phone={user.phone}
+            city={user.city}
+            birthDate={user.birthDate}
+            gender={user.gender}
+            isMinor={isMinor}
+            ageOnEventDay={ageOnEventDay}
+            hasDietary={hasDietary}
+            hasAccessibility={hasAccessibility}
+            droitsImageStatus={enrollment.droitsImageStatus}
+            statusLabel={STATUS_LABELS[enrollment.status]}
+            statusTone={STATUS_TONE[enrollment.status]}
           />
-        </CardContent>
-      </Card>
 
-      {/* Feedback card */}
-      {feedback && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Feedback reçu</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="space-y-4 text-sm">
-              <div className="flex gap-8">
-                <div>
-                  <dt className="font-medium text-zinc-500">Note globale</dt>
-                  <dd className="text-2xl font-bold text-zinc-900 mt-0.5">
-                    {feedback.overallRating}/5
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-zinc-500">Organisation</dt>
-                  <dd className="text-2xl font-bold text-zinc-900 mt-0.5">
-                    {feedback.orgRating}/5
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-zinc-500">Vision changée</dt>
-                  <dd className="text-zinc-900 mt-0.5">
-                    {feedback.changedVision ? 'Oui' : 'Non'}
-                  </dd>
-                </div>
-              </div>
-              {feedback.verbatim && (
-                <div>
-                  <dt className="font-medium text-zinc-500 mb-1">Verbatim</dt>
-                  <dd className="bg-zinc-50 rounded-xl p-4 text-zinc-700 leading-relaxed italic">
-                    &ldquo;{feedback.verbatim}&rdquo;
-                  </dd>
-                </div>
-              )}
-              {feedback.favoriteMoment && (
-                <div>
-                  <dt className="font-medium text-zinc-500">Moment préféré</dt>
-                  <dd className="text-zinc-900 mt-0.5">{feedback.favoriteMoment}</dd>
-                </div>
-              )}
-              {feedback.improvements && (
-                <div>
-                  <dt className="font-medium text-zinc-500">Améliorations suggérées</dt>
-                  <dd className="text-zinc-900 mt-0.5">{feedback.improvements}</dd>
-                </div>
-              )}
-              <div>
-                <dt className="font-medium text-zinc-500">Soumis le</dt>
-                <dd className="text-zinc-900 mt-0.5">
-                  {feedback.submittedAt.toLocaleDateString('fr-FR', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
-      )}
+          <OrientationLayer
+            niveauScolaire={user.niveauScolaire}
+            niveauScolaireAutre={user.niveauScolaireAutre}
+            etablissement={user.etablissement}
+            region={user.region}
+            projetPro={user.projetPro}
+            motivation={user.motivation}
+            motivationDetail={user.motivationDetail}
+            commentConnu={user.commentConnu}
+            orientationUpdatedAt={user.orientationUpdatedAt}
+          />
+
+          <EventLayer
+            enrolledAt={enrollment.enrolledAt}
+            mode={enrollment.mode}
+            referentName={enrollment.referentName}
+            source={enrollment.source}
+            userSource={user.source}
+            droitsImageStatus={enrollment.droitsImageStatus}
+            droitsImageSignedAt={enrollment.droitsImageSignedAt}
+            droitsImageSignature={enrollment.droitsImageSignature}
+            regime={enrollment.regime}
+            accessibilite={enrollment.accessibilite}
+            accompagnateur={enrollment.accompagnateur}
+            commentaire={enrollment.commentaire}
+          />
+
+          <InternalNote
+            enrollmentId={enrollment.id}
+            initialNote={enrollment.internalNote}
+          />
+
+          {feedback && <FeedbackCard feedback={feedback} />}
+        </main>
+
+        {/* Right rail — actions & timeline. Sticks on lg+ so it stays
+            visible as the main column scrolls. */}
+        <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+          <section className="rounded-2xl border border-stone-200 bg-white shadow-sm">
+            <div className="p-5 border-b border-stone-100">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--brand-orange)]">
+                Action
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-stone-900">
+                Prochaine étape
+              </h2>
+            </div>
+            <div className="p-5">
+              <ParticipantActions
+                enrollmentId={enrollment.id}
+                currentStatus={enrollment.status}
+                j7SentAt={enrollment.j7SentAt}
+                j2SentAt={enrollment.j2SentAt}
+                feedbackToken={enrollment.feedbackToken}
+                feedbackSentAt={enrollment.feedbackSentAt}
+                isEventDay={isEventDay}
+              />
+            </div>
+          </section>
+
+          <Timeline entries={timeline} />
+        </aside>
+      </div>
     </div>
   );
 }

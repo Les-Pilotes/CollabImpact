@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAppUrl } from "@/lib/app-url";
 
 export async function sendMagicLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -14,7 +15,7 @@ export async function sendMagicLink(formData: FormData) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${process.env.APP_URL ?? "http://localhost:3000"}/admin`,
+        emailRedirectTo: `${getAppUrl()}/admin`,
       },
     });
     if (error) {

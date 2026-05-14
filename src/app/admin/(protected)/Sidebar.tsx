@@ -14,6 +14,7 @@ import {
   Eye,
   Settings,
   ArrowLeft,
+  Shield,
 } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
@@ -145,9 +146,11 @@ export default function Sidebar({ adminName, adminEmail }: Props) {
           })}
         </div>
 
-        {/* Event mode: Paramètres pinned to bottom of nav */}
-        {inEventMode && (
-          <div className="mt-auto pt-3 border-t border-stone-800">
+        {/* Settings — pinned to bottom. Per-event in event mode, global otherwise.
+            Sub-items revealed when the section is active, so the discovery loop
+            (event mgmt → admin mgmt → email customization) stays obvious. */}
+        <div className="mt-auto pt-3 border-t border-stone-800 space-y-0.5">
+          {inEventMode ? (
             <Link
               href={`/admin/events/${eventId}/parametres`}
               title={collapsed ? "Paramètres" : undefined}
@@ -162,8 +165,38 @@ export default function Sidebar({ adminName, adminEmail }: Props) {
               <Settings className="w-4 h-4 shrink-0" />
               {!collapsed && "Paramètres"}
             </Link>
-          </div>
-        )}
+          ) : (
+            <>
+              <Link
+                href="/admin/parametres"
+                title={collapsed ? "Paramètres" : undefined}
+                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors ${
+                  collapsed ? "justify-center" : ""
+                } ${
+                  pathname === "/admin/parametres"
+                    ? "bg-stone-800 text-white"
+                    : "text-stone-400 hover:text-white hover:bg-stone-800/70"
+                }`}
+              >
+                <Settings className="w-4 h-4 shrink-0" />
+                {!collapsed && "Paramètres"}
+              </Link>
+              {!collapsed && (
+                <Link
+                  href="/admin/parametres/admins"
+                  className={`flex items-center gap-2.5 pl-7 pr-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                    pathname.startsWith("/admin/parametres/admins")
+                      ? "bg-stone-800 text-white"
+                      : "text-stone-500 hover:text-stone-200 hover:bg-stone-800/40"
+                  }`}
+                >
+                  <Shield className="w-3 h-3 shrink-0" />
+                  Administrateurs
+                </Link>
+              )}
+            </>
+          )}
+        </div>
       </nav>
 
       {/* Bottom: user + toggle */}

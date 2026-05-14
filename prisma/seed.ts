@@ -36,8 +36,9 @@ async function main() {
       organisationId: org.id,
       firstName: "Amadou",
       lastName: "Cisse",
+      role: "SUPER_ADMIN",
     },
-    update: {},
+    update: { role: "SUPER_ADMIN" },
   });
 
   const event = await prisma.event.upsert({

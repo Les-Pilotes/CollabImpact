@@ -63,3 +63,16 @@ export async function requireAdmin() {
 
   return { admin, user: { email: userEmail } };
 }
+
+/**
+ * Tighter guard for actions that should be restricted to SUPER_ADMIN
+ * (CRUD on other admins, sensitive global config). Throws (not redirect)
+ * so calling server actions can surface the error to the user.
+ */
+export async function requireSuperAdmin() {
+  const ctx = await requireAdmin();
+  if (ctx.admin.role !== "SUPER_ADMIN") {
+    throw new Error("Action réservée aux super-administrateurs.");
+  }
+  return ctx;
+}
