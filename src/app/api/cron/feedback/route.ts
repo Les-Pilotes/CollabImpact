@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     },
     include: {
       user: true,
-      event: true,
+      event: { include: { emailConfig: true } },
     },
   });
 
@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
         firstName: enrollment.user.firstName,
         immersionName: enrollment.event.name,
         feedbackUrl,
+        customNote: enrollment.event.emailConfig?.feedbackNote ?? undefined,
       }),
     });
 

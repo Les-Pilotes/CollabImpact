@@ -162,6 +162,7 @@ export async function submitInscription(
         address: true,
         organisationId: true,
         replyToEmail: true,
+        emailConfig: { select: { confirmationNote: true } },
       },
     });
     if (!event) {
@@ -253,6 +254,7 @@ export async function submitInscription(
           eventName: event.name,
           eventDate: formatEventDate(event.date),
           eventAddress: event.address,
+          customNote: event.emailConfig?.confirmationNote ?? undefined,
         }),
       });
     } catch (err) {

@@ -5,9 +5,10 @@ type Props = {
   firstName: string;
   immersionName: string;
   feedbackUrl: string;
+  customNote?: string;
 };
 
-export default function FeedbackInvite({ firstName, immersionName, feedbackUrl }: Props) {
+export default function FeedbackInvite({ firstName, immersionName, feedbackUrl, customNote }: Props) {
   return (
     <BaseLayout preview={`Ton avis sur ${immersionName}`}>
       <Heading as="h2">Merci d&apos;être venu(e), {firstName} !</Heading>
@@ -20,6 +21,11 @@ export default function FeedbackInvite({ firstName, immersionName, feedbackUrl }
           Donner mon avis
         </Button>
       </Section>
+      {customNote && (
+        <Section style={{ backgroundColor: "#f5f5f4", borderRadius: 6, padding: "12px 16px", margin: "16px 0" }}>
+          <Text style={{ fontSize: 13, color: "#44403c", margin: 0, whiteSpace: "pre-line" }}>{customNote}</Text>
+        </Section>
+      )}
       <Text style={{ fontSize: 13, color: "#71717a" }}>Lien valable 30 jours.</Text>
     </BaseLayout>
   );

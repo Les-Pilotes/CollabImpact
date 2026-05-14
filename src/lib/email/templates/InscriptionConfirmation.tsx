@@ -1,4 +1,4 @@
-import { Heading, Text } from "@react-email/components";
+import { Heading, Section, Text } from "@react-email/components";
 import { BaseLayout } from "./BaseLayout";
 
 type Props = {
@@ -6,6 +6,7 @@ type Props = {
   eventName: string;
   eventDate: string;
   eventAddress: string;
+  customNote?: string;
 };
 
 export default function InscriptionConfirmation({
@@ -13,6 +14,7 @@ export default function InscriptionConfirmation({
   eventName,
   eventDate,
   eventAddress,
+  customNote,
 }: Props) {
   return (
     <BaseLayout preview={`Bienvenue ${firstName} ! Ton inscription est confirmée.`}>
@@ -25,6 +27,11 @@ export default function InscriptionConfirmation({
         On a hâte de te retrouver — en cas de question, réponds à cet email ou contacte-nous sur
         WhatsApp.
       </Text>
+      {customNote && (
+        <Section style={{ backgroundColor: "#f5f5f4", borderRadius: 6, padding: "12px 16px", margin: "16px 0" }}>
+          <Text style={{ fontSize: 13, color: "#44403c", margin: 0, whiteSpace: "pre-line" }}>{customNote}</Text>
+        </Section>
+      )}
       <Text>À très bientôt, l&apos;équipe Les Pilotes 💛</Text>
     </BaseLayout>
   );

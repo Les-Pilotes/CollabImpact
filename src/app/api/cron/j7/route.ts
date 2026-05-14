@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       j7SentAt: null,
       deletedAt: null,
     },
-    include: { user: true, event: true },
+    include: { user: true, event: { include: { emailConfig: true } } },
   });
 
   const appUrl = getAppUrl();
@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
           confirmUrl: `${appUrl}/confirm/${confirmToken}`,
           declineUrl: `${appUrl}/decline/${declineToken}`,
           isMinor,
+          customNote: enrollment.event.emailConfig?.j7Note ?? undefined,
         }),
       });
       await prisma.enrollment.update({

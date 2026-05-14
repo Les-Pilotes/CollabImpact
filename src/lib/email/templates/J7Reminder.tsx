@@ -9,6 +9,7 @@ type Props = {
   confirmUrl: string;
   declineUrl: string;
   isMinor?: boolean;
+  customNote?: string;
 };
 
 export default function J7Reminder({
@@ -19,6 +20,7 @@ export default function J7Reminder({
   confirmUrl,
   declineUrl,
   isMinor,
+  customNote,
 }: Props) {
   return (
     <BaseLayout preview={`Confirme ta venue à ${immersionName} — J-7`}>
@@ -51,6 +53,11 @@ export default function J7Reminder({
             📄 <strong>Rappel mineure</strong> — n&apos;oublie pas d&apos;apporter
             l&apos;autorisation parentale signée le jour J.
           </Text>
+        </Section>
+      )}
+      {customNote && (
+        <Section style={{ backgroundColor: "#f5f5f4", borderRadius: 6, padding: "12px 16px", margin: "16px 0" }}>
+          <Text style={{ fontSize: 13, color: "#44403c", margin: 0, whiteSpace: "pre-line" }}>{customNote}</Text>
         </Section>
       )}
       <Text style={{ fontSize: 13, color: "#71717a" }}>

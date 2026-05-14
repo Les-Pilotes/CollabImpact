@@ -9,6 +9,7 @@ type Props = {
   confirmUrl: string;
   declineUrl: string;
   isMinor?: boolean;
+  customNote?: string;
 };
 
 export default function J2Reminder({
@@ -19,6 +20,7 @@ export default function J2Reminder({
   confirmUrl,
   declineUrl,
   isMinor,
+  customNote,
 }: Props) {
   return (
     <BaseLayout preview={`Dernière confirmation pour ${immersionName}`}>
@@ -52,6 +54,11 @@ export default function J2Reminder({
             📄 <strong>N&apos;oublie pas l&apos;autorisation parentale signée</strong> —
             sans ce document tu ne pourras pas participer.
           </Text>
+        </Section>
+      )}
+      {customNote && (
+        <Section style={{ backgroundColor: "#f5f5f4", borderRadius: 6, padding: "12px 16px", margin: "16px 0" }}>
+          <Text style={{ fontSize: 13, color: "#44403c", margin: 0, whiteSpace: "pre-line" }}>{customNote}</Text>
         </Section>
       )}
       <Text style={{ fontSize: 13, color: "#71717a" }}>

@@ -183,6 +183,7 @@ model Event {
   groups         Group[]
   formConfig     FormConfig?
   feedbackConfig FeedbackConfig?
+  emailConfig    EmailConfig?
   // V3 (requires migration): partnerCompany PartnerCompany?
 
   @@map("Immersion")
@@ -363,6 +364,21 @@ model FeedbackConfig {
   recommendEnabled       Boolean @default(true)
 
   customFields Json @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Per-event email customisation — optional notes appended to each transactional email
+model EmailConfig {
+  id      String @id @default(cuid())
+  eventId String @unique
+  event   Event  @relation(fields: [eventId], references: [id])
+
+  confirmationNote String?
+  j7Note           String?
+  j2Note           String?
+  feedbackNote     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
