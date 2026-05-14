@@ -166,6 +166,7 @@ model Event {
   status      ImmersionStatus  @default(brouillon)
   address     String
   date        DateTime
+  endTime     DateTime?
   capacity    Int
   description String?
 
@@ -369,16 +370,31 @@ model FeedbackConfig {
   updatedAt DateTime @updatedAt
 }
 
-/// Per-event email customisation — optional notes appended to each transactional email
+/// Per-event email customisation — optional overrides for each transactional email
 model EmailConfig {
   id      String @id @default(cuid())
   eventId String @unique
   event   Event  @relation(fields: [eventId], references: [id])
 
-  confirmationNote String?
-  j7Note           String?
-  j2Note           String?
-  feedbackNote     String?
+  // Inscription confirmation
+  confirmationSubject String?
+  confirmationBody    String?
+  confirmationNote    String?
+
+  // J-7 reminder
+  j7Subject String?
+  j7Body    String?
+  j7Note    String?
+
+  // J-2 reminder
+  j2Subject String?
+  j2Body    String?
+  j2Note    String?
+
+  // Feedback invite
+  feedbackSubject String?
+  feedbackBody    String?
+  feedbackNote    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

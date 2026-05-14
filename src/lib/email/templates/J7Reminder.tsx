@@ -2,34 +2,30 @@ import { Button, Heading, Section, Text } from "@react-email/components";
 import { BaseLayout } from "./BaseLayout";
 
 type Props = {
-  firstName: string;
-  immersionName: string;
-  companyName: string;
-  dateLabel: string;
+  heading: string;
+  body: string;
   confirmUrl: string;
   declineUrl: string;
   isMinor?: boolean;
   customNote?: string;
+  signature?: string;
+  immersionName: string;
 };
 
 export default function J7Reminder({
-  firstName,
-  immersionName,
-  companyName,
-  dateLabel,
+  heading,
+  body,
   confirmUrl,
   declineUrl,
   isMinor,
   customNote,
+  signature,
+  immersionName,
 }: Props) {
   return (
     <BaseLayout preview={`Confirme ta venue à ${immersionName} — J-7`}>
-      <Heading as="h2">Plus qu&apos;une semaine, {firstName} !</Heading>
-      <Text>
-        On a hâte de te voir à <strong>{immersionName}</strong> chez <strong>{companyName}</strong>
-        , le <strong>{dateLabel}</strong>.
-      </Text>
-      <Text>Confirme ta présence en un clic :</Text>
+      <Heading as="h2">{heading}</Heading>
+      <Text style={{ whiteSpace: "pre-line" }}>{body}</Text>
       <Section style={{ textAlign: "center", margin: "24px 0" }}>
         <Button href={confirmUrl} style={confirmButton}>
           ✓ Je serai là
@@ -56,13 +52,34 @@ export default function J7Reminder({
         </Section>
       )}
       {customNote && (
-        <Section style={{ backgroundColor: "#f5f5f4", borderRadius: 6, padding: "12px 16px", margin: "16px 0" }}>
-          <Text style={{ fontSize: 13, color: "#44403c", margin: 0, whiteSpace: "pre-line" }}>{customNote}</Text>
+        <Section
+          style={{
+            backgroundColor: "#f5f5f4",
+            borderRadius: 6,
+            padding: "12px 16px",
+            margin: "16px 0",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              color: "#44403c",
+              margin: 0,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {customNote}
+          </Text>
         </Section>
       )}
       <Text style={{ fontSize: 13, color: "#71717a" }}>
         Sans réponse sous 24h, on te rappellera au téléphone pour s&apos;assurer que tout va bien.
       </Text>
+      {signature && (
+        <Text style={{ fontSize: 13, color: "#44403c", whiteSpace: "pre-line", marginTop: 24 }}>
+          {signature}
+        </Text>
+      )}
     </BaseLayout>
   );
 }
@@ -89,10 +106,9 @@ const declineButton: React.CSSProperties = {
 };
 
 J7Reminder.PreviewProps = {
-  firstName: "Amadou",
+  heading: "Plus qu'une semaine, Amadou !",
+  body: "On a hâte de te voir à Workshop 100% Féminin, le samedi 18 avril 2026.\n\nConfirme ta présence en un clic :",
   immersionName: "Workshop 100% Féminin",
-  companyName: "Les Pilotes",
-  dateLabel: "samedi 18 avril 2026",
   confirmUrl: "https://example.com/confirm/abc",
   declineUrl: "https://example.com/decline/abc",
   isMinor: false,

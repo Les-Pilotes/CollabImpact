@@ -2,8 +2,9 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import EventSettingsForm from "./EventSettingsForm";
-import FormConfigSection from "./FormConfigSection";
-import EmailConfigSection from "./EmailConfigSection";
+import FormulairesTab from "./FormulairesTab";
+import CommunicationsTab from "./CommunicationsTab";
+import ParametresShell from "./ParametresShell";
 
 export const metadata = { title: "Paramètres — Event" };
 
@@ -22,6 +23,7 @@ export default async function EventParametresPage({
       name: true,
       type: true,
       date: true,
+      endTime: true,
       address: true,
       capacity: true,
       description: true,
@@ -29,6 +31,7 @@ export default async function EventParametresPage({
       replyToEmail: true,
       emailSignature: true,
       formConfig: true,
+      feedbackConfig: true,
       emailConfig: true,
     },
   });
@@ -36,6 +39,7 @@ export default async function EventParametresPage({
   if (!event) notFound();
 
   const dateISO = event.date.toISOString();
+  const endTimeISO = event.endTime?.toISOString();
 
   const formCfg = event.formConfig ?? {
     phoneEnabled: true,
@@ -44,76 +48,86 @@ export default async function EventParametresPage({
     sourceEnabled: true,
   };
 
-  const emailCfg = event.emailConfig ?? {
-    confirmationNote: "",
-    j7Note: "",
-    j2Note: "",
-    feedbackNote: "",
+  const feedbackCfg = event.feedbackConfig ?? {
+    satisfactionEnabled: true,
+    highlightsEnabled: true,
+    favoriteSpeakerEnabled: true,
+    recommendEnabled: true,
   };
 
+  const emailCfg = event.emailConfig;
+
   return (
-    <div className="space-y-10 max-w-2xl">
+    <div className="space-y-8 max-w-5xl">
       <header className="space-y-1">
         <p className="text-xs uppercase tracking-[0.18em] text-stone-500">{event.name}</p>
-        <h1 className="text-2xl font-bold text-stone-900">Paramètres</h1>
+        <h1 className="text-3xl font-bold text-stone-900 tracking-tight">Paramètres</h1>
       </header>
 
-      <EventSettingsForm
-        eventId={event.id}
-        initial={{
-          name: event.name,
-          type: event.type,
-          date: dateISO.slice(0, 10),
-          time: dateISO.slice(11, 16),
-          address: event.address,
-          capacity: event.capacity,
-          description: event.description ?? "",
-          replyToEmail: event.replyToEmail ?? "",
-          emailSignature: event.emailSignature ?? "",
+      <ParametresShell
+        tabs={[
+          { key: "informations", label: "Informations" },
+          { key: "formulaires", label: "Formulaires" },
+          { key: "communications", label: "Communications" },
+        ]}
+        initialTab="informations"
+        panels={{
+          informations: (
+            <EventSettingsForm
+              eventId={event.id}
+              initial={{
+                name: event.name,
+                type: event.type,
+                date: dateISO.slice(0, 10),
+                time: dateISO.slice(11, 16),
+                endTime: endTimeISO ? endTimeISO.slice(11, 16) : "",
+                address: event.address,
+                capacity: event.capacity,
+                description: event.description ?? "",
+                replyToEmail: event.replyToEmail ?? "",
+                emailSignature: event.emailSignature ?? "",
+              }}
+            />
+          ),
+          formulaires: (
+            <FormulairesTab
+              eventId={event.id}
+              formCfg={{
+                phoneEnabled: formCfg.phoneEnabled,
+                birthDateEnabled: formCfg.birthDateEnabled,
+                cityEnabled: formCfg.cityEnabled,
+                sourceEnabled: formCfg.sourceEnabled,
+              }}
+              feedbackCfg={{
+                satisfactionEnabled: feedbackCfg.satisfactionEnabled,
+                highlightsEnabled: feedbackCfg.highlightsEnabled,
+                favoriteSpeakerEnabled: feedbackCfg.favoriteSpeakerEnabled,
+                recommendEnabled: feedbackCfg.recommendEnabled,
+              }}
+            />
+          ),
+          communications: (
+            <CommunicationsTab
+              eventId={event.id}
+              signature={event.emailSignature ?? ""}
+              initial={{
+                confirmationSubject: emailCfg?.confirmationSubject ?? "",
+                confirmationBody: emailCfg?.confirmationBody ?? "",
+                confirmationNote: emailCfg?.confirmationNote ?? "",
+                j7Subject: emailCfg?.j7Subject ?? "",
+                j7Body: emailCfg?.j7Body ?? "",
+                j7Note: emailCfg?.j7Note ?? "",
+                j2Subject: emailCfg?.j2Subject ?? "",
+                j2Body: emailCfg?.j2Body ?? "",
+                j2Note: emailCfg?.j2Note ?? "",
+                feedbackSubject: emailCfg?.feedbackSubject ?? "",
+                feedbackBody: emailCfg?.feedbackBody ?? "",
+                feedbackNote: emailCfg?.feedbackNote ?? "",
+              }}
+            />
+          ),
         }}
       />
-
-      <section className="space-y-4 pt-4 border-t border-stone-200">
-        <div>
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">
-            Formulaire d&apos;inscription
-          </h2>
-          <p className="text-xs text-stone-500 mt-1.5 max-w-prose">
-            Coche les champs à afficher dans le formulaire. Les champs obligatoires (prénom,
-            nom, email) sont toujours présents.
-          </p>
-        </div>
-        <FormConfigSection
-          eventId={event.id}
-          initial={{
-            phoneEnabled: formCfg.phoneEnabled,
-            birthDateEnabled: formCfg.birthDateEnabled,
-            cityEnabled: formCfg.cityEnabled,
-            sourceEnabled: formCfg.sourceEnabled,
-          }}
-        />
-      </section>
-
-      <section className="space-y-4 pt-4 border-t border-stone-200">
-        <div>
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">
-            Notes dans les emails
-          </h2>
-          <p className="text-xs text-stone-500 mt-1.5 max-w-prose">
-            Ajoute une note personnalisée à chaque type d&apos;email envoyé aux participantes.
-            Le reste du contenu (boutons, infos pratiques) reste identique.
-          </p>
-        </div>
-        <EmailConfigSection
-          eventId={event.id}
-          initial={{
-            confirmationNote: emailCfg.confirmationNote ?? "",
-            j7Note: emailCfg.j7Note ?? "",
-            j2Note: emailCfg.j2Note ?? "",
-            feedbackNote: emailCfg.feedbackNote ?? "",
-          }}
-        />
-      </section>
     </div>
   );
 }

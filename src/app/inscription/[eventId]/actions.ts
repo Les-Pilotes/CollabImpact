@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/client";
 import { inscriptionSchema, type InscriptionInput } from "@/lib/validation/inscription";
 import InscriptionConfirmation from "@/lib/email/templates/InscriptionConfirmation";
+import { resolveEmail } from "@/lib/email/resolve";
 import React from "react";
 
 const STALE_ORIENTATION_MONTHS = 6;
@@ -162,7 +163,8 @@ export async function submitInscription(
         address: true,
         organisationId: true,
         replyToEmail: true,
-        emailConfig: { select: { confirmationNote: true } },
+        emailSignature: true,
+        emailConfig: true,
       },
     });
     if (!event) {
@@ -245,16 +247,23 @@ export async function submitInscription(
     });
 
     try {
+      const resolved = resolveEmail("confirmation", event.emailConfig, {
+        prenom: user.firstName,
+        event: event.name,
+        date: formatEventDate(event.date),
+        horaire: event.date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+        lieu: event.address,
+      });
       await sendEmail({
         to: user.email,
-        subject: `Ton inscription à ${event.name} est confirmée !`,
+        subject: resolved.subject,
         replyTo: event.replyToEmail ?? undefined,
         react: React.createElement(InscriptionConfirmation, {
-          firstName: user.firstName,
+          heading: resolved.heading,
+          body: resolved.body,
           eventName: event.name,
-          eventDate: formatEventDate(event.date),
-          eventAddress: event.address,
-          customNote: event.emailConfig?.confirmationNote ?? undefined,
+          customNote: resolved.note ?? undefined,
+          signature: event.emailSignature ?? undefined,
         }),
       });
     } catch (err) {

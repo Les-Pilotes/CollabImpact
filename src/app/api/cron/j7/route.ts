@@ -5,13 +5,13 @@ import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/client";
 import { createActionToken } from "@/lib/tokens";
 import { getAppUrl } from "@/lib/app-url";
+import { resolveEmail } from "@/lib/email/resolve";
 import J7Reminder from "@/lib/email/templates/J7Reminder";
 
 export async function GET(request: NextRequest) {
   const unauthorized = assertCronRequest(request);
   if (unauthorized) return unauthorized;
 
-  // J-7 window: events occurring in [+5d, +9d] from now
   const now = new Date();
   const minDate = new Date(now.getTime() + 5 * 86400000);
   const maxDate = new Date(now.getTime() + 9 * 86400000);
@@ -39,6 +39,10 @@ export async function GET(request: NextRequest) {
       month: "long",
       year: "numeric",
     });
+    const timeLabel = enrollment.event.date.toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     const confirmToken = createActionToken(enrollment.id, "confirm");
     const declineToken = createActionToken(enrollment.id, "decline");
     const isMinor = enrollment.user.birthDate
@@ -47,20 +51,28 @@ export async function GET(request: NextRequest) {
         18
       : false;
 
+    const resolved = resolveEmail("j7", enrollment.event.emailConfig, {
+      prenom: enrollment.user.firstName,
+      event: enrollment.event.name,
+      date: dateLabel,
+      horaire: timeLabel,
+      lieu: enrollment.event.address,
+    });
+
     try {
       await sendEmail({
         to: enrollment.user.email,
-        subject: `Confirme ta venue — ${enrollment.event.name}`,
+        subject: resolved.subject,
         replyTo: enrollment.event.replyToEmail ?? undefined,
         react: React.createElement(J7Reminder, {
-          firstName: enrollment.user.firstName,
+          heading: resolved.heading,
+          body: resolved.body,
           immersionName: enrollment.event.name,
-          companyName: enrollment.event.address,
-          dateLabel,
           confirmUrl: `${appUrl}/confirm/${confirmToken}`,
           declineUrl: `${appUrl}/decline/${declineToken}`,
           isMinor,
-          customNote: enrollment.event.emailConfig?.j7Note ?? undefined,
+          customNote: resolved.note ?? undefined,
+          signature: enrollment.event.emailSignature ?? undefined,
         }),
       });
       await prisma.enrollment.update({

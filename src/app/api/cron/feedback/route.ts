@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/client";
 import { createFeedbackToken } from "@/lib/tokens";
 import { getAppUrl } from "@/lib/app-url";
+import { resolveEmail } from "@/lib/email/resolve";
 import FeedbackInvite from "@/lib/email/templates/FeedbackInvite";
 
 export async function GET(request: NextRequest) {
@@ -36,15 +37,36 @@ export async function GET(request: NextRequest) {
       data: { feedbackToken: token, feedbackSentAt: new Date() },
     });
 
+    const dateLabel = enrollment.event.date.toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const timeLabel = enrollment.event.date.toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const resolved = resolveEmail("feedback", enrollment.event.emailConfig, {
+      prenom: enrollment.user.firstName,
+      event: enrollment.event.name,
+      date: dateLabel,
+      horaire: timeLabel,
+      lieu: enrollment.event.address,
+    });
+
     await sendEmail({
       to: enrollment.user.email,
-      subject: `Ton avis sur ${enrollment.event.name}`,
+      subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
       react: React.createElement(FeedbackInvite, {
-        firstName: enrollment.user.firstName,
+        heading: resolved.heading,
+        body: resolved.body,
         immersionName: enrollment.event.name,
         feedbackUrl,
-        customNote: enrollment.event.emailConfig?.feedbackNote ?? undefined,
+        customNote: resolved.note ?? undefined,
+        signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
 

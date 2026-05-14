@@ -78,6 +78,7 @@ export async function updateEvent(
         name: data.name,
         type: data.type,
         date: combineDateTime(data.date, data.time),
+        endTime: data.endTime && data.endTime !== "" ? combineDateTime(data.date, data.endTime) : null,
         address: data.address,
         capacity: data.capacity,
         description: data.description,

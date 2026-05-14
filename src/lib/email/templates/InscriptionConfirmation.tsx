@@ -2,44 +2,57 @@ import { Heading, Section, Text } from "@react-email/components";
 import { BaseLayout } from "./BaseLayout";
 
 type Props = {
-  firstName: string;
+  heading: string;
+  body: string;
   eventName: string;
-  eventDate: string;
-  eventAddress: string;
   customNote?: string;
+  signature?: string;
 };
 
 export default function InscriptionConfirmation({
-  firstName,
+  heading,
+  body,
   eventName,
-  eventDate,
-  eventAddress,
   customNote,
+  signature,
 }: Props) {
   return (
-    <BaseLayout preview={`Bienvenue ${firstName} ! Ton inscription est confirmée.`}>
-      <Heading as="h2">Bienvenue {firstName} !</Heading>
-      <Text>
-        Ton inscription au <strong>{eventName}</strong> le <strong>{eventDate}</strong> à{" "}
-        <strong>{eventAddress}</strong> est bien enregistrée.
-      </Text>
-      <Text>
-        On a hâte de te retrouver — en cas de question, réponds à cet email ou contacte-nous sur
-        WhatsApp.
-      </Text>
+    <BaseLayout preview={`Inscription confirmée — ${eventName}`}>
+      <Heading as="h2">{heading}</Heading>
+      <Text style={{ whiteSpace: "pre-line" }}>{body}</Text>
       {customNote && (
-        <Section style={{ backgroundColor: "#f5f5f4", borderRadius: 6, padding: "12px 16px", margin: "16px 0" }}>
-          <Text style={{ fontSize: 13, color: "#44403c", margin: 0, whiteSpace: "pre-line" }}>{customNote}</Text>
+        <Section
+          style={{
+            backgroundColor: "#f5f5f4",
+            borderRadius: 6,
+            padding: "12px 16px",
+            margin: "16px 0",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              color: "#44403c",
+              margin: 0,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {customNote}
+          </Text>
         </Section>
       )}
       <Text>À très bientôt, l&apos;équipe Les Pilotes 💛</Text>
+      {signature && (
+        <Text style={{ fontSize: 13, color: "#44403c", whiteSpace: "pre-line", marginTop: 24 }}>
+          {signature}
+        </Text>
+      )}
     </BaseLayout>
   );
 }
 
 InscriptionConfirmation.PreviewProps = {
-  firstName: "Yasmine",
-  eventName: "Workshop 100% Féminin — La Cité Audacieuse",
-  eventDate: "Samedi 18 avril 2026",
-  eventAddress: "9 rue de Vaugirard, Paris 6",
+  heading: "Bienvenue Yasmine !",
+  body: "Ton inscription au Workshop 100% Féminin le samedi 18 avril 2026 à La Cité Audacieuse est bien enregistrée.\n\nOn a hâte de te retrouver.",
+  eventName: "Workshop 100% Féminin",
 } satisfies Props;
