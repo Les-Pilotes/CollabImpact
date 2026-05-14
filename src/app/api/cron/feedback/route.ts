@@ -7,17 +7,17 @@ import { createFeedbackToken } from "@/lib/tokens";
 import { getAppUrl } from "@/lib/app-url";
 import FeedbackInvite from "@/lib/email/templates/FeedbackInvite";
 
-const EVENT_ID = "seed-event-cite-audacieuse";
-
 export async function GET(request: NextRequest) {
   const unauthorized = assertCronRequest(request);
   if (unauthorized) return unauthorized;
 
+  const now = new Date();
+
   const enrollments = await prisma.enrollment.findMany({
     where: {
-      eventId: EVENT_ID,
+      event: { date: { lt: now }, deletedAt: null },
       status: "presente",
-      OR: [{ feedbackToken: null }, { feedbackSentAt: null }],
+      feedbackSentAt: null,
       deletedAt: null,
     },
     include: {
