@@ -4,6 +4,7 @@ import React, { useTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   markContactee,
@@ -12,6 +13,9 @@ import {
   markConfirmeeJ2,
   markDesistement,
   sendManualReminder,
+  revertJ7Send,
+  revertJ2Send,
+  revertStatus,
 } from '../inscrites/actions';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -80,6 +84,63 @@ export function AppelView({
         router.refresh();
       } else {
         setError(res.error ?? 'Une erreur est survenue.');
+      }
+    });
+  }
+
+  /** Action with toast.success + Annuler */
+  function runWithUndo(
+    action: () => Promise<{ ok: boolean; error?: string }>,
+    successText: string,
+    undoFn: () => Promise<{ ok: boolean }>,
+    undoText = 'Annulé',
+  ) {
+    setError(null);
+    startTransition(async () => {
+      const res = await action();
+      if (res.ok) {
+        toast.success(successText, {
+          action: {
+            label: 'Annuler',
+            onClick: () => {
+              undoFn().then((u) => {
+                if (u.ok) {
+                  toast.success(undoText);
+                  router.refresh();
+                }
+              });
+            },
+          },
+        });
+        router.refresh();
+      } else {
+        setError(res.error ?? 'Une erreur est survenue.');
+      }
+    });
+  }
+
+  function runDesistement() {
+    setError(null);
+    startTransition(async () => {
+      const res = await markDesistement(enrollmentId);
+      if (res.ok) {
+        const prev = res.previousStatus;
+        toast.success('Désistement enregistré', {
+          action: {
+            label: 'Annuler',
+            onClick: () => {
+              revertStatus(enrollmentId, prev).then((u) => {
+                if (u.ok) {
+                  toast.success('Désistement annulé');
+                  router.refresh();
+                }
+              });
+            },
+          },
+        });
+        router.refresh();
+      } else {
+        setError(res.error);
       }
     });
   }
@@ -159,7 +220,14 @@ export function AppelView({
             <Button
               className="w-full"
               disabled={isPending}
-              onClick={() => run(() => sendManualReminder(enrollmentId))}
+              onClick={() =>
+                runWithUndo(
+                  () => sendManualReminder(enrollmentId),
+                  'Email J-7 envoyé',
+                  () => revertJ7Send(enrollmentId),
+                  'J-7 marqué comme non envoyé',
+                )
+              }
             >
               {isPending ? <Loader2 className="animate-spin" /> : 'Envoyer message J-7'}
             </Button>
@@ -189,7 +257,14 @@ export function AppelView({
             <Button
               className="w-full"
               disabled={isPending}
-              onClick={() => run(() => sendJ2Reminder(enrollmentId))}
+              onClick={() =>
+                runWithUndo(
+                  () => sendJ2Reminder(enrollmentId),
+                  'Email J-2 envoyé',
+                  () => revertJ2Send(enrollmentId),
+                  'J-2 marqué comme non envoyé',
+                )
+              }
             >
               {isPending ? <Loader2 className="animate-spin" /> : 'Envoyer message J-2'}
             </Button>
@@ -228,7 +303,7 @@ export function AppelView({
               variant="ghost"
               className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
               disabled={isPending}
-              onClick={() => run(() => markDesistement(enrollmentId))}
+              onClick={runDesistement}
             >
               {isPending ? <Loader2 className="animate-spin" /> : 'Désiste'}
             </Button>

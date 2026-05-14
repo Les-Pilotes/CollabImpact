@@ -211,7 +211,8 @@ export default function KanbanBoard({
     setSelectedId(null);
   }, []);
 
-  // Simulation actions
+  // Simulation actions — kept until PR #5 (Kanban rewrite) since they're still
+  // used by some legacy keyboard shortcuts. Not surfaced in the UI anymore.
   const sim = {
     sendJ7: (id: string) => {
       update(id, { j7EmailSent: true }, { id: "j7send", label: "Confirmation J-7 · Email envoyé", kind: "email" });
@@ -290,31 +291,15 @@ export default function KanbanBoard({
           activeTab={activeTab}
           onTabChange={(id) => { setActiveTab(id); setSelectedId(null); }}
           actions={
-            <>
-              <a
-                href={`/api/events/${eventId}/export`}
-                download
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
-                title="Télécharger toutes les inscriptions au format CSV"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Exporter CSV
-              </a>
-              <button
-                onClick={addDemo}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Simuler inscription
-              </button>
-              <button
-                onClick={reset}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 text-xs font-semibold hover:bg-zinc-200 transition-colors"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Réinitialiser
-              </button>
-            </>
+            <a
+              href={`/api/events/${eventId}/export`}
+              download
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
+              title="Télécharger toutes les inscriptions au format CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Exporter CSV
+            </a>
           }
         />
 
@@ -566,69 +551,20 @@ export default function KanbanBoard({
               </div>
             </div>
 
-            {/* Simulation section */}
+            {/* Actions — read-only here. CRUD happens on the participant detail page,
+                with confirmation. Keeps the Kanban a safe consultation surface,
+                no destructive misclicks. */}
             <div className="p-4 border-t border-zinc-100 shrink-0">
-              <button
-                onClick={() => setSimOpen((v) => !v)}
-                className="flex items-center justify-between w-full text-[10px] font-bold uppercase tracking-wider text-orange-500 mb-2"
+              <p className="text-[11px] text-stone-400 mb-3">
+                Cette vue est en lecture. Pour relancer, modifier le statut ou voir tous
+                les détails, ouvre la fiche.
+              </p>
+              <a
+                href={`/admin/events/${eventId}/inscrites/${selected.id}`}
+                className="block w-full text-center px-3 py-2 rounded-lg bg-white border border-stone-200 text-stone-700 text-xs font-semibold hover:bg-stone-50 transition-colors"
               >
-                <span className="flex items-center gap-1.5">
-                  <Zap className="w-3 h-3" />
-                  Mode simulation
-                </span>
-                {simOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
-
-              {simOpen && (
-                <div className="space-y-1.5">
-                  {selected.status === "attente_j7" && (
-                    <>
-                      {!selected.j7EmailSent && (
-                        <SimBtn onClick={() => sim.sendJ7(selected.id)}>
-                          ✉️ Simuler envoi email J-7
-                        </SimBtn>
-                      )}
-                      {selected.j7EmailSent && (
-                        <SimBtn onClick={() => sim.confirmJ7(selected.id)} highlight>
-                          ✅ Simuler confirmation J-7
-                        </SimBtn>
-                      )}
-                      <SimBtn onClick={() => sim.desist(selected.id)} danger>
-                        ❌ Simuler désistement
-                      </SimBtn>
-                    </>
-                  )}
-
-                  {selected.status === "attente_j2" && (
-                    <>
-                      {!selected.j2EmailSent && (
-                        <SimBtn onClick={() => sim.sendJ2(selected.id)}>
-                          ✉️ Simuler envoi email J-2
-                        </SimBtn>
-                      )}
-                      {selected.j2EmailSent && (
-                        <SimBtn onClick={() => sim.confirmJ2(selected.id)} highlight>
-                          ✅ Simuler confirmation J-2
-                        </SimBtn>
-                      )}
-                      <SimBtn onClick={() => sim.desist(selected.id)} danger>
-                        ❌ Simuler désistement
-                      </SimBtn>
-                    </>
-                  )}
-
-                  {selected.status === "confirmee" && (
-                    <>
-                      <SimBtn onClick={() => sim.presente(selected.id)} highlight>
-                        ✅ Simuler présente Jour J
-                      </SimBtn>
-                      <SimBtn onClick={() => sim.absente(selected.id)} danger>
-                        ❌ Simuler absente Jour J
-                      </SimBtn>
-                    </>
-                  )}
-                </div>
-              )}
+                Ouvrir la fiche détaillée →
+              </a>
             </div>
           </div>
         </>

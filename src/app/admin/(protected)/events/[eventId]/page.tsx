@@ -25,10 +25,16 @@ function formatDate(date: Date): string {
 function formatShortDate(date: Date): string {
   return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
 }
-function getCountdown(eventDate: Date) {
+function getCountdown(eventDate: Date, status?: string) {
   const now = new Date();
   const days = Math.floor((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (days < 0) return { text: "Termine", tone: "past" };
+  if (days < 0) {
+    // Date passed — wording reflects whether the admin has explicitly
+    // closed the event (Finalisé/Archivé) vs forgotten to update it.
+    if (status === "termine") return { text: "Finalisé", tone: "past" };
+    if (status === "archive") return { text: "Archivé", tone: "past" };
+    return { text: "Date passée · à mettre à jour", tone: "warn" };
+  }
   if (days === 0) return { text: "aujourd'hui", tone: "today" };
   if (days <= 3) return { text: `J-${days}`, tone: "soon" };
   if (days <= 7) return { text: `J-${days}`, tone: "warn" };
@@ -67,7 +73,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
     event.date.getDate() === today.getDate();
   const isEnCours = !!isSameDay;
 
-  const countdown = getCountdown(kpis.eventDate);
+  const countdown = getCountdown(kpis.eventDate, event?.status);
   const fillPct = kpis.capacity > 0 ? Math.round((kpis.totalEnrolled / kpis.capacity) * 100) : 0;
   const confirmedPct = kpis.totalEnrolled > 0 ? Math.round((kpis.confirmed / kpis.totalEnrolled) * 100) : 0;
   const attendedPct = kpis.confirmed > 0 ? Math.round((kpis.attended / kpis.confirmed) * 100) : 0;
