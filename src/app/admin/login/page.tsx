@@ -10,11 +10,14 @@ export const metadata = { title: "Connexion admin, Les Pilotes" };
 const REASON_MESSAGES: Record<string, string> = {
   "not-authorized": "Cet email n'est pas autorisé à accéder à l'admin.",
   "auth-unavailable":
-    "Service d'authentification indisponible. Si tu testes en local, active DEV_BYPASS_AUTH=true.",
+    "Service d'authentification indisponible. Réessaie dans quelques secondes — si ça persiste, regarde les logs Vercel.",
   "db-error":
     "Base de données inaccessible. Vérifie DATABASE_URL côté Vercel (env vars du projet).",
   "magic-sent": "Un lien de connexion vient d'être envoyé à ton email.",
-  "magic-error": "Impossible d'envoyer le lien magique. Vérifie l'email ou réessaie.",
+  "magic-error":
+    "Impossible d'envoyer le lien magique. Vérifie l'orthographe de l'email puis réessaie.",
+  "rate-limit":
+    "Trop de tentatives sur cet email. Supabase limite à 4 envois par heure — attends quelques minutes puis réessaie.",
 };
 
 export default async function AdminLoginPage({
