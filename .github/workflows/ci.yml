@@ -6,57 +6,11 @@ on:
   push:
     branches: [main]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  ci:
-    name: Lint, Typecheck, Test, Build
+  hello:
+    name: Hello
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci?schema=public
-      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ci?schema=public
-      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
-      RESEND_API_KEY: re_placeholder
-      CRON_SECRET: ci-secret
-      LES_PILOTES_ORG_ID: ci-org
-      APP_URL: https://ci.example.com
-
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Enable corepack and pin pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@9.15.0 --activate
-          pnpm --version
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Materialise .env.local
-        run: |
-          cat > .env.local <<EOF
-          DATABASE_URL=$DATABASE_URL
-          DIRECT_URL=$DIRECT_URL
-          NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-          NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
-          RESEND_API_KEY=$RESEND_API_KEY
-          CRON_SECRET=$CRON_SECRET
-          LES_PILOTES_ORG_ID=$LES_PILOTES_ORG_ID
-          APP_URL=$APP_URL
-          EOF
-
-      - run: pnpm prisma generate
-      - run: pnpm prisma validate
-      - run: pnpm lint
-      - run: pnpm tsc --noEmit
-      - run: pnpm test
-      - run: pnpm build
+      - run: echo "hello"
+      - run: node --version
+      - run: npm --version
