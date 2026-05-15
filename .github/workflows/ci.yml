@@ -6,7 +6,6 @@ on:
   push:
     branches: [main]
 
-# Cancel in-progress runs for the same PR/branch when a new commit is pushed
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -17,8 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # Tests + build read env via dotenv, but they don't connect to anything real.
-    # These placeholders satisfy dotenv-cli + Prisma's URL parser.
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci?schema=public
       DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ci?schema=public
@@ -30,38 +27,18 @@ jobs:
       APP_URL: https://ci.example.com
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - run: pnpm install --frozen-lockfile
 
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # Tests use `dotenv -e .env.local`. In CI we materialise one from the env
-      # block above so the same command works locally and in CI.
-      - name: Materialise .env.local for dotenv-cli
+      - name: Materialise .env.local
         run: |
           cat > .env.local <<EOF
           DATABASE_URL=$DATABASE_URL
@@ -74,20 +51,9 @@ jobs:
           APP_URL=$APP_URL
           EOF
 
-      - name: Prisma generate
-        run: pnpm prisma generate
-
-      - name: Prisma schema validate
-        run: pnpm prisma validate
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm tsc --noEmit
-
-      - name: Test
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
+      - run: pnpm prisma generate
+      - run: pnpm prisma validate
+      - run: pnpm lint
+      - run: pnpm tsc --noEmit
+      - run: pnpm test
+      - run: pnpm build
