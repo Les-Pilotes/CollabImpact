@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel in-progress runs for the same PR/branch when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, Typecheck, Test, Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Tests + build read env via dotenv, but they don't connect to anything real.
+    # These placeholders satisfy dotenv-cli + Prisma's URL parser.
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ci?schema=public
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+      RESEND_API_KEY: re_placeholder
+      CRON_SECRET: ci-secret
+      LES_PILOTES_ORG_ID: ci-org
+      APP_URL: https://ci.example.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Tests use `dotenv -e .env.local`. In CI we materialise one from the env
+      # block above so the same command works locally and in CI.
+      - name: Materialise .env.local for dotenv-cli
+        run: |
+          cat > .env.local <<EOF
+          DATABASE_URL=$DATABASE_URL
+          DIRECT_URL=$DIRECT_URL
+          NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+          RESEND_API_KEY=$RESEND_API_KEY
+          CRON_SECRET=$CRON_SECRET
+          LES_PILOTES_ORG_ID=$LES_PILOTES_ORG_ID
+          APP_URL=$APP_URL
+          EOF
+
+      - name: Prisma generate
+        run: pnpm prisma generate
+
+      - name: Prisma schema validate
+        run: pnpm prisma validate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm tsc --noEmit
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
