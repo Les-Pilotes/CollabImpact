@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     name: Lint, Typecheck, Test, Build
@@ -25,16 +29,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install pnpm
-        run: |
-          npm install -g pnpm@9.15.0
-          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
-
-      - run: pnpm --version
+          cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
