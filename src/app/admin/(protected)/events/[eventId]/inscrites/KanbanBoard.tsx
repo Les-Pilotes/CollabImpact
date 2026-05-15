@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer } from "lucide-react";
 import PageHeader from "../../../PageHeader";
 import { QrCode } from "@/components/ui/qr-code";
+import { sendManualReminder, sendJ2Reminder } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,6 +157,8 @@ export default function KanbanBoard({
   initialParticipants: ParticipantRow[];
   eventId: string;
 }) {
+  const router = useRouter();
+  const [isSending, startSending] = useTransition();
   const [participants, setParticipants] = useState<ParticipantRow[]>(initialParticipants);
   const [archived, setArchived] = useState<ParticipantRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -188,6 +192,36 @@ export default function KanbanBoard({
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const bulkSend = useCallback(
+    (kind: "j7" | "j2") => {
+      const ids = Array.from(checkedIds);
+      const filtered = participants
+        .filter((p) => ids.includes(p.id))
+        .filter((p) => p.status === (kind === "j7" ? "attente_j7" : "attente_j2"))
+        .map((p) => p.id);
+      if (filtered.length === 0) return;
+
+      const action = kind === "j7" ? sendManualReminder : sendJ2Reminder;
+      const label = kind === "j7" ? "J-7" : "J-2";
+
+      startSending(async () => {
+        const results = await Promise.all(filtered.map((id) => action(id)));
+        const ok = results.filter((r) => r.ok).length;
+        const fail = results.length - ok;
+        if (fail === 0) {
+          showToast(`Email ${label} envoyé à ${ok} participante${ok > 1 ? "s" : ""}`);
+        } else if (ok === 0) {
+          showToast(`Échec de l'envoi ${label} (${fail} erreur${fail > 1 ? "s" : ""})`);
+        } else {
+          showToast(`${label} : ${ok} envoyé${ok > 1 ? "s" : ""}, ${fail} échec${fail > 1 ? "s" : ""}`);
+        }
+        clearChecked();
+        router.refresh();
+      });
+    },
+    [checkedIds, participants, showToast, clearChecked, router],
+  );
 
   const update = useCallback((id: string, patch: Partial<ParticipantRow>, extraHistory?: Omit<HistoryItem, "ts" | "relTime">) => {
     setParticipants((prev) =>
@@ -446,26 +480,20 @@ export default function KanbanBoard({
           <div className="flex gap-2 flex-1 flex-wrap">
             {checkedParticipants.some((p) => p.status === "attente_j7") && (
               <button
-                onClick={() => { showToast(`Email J-7 simulé pour ${checkedIds.size} participante(s)`); clearChecked(); }}
-                className="px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold transition-colors"
+                disabled={isSending}
+                onClick={() => bulkSend("j7")}
+                className="px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-wait text-white text-xs font-semibold transition-colors"
               >
-                ✉️ Envoyer J-7
+                {isSending ? "Envoi…" : "✉️ Envoyer J-7"}
               </button>
             )}
             {checkedParticipants.some((p) => p.status === "attente_j2") && (
               <button
-                onClick={() => { showToast(`Email J-2 simulé pour ${checkedIds.size} participante(s)`); clearChecked(); }}
-                className="px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-xs font-semibold transition-colors"
+                disabled={isSending}
+                onClick={() => bulkSend("j2")}
+                className="px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-wait text-white text-xs font-semibold transition-colors"
               >
-                ✉️ Envoyer J-2
-              </button>
-            )}
-            {checkedParticipants.some((p) => p.status === "confirmee") && (
-              <button
-                onClick={() => { showToast(`Confirmation Jour J simulée`); clearChecked(); }}
-                className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition-colors"
-              >
-                ✅ Confirmer Jour J
+                {isSending ? "Envoi…" : "✉️ Envoyer J-2"}
               </button>
             )}
           </div>
