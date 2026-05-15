@@ -29,7 +29,11 @@ jobs:
         with:
           node-version: 20
 
-      - run: npm install -g pnpm@9.15.0
+      - name: Install pnpm
+        run: |
+          npm install -g pnpm@9.15.0
+          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
+
       - run: pnpm --version
 
       - run: pnpm install --frozen-lockfile
