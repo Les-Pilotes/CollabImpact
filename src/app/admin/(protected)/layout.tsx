@@ -6,6 +6,11 @@ import Image from "next/image";
 import { Toaster } from "sonner";
 import AdminSignOutButton from "./AdminSignOutButton";
 import Sidebar from "./Sidebar";
+import NotificationBell from "./_components/NotificationBell";
+import {
+  countUnread,
+  listNotifications,
+} from "@/lib/notifications/queries";
 
 export default async function AdminLayout({
   children,
@@ -13,6 +18,15 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const { admin } = await requireAdmin();
+
+  const [initialUnread, initialItems] = await Promise.all([
+    countUnread(admin.organisationId, admin.id),
+    listNotifications(admin.organisationId, admin.id, { limit: 10 }),
+  ]);
+
+  const bell = (
+    <NotificationBell initialUnread={initialUnread} initialItems={initialItems} />
+  );
 
   return (
     <div className="h-screen bg-stone-50 flex overflow-hidden">
@@ -28,8 +42,14 @@ export default async function AdminLayout({
           <Image src="/logo-pilotes.png" alt="Les Pilotes" width={24} height={24} className="rounded-md" />
           <span className="font-semibold text-sm tracking-tight">Les Pilotes</span>
         </Link>
-        <AdminSignOutButton />
+        <div className="flex items-center gap-2">
+          {bell}
+          <AdminSignOutButton />
+        </div>
       </div>
+
+      {/* Desktop floating bell */}
+      <div className="hidden md:block fixed top-4 right-6 z-40">{bell}</div>
 
       {/* Main */}
       <main className="flex-1 min-w-0 md:p-10 p-4 pt-16 md:pt-10 overflow-y-auto">
