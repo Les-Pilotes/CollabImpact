@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 /**
- * Tokens HMAC signés. Trois usages :
+ * Tokens HMAC signés. Quatre usages :
  *
  * 1. Feedback token — `createFeedbackToken` / `verifyFeedbackToken`
  *    Format : base64url(enrollmentId).base64url(expiryTs).base64url(hmac)
@@ -15,6 +15,12 @@ import crypto from "node:crypto";
  * 3. Checkin token — `createCheckinToken` / `verifyCheckinToken`
  *    Format : base64url(enrollmentId).base64url("checkin").base64url(expiryTs).base64url(hmac)
  *    Encodé dans le QR Jour-J personnel d'une participante. TTL court (~2 jours).
+ *    Pas stocké en base — auto-vérifiable via signature.
+ *
+ * 4. Resume token — `createResumeToken` / `verifyResumeToken`
+ *    Format : base64url(userId).base64url(eventId).base64url("resume").base64url(expiryTs).base64url(hmac)
+ *    Magic-link participant : permet à un.e utilisateur.rice connu.e de reprendre
+ *    son inscription sans re-saisir ses infos. TTL très court (~15 min).
  *    Pas stocké en base — auto-vérifiable via signature.
  */
 
@@ -159,5 +165,67 @@ export function verifyCheckinToken(token: string): CheckinTokenResult {
   return {
     valid: true,
     enrollmentId: Buffer.from(encId, "base64url").toString("utf8"),
+  };
+}
+
+// ─── Resume tokens (magic-link participant) ─────────────────────────────────
+
+const RESUME_TTL_MINUTES = 15;
+const RESUME_TAG = "resume";
+
+/**
+ * Émet un token signé pour qu'un.e participant.e qui revient puisse reprendre
+ * son inscription sans re-saisir ses infos. Lié à `userId` ET `eventId` : un
+ * token ne sert qu'au couple pour lequel il a été émis. TTL très court car
+ * c'est un secret d'authentification, pas un rappel transactionnel.
+ */
+export function createResumeToken(
+  userId: string,
+  eventId: string,
+  ttlMinutes = RESUME_TTL_MINUTES,
+): string {
+  const expiry = Date.now() + ttlMinutes * 60 * 1000;
+  const payload = `${b64url(userId)}.${b64url(eventId)}.${b64url(RESUME_TAG)}.${b64url(String(expiry))}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+export type ResumeTokenResult =
+  | { valid: true; userId: string; eventId: string }
+  | {
+      valid: false;
+      reason: "malformed" | "bad_signature" | "expired" | "bad_tag" | "wrong_event";
+    };
+
+export function verifyResumeToken(
+  token: string,
+  expectedEventId: string,
+): ResumeTokenResult {
+  const parts = token.split(".");
+  if (parts.length !== 5) return { valid: false, reason: "malformed" };
+  const [encUid, encEid, encTag, encExp, sig] = parts;
+  const payload = `${encUid}.${encEid}.${encTag}.${encExp}`;
+  const expected = sign(payload);
+  if (
+    sig.length !== expected.length ||
+    !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))
+  ) {
+    return { valid: false, reason: "bad_signature" };
+  }
+  const tag = Buffer.from(encTag, "base64url").toString("utf8");
+  if (tag !== RESUME_TAG) {
+    return { valid: false, reason: "bad_tag" };
+  }
+  const expiry = Number(Buffer.from(encExp, "base64url").toString("utf8"));
+  if (!Number.isFinite(expiry) || Date.now() > expiry) {
+    return { valid: false, reason: "expired" };
+  }
+  const eventId = Buffer.from(encEid, "base64url").toString("utf8");
+  if (eventId !== expectedEventId) {
+    return { valid: false, reason: "wrong_event" };
+  }
+  return {
+    valid: true,
+    userId: Buffer.from(encUid, "base64url").toString("utf8"),
+    eventId,
   };
 }
