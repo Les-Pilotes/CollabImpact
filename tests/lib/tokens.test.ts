@@ -5,6 +5,8 @@ import {
   createCheckinToken,
   verifyCheckinToken,
   createActionToken,
+  createResumeToken,
+  verifyResumeToken,
 } from "@/lib/tokens";
 
 beforeAll(() => {
@@ -69,6 +71,37 @@ describe("createCheckinToken / verifyCheckinToken", () => {
     // Action tokens have 4 parts too, but use a different tag string; HMAC differs.
     const actionToken = createActionToken("e_abc", "confirm");
     const result = verifyCheckinToken(actionToken);
+    expect(result.valid).toBe(false);
+  });
+});
+
+describe("createResumeToken / verifyResumeToken", () => {
+  it("round-trips a valid token bound to the right event", () => {
+    const token = createResumeToken("u_42", "ev_main");
+    const result = verifyResumeToken(token, "ev_main");
+    expect(result).toEqual({ valid: true, userId: "u_42", eventId: "ev_main" });
+  });
+
+  it("rejects a token used for a different event", () => {
+    const token = createResumeToken("u_42", "ev_main");
+    const result = verifyResumeToken(token, "ev_other");
+    expect(result).toEqual({ valid: false, reason: "wrong_event" });
+  });
+
+  it("rejects an expired token", () => {
+    const token = createResumeToken("u_42", "ev_main", -1);
+    const result = verifyResumeToken(token, "ev_main");
+    expect(result).toEqual({ valid: false, reason: "expired" });
+  });
+
+  it("rejects a malformed token", () => {
+    const result = verifyResumeToken("not.a.real.token", "ev_main");
+    expect(result).toMatchObject({ valid: false });
+  });
+
+  it("rejects a feedback token reused as resume (wrong shape / signature)", () => {
+    const feedback = createFeedbackToken("e_abc");
+    const result = verifyResumeToken(feedback, "ev_main");
     expect(result.valid).toBe(false);
   });
 });
