@@ -22,7 +22,7 @@ Comme tu es mineure, tes parents doivent signer l'autorisation parentale pour le
       </Text>
       <Section style={{ textAlign: "center", margin: "24px 0" }}>
         <Button href={pdfUrl} style={button}>
-          Télécharger l'autorisation parentale (PDF)
+          Télécharger l&apos;autorisation parentale (PDF)
         </Button>
       </Section>
       <Text style={{ fontSize: 13, color: "#71717a" }}>
