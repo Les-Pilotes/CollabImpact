@@ -23,7 +23,12 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+vi.mock("@/lib/notifications/emit", () => ({
+  emitNotification: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { prisma } from "@/lib/db";
+import { emitNotification } from "@/lib/notifications/emit";
 import {
   createEvent,
   updateEvent,
@@ -32,6 +37,7 @@ import {
 } from "@/app/admin/(protected)/events/actions";
 
 const ev = vi.mocked(prisma.event);
+const emit = vi.mocked(emitNotification);
 
 describe("createEvent", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -123,8 +129,12 @@ describe("updateEvent", () => {
 describe("transitionEventStatus", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("allows brouillon → publie", async () => {
-    ev.findUnique.mockResolvedValue({ status: ImmersionStatus.brouillon } as never);
+  it("allows brouillon → publie and emits a status_changed notification", async () => {
+    ev.findUnique.mockResolvedValue({
+      status: ImmersionStatus.brouillon,
+      name: "Workshop 7",
+      organisationId: "org-1",
+    } as never);
     ev.update.mockResolvedValue({} as never);
 
     const result = await transitionEventStatus("ev-1", ImmersionStatus.publie);
@@ -134,19 +144,36 @@ describe("transitionEventStatus", () => {
       where: { id: "ev-1" },
       data: { status: ImmersionStatus.publie },
     });
+    expect(emit).toHaveBeenCalledOnce();
+    expect(emit.mock.calls[0][0]).toMatchObject({
+      organisationId: "org-1",
+      type: "event.status_changed",
+      eventId: "ev-1",
+      metadata: { from: ImmersionStatus.brouillon, to: ImmersionStatus.publie },
+    });
+    expect(emit.mock.calls[0][0].title).toContain("Workshop 7");
   });
 
-  it("rejects brouillon → en_cours (skipping publie)", async () => {
-    ev.findUnique.mockResolvedValue({ status: ImmersionStatus.brouillon } as never);
+  it("rejects brouillon → en_cours (skipping publie) and does not emit", async () => {
+    ev.findUnique.mockResolvedValue({
+      status: ImmersionStatus.brouillon,
+      name: "Workshop 7",
+      organisationId: "org-1",
+    } as never);
 
     const result = await transitionEventStatus("ev-1", ImmersionStatus.en_cours);
 
     expect(result.ok).toBe(false);
     expect(ev.update).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
   });
 
   it("allows archive from any non-archive state", async () => {
-    ev.findUnique.mockResolvedValue({ status: ImmersionStatus.termine } as never);
+    ev.findUnique.mockResolvedValue({
+      status: ImmersionStatus.termine,
+      name: "Workshop 7",
+      organisationId: "org-1",
+    } as never);
     ev.update.mockResolvedValue({} as never);
 
     const result = await transitionEventStatus("ev-1", ImmersionStatus.archive);
