@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyFeedbackToken } from "@/lib/tokens";
 import { feedbackSchema } from "@/lib/validation/feedback";
+import { emitNotification } from "@/lib/notifications/emit";
 
 export async function POST(
   request: NextRequest,
@@ -18,7 +19,11 @@ export async function POST(
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
-    include: { feedback: true },
+    include: {
+      feedback: true,
+      user: { select: { firstName: true, lastName: true } },
+      event: { select: { id: true, name: true } },
+    },
   });
 
   if (!enrollment || enrollment.status !== "presente") {
@@ -54,6 +59,19 @@ export async function POST(
   await prisma.enrollment.update({
     where: { id: enrollmentId },
     data: { status: "feedback_recu" },
+  });
+
+  void emitNotification({
+    organisationId: enrollment.organisationId,
+    type: "feedback.received",
+    title: `${enrollment.user.firstName} ${enrollment.user.lastName} a laissé un feedback sur ${enrollment.event.name}`,
+    body: `Note globale : ${parsed.data.overallRating}/5 · Orga : ${parsed.data.orgRating}/5`,
+    eventId: enrollment.event.id,
+    enrollmentId,
+    metadata: {
+      overallRating: parsed.data.overallRating,
+      orgRating: parsed.data.orgRating,
+    },
   });
 
   return NextResponse.json({ ok: true });

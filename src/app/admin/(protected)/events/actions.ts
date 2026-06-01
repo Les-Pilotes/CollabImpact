@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ImmersionStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { emitNotification } from "@/lib/notifications/emit";
 import {
   createEventSchema,
   updateEventSchema,
@@ -11,6 +12,15 @@ import {
   type CreateEventInput,
   type UpdateEventInput,
 } from "@/lib/validation/event";
+
+const STATUS_LABEL_FR: Record<ImmersionStatus, string> = {
+  brouillon: "Brouillon",
+  publie: "Publié",
+  complet: "Complet",
+  en_cours: "En cours",
+  termine: "Terminé",
+  archive: "Archivé",
+};
 
 type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -105,7 +115,7 @@ export async function transitionEventStatus(
   try {
     const event = await prisma.event.findUnique({
       where: { id: eventId, deletedAt: null },
-      select: { status: true },
+      select: { status: true, name: true, organisationId: true },
     });
     if (!event) return { ok: false, error: "Événement introuvable." };
 
@@ -121,6 +131,15 @@ export async function transitionEventStatus(
       where: { id: eventId },
       data: { status: newStatus },
     });
+
+    void emitNotification({
+      organisationId: event.organisationId,
+      type: "event.status_changed",
+      title: `${event.name} : ${STATUS_LABEL_FR[event.status]} → ${STATUS_LABEL_FR[newStatus]}`,
+      eventId,
+      metadata: { from: event.status, to: newStatus },
+    });
+
     revalidatePath(`/admin/events/${eventId}`);
     revalidatePath("/admin/events");
     return { ok: true, data: undefined };

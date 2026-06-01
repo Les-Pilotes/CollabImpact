@@ -6,6 +6,7 @@ import { inscriptionSchema, type InscriptionInput } from "@/lib/validation/inscr
 import InscriptionConfirmation from "@/lib/email/templates/InscriptionConfirmation";
 import ResumeInscription from "@/lib/email/templates/ResumeInscription";
 import { resolveEmail } from "@/lib/email/resolve";
+import { emitNotification } from "@/lib/notifications/emit";
 import { getAppUrl } from "@/lib/app-url";
 import { createResumeToken, verifyResumeToken } from "@/lib/tokens";
 import React from "react";
@@ -252,6 +253,7 @@ export async function submitInscription(
         name: true,
         date: true,
         address: true,
+        capacity: true,
         organisationId: true,
         replyToEmail: true,
         emailSignature: true,
@@ -310,6 +312,14 @@ export async function submitInscription(
       },
     });
 
+    // Detect whether this is a brand-new enrollment (notif fires only once)
+    // before the upsert collapses create/update into one call.
+    const existingEnrollment = await prisma.enrollment.findUnique({
+      where: { eventId_userId: { eventId: event.id, userId: user.id } },
+      select: { id: true },
+    });
+    const isNewEnrollment = !existingEnrollment;
+
     const enrollment = await prisma.enrollment.upsert({
       where: {
         eventId_userId: { eventId: event.id, userId: user.id },
@@ -336,6 +346,33 @@ export async function submitInscription(
         commentaire: data.commentaire,
       },
     });
+
+    if (isNewEnrollment) {
+      void emitNotification({
+        organisationId: event.organisationId,
+        type: "enrollment.created",
+        title: `${user.firstName} ${user.lastName} s'est inscrite à ${event.name}`,
+        body: user.city ? `Depuis ${user.city}.` : undefined,
+        eventId: event.id,
+        enrollmentId: enrollment.id,
+      });
+
+      if (event.capacity > 0) {
+        const count = await prisma.enrollment.count({
+          where: { eventId: event.id, deletedAt: null },
+        });
+        if (count >= event.capacity) {
+          void emitNotification({
+            organisationId: event.organisationId,
+            type: "event.capacity_reached",
+            title: `${event.name} est complet`,
+            body: `${count} inscrites sur ${event.capacity} places.`,
+            eventId: event.id,
+            dedupePerEvent: true,
+          });
+        }
+      }
+    }
 
     try {
       const resolved = resolveEmail("confirmation", event.emailConfig, {

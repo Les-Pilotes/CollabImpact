@@ -90,11 +90,12 @@ model Organisation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users       User[]
-  admins      Admin[]
-  events      Event[]
-  enrollments Enrollment[]
-  speakers    Speaker[]
+  users         User[]
+  admins        Admin[]
+  events        Event[]
+  enrollments   Enrollment[]
+  speakers      Speaker[]
+  notifications Notification[]
   // V3: partnerCompanies PartnerCompany[]
 }
 
@@ -111,6 +112,8 @@ model Admin {
   updatedAt      DateTime     @updatedAt
   organisation   Organisation @relation(fields: [organisationId], references: [id])
 
+  notificationReads NotificationRead[]
+
   @@index([organisationId])
 }
 
@@ -124,25 +127,25 @@ model User {
 
   firstName        String
   lastName         String
-  email            String  @unique
+  email            String    @unique
   phone            String?
   birthDate        DateTime? @db.Date
-  gender           String?  // "Fille" | "Garçon"
+  gender           String? // "Fille" | "Garçon"
   city             String?
-  source           String?  // "whatsapp" | "instagram" | "classe" | "conseiller" | "autre" | "bouche_a_oreille"
-  reliabilityScore Int     @default(0)
-  emailVerified    Boolean @default(false)
+  source           String? // "whatsapp" | "instagram" | "classe" | "conseiller" | "autre" | "bouche_a_oreille"
+  reliabilityScore Int       @default(0)
+  emailVerified    Boolean   @default(false)
 
   // Couche Orientation — updated on inscription, refreshed if stale > 6 months
-  niveauScolaire        String?  // "3ème" | "2nde" | "1ère" | "Terminale" | "BTS" | "Licence" | "Master" | "Autres"
-  niveauScolaireAutre   String?
-  etablissement         String?
-  region                String?  // "Île-De-France" | "Hauts-de-France" | "Auvergne-Rhône-Alpes" | "Provence-Alpes-Côte d'Azur" | "Pays de la Loire"
-  projetPro             String?
-  motivation            String[] @default([])  // multi-select serialized
-  motivationDetail      String?
-  commentConnu          String?
-  orientationUpdatedAt  DateTime?
+  niveauScolaire       String? // "3ème" | "2nde" | "1ère" | "Terminale" | "BTS" | "Licence" | "Master" | "Autres"
+  niveauScolaireAutre  String?
+  etablissement        String?
+  region               String? // "Île-De-France" | "Hauts-de-France" | "Auvergne-Rhône-Alpes" | "Provence-Alpes-Côte d'Azur" | "Pays de la Loire"
+  projetPro            String?
+  motivation           String[]  @default([]) // multi-select serialized
+  motivationDetail     String?
+  commentConnu         String?
+  orientationUpdatedAt DateTime?
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -157,13 +160,13 @@ model User {
 
 // Un évent (workshop, immersion…).
 model Event {
-  id             String          @id @default(cuid())
+  id             String       @id @default(cuid())
   organisationId String
-  organisation   Organisation    @relation(fields: [organisationId], references: [id])
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
 
-  type        EventType    @default(FEMININ)
+  type        EventType       @default(FEMININ)
   name        String
-  status      ImmersionStatus  @default(brouillon)
+  status      ImmersionStatus @default(brouillon)
   address     String
   date        DateTime
   endTime     DateTime?
@@ -187,30 +190,30 @@ model Event {
   emailConfig    EmailConfig?
   // V3 (requires migration): partnerCompany PartnerCompany?
 
-  @@map("Immersion")
   @@index([organisationId])
   @@index([date])
   @@index([status])
+  @@map("Immersion")
 }
 
 // Inscription d'une participante à un évent.
 model Enrollment {
-  id             String           @id @default(cuid())
+  id             String       @id @default(cuid())
   organisationId String
-  organisation   Organisation     @relation(fields: [organisationId], references: [id])
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
 
-  eventId String  @map("immersionId")
-  event   Event @relation(fields: [eventId], references: [id])
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
+  eventId String @map("immersionId")
+  event   Event  @relation(fields: [eventId], references: [id])
+  userId  String
+  user    User   @relation(fields: [userId], references: [id])
 
   status       EnrollmentStatus @default(inscrit)
   mode         EnrollmentMode   @default(individuel)
   referentName String?
-  source       String?          // free string: whatsapp, instagram, etc.
+  source       String? // free string: whatsapp, instagram, etc.
 
   attendedAt DateTime? // émargement Jour J
-  noShow     Boolean  @default(false)
+  noShow     Boolean   @default(false)
   j7SentAt   DateTime?
   j2SentAt   DateTime?
 
@@ -218,13 +221,13 @@ model Enrollment {
   feedbackSentAt DateTime?
 
   // Couche Événement — answered at inscription, specific to this enrollment
-  droitsImageStatus  DroitsImageStatus @default(pending)
-  droitsImageSignedAt DateTime?
-  droitsImageSignature String?         // digital signature: full name typed by the majeure
-  regime             String[] @default([])  // multi-select: ["Végétarien", "Sans gluten", ...]
-  accessibilite      String?
-  accompagnateur     Boolean   @default(false)
-  commentaire        String?
+  droitsImageStatus    DroitsImageStatus @default(pending)
+  droitsImageSignedAt  DateTime?
+  droitsImageSignature String? // digital signature: full name typed by the majeure
+  regime               String[]          @default([]) // multi-select: ["Végétarien", "Sans gluten", ...]
+  accessibilite        String?
+  accompagnateur       Boolean           @default(false)
+  commentaire          String?
 
   // Admin-only internal note (not visible to participante)
   internalNote String?
@@ -249,8 +252,8 @@ model Feedback {
   enrollmentId String     @unique
   enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
 
-  overallRating  Int     // 1-5
-  orgRating      Int     // 1-5
+  overallRating  Int // 1-5
+  orgRating      Int // 1-5
   favoriteMoment String?
   changedVision  Boolean
   improvements   String?
@@ -263,9 +266,9 @@ model Feedback {
 
 // Tâche de suivi liée à un évent.
 model Task {
-  id      String    @id @default(cuid())
+  id      String @id @default(cuid())
   eventId String
-  event   Event @relation(fields: [eventId], references: [id])
+  event   Event  @relation(fields: [eventId], references: [id])
 
   phase       TaskPhase
   title       String
@@ -281,34 +284,34 @@ model Task {
 
 /// Intervenante — professionnelle invitée à un workshop
 model Speaker {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   organisationId String
-  organisation   Organisation  @relation(fields: [organisationId], references: [id])
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
 
-  firstName      String
-  lastName       String
-  jobTitle       String?
-  company        String?
-  domain         String?       // ex: "Informatique", "Marketing"
-  bio            String?
-  photoUrl       String?
+  firstName String
+  lastName  String
+  jobTitle  String?
+  company   String?
+  domain    String? // ex: "Informatique", "Marketing"
+  bio       String?
+  photoUrl  String?
 
-  status         SpeakerStatus @default(invitee)
+  status SpeakerStatus @default(invitee)
 
-  profileToken   String        @unique @default(cuid())
-  feedbackToken  String        @unique @default(cuid())
+  profileToken  String @unique @default(cuid())
+  feedbackToken String @unique @default(cuid())
 
   profileSubmittedAt  DateTime?
   feedbackSubmittedAt DateTime?
 
-  eventId        String
-  event          Event         @relation(fields: [eventId], references: [id])
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id])
 
-  group          Group?
+  group Group?
 
-  deletedAt      DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([organisationId])
   @@index([eventId])
@@ -317,29 +320,29 @@ model Speaker {
 
 /// Groupe workshop — une intervenante + N participantes
 model Group {
-  id          String     @id @default(cuid())
-  eventId     String
-  event       Event      @relation(fields: [eventId], references: [id])
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id])
 
-  speakerId   String?    @unique
-  speaker     Speaker?   @relation(fields: [speakerId], references: [id])
+  speakerId String?  @unique
+  speaker   Speaker? @relation(fields: [speakerId], references: [id])
 
-  name        String
-  order       Int        @default(0)
+  name  String
+  order Int    @default(0)
 
   // V3 (requires groupId on Enrollment + migration): enrollments Enrollment[]
 
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([eventId])
 }
 
 /// Configuration du formulaire d'inscription d'un event
 model FormConfig {
-  id          String    @id @default(cuid())
-  eventId     String    @unique
-  event       Event     @relation(fields: [eventId], references: [id])
+  id      String @id @default(cuid())
+  eventId String @unique
+  event   Event  @relation(fields: [eventId], references: [id])
 
   phoneEnabled     Boolean @default(true)
   birthDateEnabled Boolean @default(true)
@@ -347,17 +350,17 @@ model FormConfig {
   sourceEnabled    Boolean @default(true)
 
   // Format: [{ "id": "cuid", "label": "...", "type": "text|select", "required": bool, "options": [...] }]
-  customFields     Json    @default("[]")
+  customFields Json @default("[]")
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// Configuration du formulaire de feedback post-event
 model FeedbackConfig {
-  id          String    @id @default(cuid())
-  eventId     String    @unique
-  event       Event     @relation(fields: [eventId], references: [id])
+  id      String @id @default(cuid())
+  eventId String @unique
+  event   Event  @relation(fields: [eventId], references: [id])
 
   satisfactionEnabled    Boolean @default(true)
   highlightsEnabled      Boolean @default(true)
@@ -398,6 +401,43 @@ model EmailConfig {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// In-app notification for admin dashboard. One row per org event (deduplicated
+/// across admins); per-admin read state is tracked in NotificationRead.
+model Notification {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+
+  /// "enrollment.created" | "event.capacity_reached" | "event.status_changed" | "feedback.received"
+  type         String
+  title        String
+  body         String?
+  eventId      String?
+  enrollmentId String?
+  metadata     Json?
+
+  createdAt DateTime @default(now())
+
+  reads NotificationRead[]
+
+  @@index([organisationId, createdAt])
+  @@index([eventId, type])
+}
+
+/// Per-admin read state for a notification.
+model NotificationRead {
+  id             String   @id @default(cuid())
+  notificationId String
+  adminId        String
+  readAt         DateTime @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  admin        Admin        @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, adminId])
+  @@index([adminId])
 }
 
 // V3: model PartnerCompany (requires partnerCompanyId FK on Event + migration)
