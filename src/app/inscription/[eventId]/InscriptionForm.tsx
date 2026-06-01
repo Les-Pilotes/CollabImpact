@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Play, FileDown, X } from "lucide-react";
+import { Play, FileDown, X, Mail, MailX } from "lucide-react";
 import {
   lookupUserByEmail,
-  verifyAndFetchProfile,
+  sendResumeLink,
+  consumeResumeToken,
   submitInscription,
   type ReturningProfile,
 } from "./actions";
@@ -32,8 +33,14 @@ type EventProps = {
   isClosed: boolean;
 };
 
-type Flow = "unknown" | "new" | "returning_fresh" | "returning_stale";
-type Step = 0 | 0.5 | 1 | 2 | 3;
+type Flow =
+  | "unknown"
+  | "link_sent"
+  | "link_expired"
+  | "new"
+  | "returning_fresh"
+  | "returning_stale";
+type Step = 0 | 1 | 2 | 3;
 
 type FormData = {
   // fondamentale
@@ -140,27 +147,78 @@ const DEFAULT_FORM_CONFIG: FormConfig = {
 export default function InscriptionForm({
   event,
   formConfig,
+  resumeToken,
 }: {
   event: EventProps;
   formConfig?: FormConfig | null;
+  resumeToken?: string | null;
 }) {
   const fc = formConfig ?? DEFAULT_FORM_CONFIG;
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
   const [flow, setFlow] = useState<Flow>("unknown");
   const [data, setData] = useState<FormData>(EMPTY);
-  const [pendingProfile, setPendingProfile] = useState<{
+  const [recognition, setRecognition] = useState<{
     firstName: string;
+    maskedEmail: string;
     lastEventName: string | null;
-    verifyBirthDate: string;
-    isStale: boolean;
   } | null>(null);
-  const [verifyDob, setVerifyDob] = useState("");
-  const [verifyError, setVerifyError] = useState(false);
+  const [resumeNotice, setResumeNotice] = useState<string | null>(null);
+  const [consumingResume, setConsumingResume] = useState<boolean>(
+    Boolean(resumeToken),
+  );
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoIdx, setVideoIdx] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const consumedTokenRef = useRef<string | null>(null);
+
+  function applyProfile(profile: ReturningProfile, isStale: boolean) {
+    setData((p) => ({
+      ...p,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      email: profile.email,
+      phone: profile.phone,
+      birthDate: profile.birthDate,
+      gender: (profile.gender as FormData["gender"]) ?? "",
+      city: profile.city,
+      niveauScolaire: profile.niveauScolaire ?? "",
+      etablissement: profile.etablissement ?? "",
+      region: profile.region ?? "",
+      projetPro: profile.projetPro ?? "",
+      motivation: profile.motivation ?? [],
+      motivationDetail: profile.motivationDetail ?? "",
+      commentConnu: profile.commentConnu ?? "",
+    }));
+    setRecognition(null);
+    setResumeNotice(null);
+    setFlow(isStale ? "returning_stale" : "returning_fresh");
+    // returning_fresh skips steps 1 + 2; returning_stale skips only step 1
+    setStep(isStale ? 2 : 3);
+  }
+
+  useEffect(() => {
+    if (!resumeToken) return;
+    if (consumedTokenRef.current === resumeToken) return;
+    consumedTokenRef.current = resumeToken;
+    void (async () => {
+      const result = await consumeResumeToken(resumeToken, event.id);
+      if (result.ok) {
+        applyProfile(result.profile, result.isStale);
+        if (typeof window !== "undefined") {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("resume");
+          window.history.replaceState({}, "", url.toString());
+        }
+      } else {
+        setFlow("link_expired");
+        setStep(0);
+      }
+      setConsumingResume(false);
+    })();
+  }, [resumeToken, event.id]);
 
   const eventDate = new Date(event.date);
   const eventDateLabel = new Intl.DateTimeFormat("fr-FR", {
@@ -225,28 +283,6 @@ export default function InscriptionForm({
     }));
   }
 
-  function applyProfile(profile: ReturningProfile, isStale: boolean) {
-    setData((p) => ({
-      ...p,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      phone: profile.phone,
-      birthDate: profile.birthDate,
-      gender: (profile.gender as FormData["gender"]) ?? "",
-      city: profile.city,
-      niveauScolaire: profile.niveauScolaire ?? "",
-      etablissement: profile.etablissement ?? "",
-      region: profile.region ?? "",
-      projetPro: profile.projetPro ?? "",
-      motivation: profile.motivation ?? [],
-      motivationDetail: profile.motivationDetail ?? "",
-      commentConnu: profile.commentConnu ?? "",
-    }));
-    setFlow(isStale ? "returning_stale" : "returning_fresh");
-    // returning_fresh skips steps 1 + 2; returning_stale skips only step 1
-    setStep(isStale ? 2 : 3);
-  }
-
   // ─── Step transitions ──────────────────────────────────────────────────────
   async function handleEmailContinue() {
     if (!data.email.includes("@")) return;
@@ -255,37 +291,50 @@ export default function InscriptionForm({
       if (result.kind === "new") {
         setFlow("new");
         setStep(1);
+        return;
+      }
+      setRecognition({
+        firstName: result.firstName,
+        maskedEmail: result.maskedEmail,
+        lastEventName: result.lastEventName,
+      });
+      const sent = await sendResumeLink(data.email, event.id);
+      if (sent.ok) {
+        setFlow("link_sent");
+        setResumeNotice(null);
+      } else if (sent.reason === "rate_limited") {
+        setFlow("link_sent");
+        setResumeNotice(
+          "On vient de t'envoyer un lien récemment. Vérifie tes spams, ou patiente une minute avant de redemander.",
+        );
       } else {
-        setPendingProfile({
-          firstName: result.firstName,
-          lastEventName: result.lastEventName,
-          verifyBirthDate: result.verifyBirthDate,
-          isStale: result.isStale,
-        });
-        setStep(0.5);
+        // unknown_email shouldn't happen here (we just looked up), but fall back gracefully
+        setFlow("new");
+        setStep(1);
       }
     });
   }
 
-  async function handleVerifyConfirm() {
-    if (!pendingProfile || !verifyDob) return;
+  async function handleResumeResend() {
+    if (!data.email) return;
     startTransition(async () => {
-      const profile = await verifyAndFetchProfile(data.email, verifyDob);
-      if (profile) {
-        applyProfile(profile, pendingProfile.isStale);
-        setPendingProfile(null);
-        setVerifyDob("");
-        setVerifyError(false);
+      const sent = await sendResumeLink(data.email, event.id);
+      if (sent.ok) {
+        setFlow("link_sent");
+        setResumeNotice("Lien renvoyé. Vérifie ta boîte (et tes spams).");
+      } else if (sent.reason === "rate_limited") {
+        setResumeNotice(
+          "Patiente une minute avant de redemander un nouveau lien.",
+        );
       } else {
-        setVerifyError(true);
+        setResumeNotice("Impossible d'envoyer le lien. Réessaie dans un instant.");
       }
     });
   }
 
-  function handleVerifyFallback() {
-    setPendingProfile(null);
-    setVerifyDob("");
-    setVerifyError(false);
+  function handleResumeFallbackNew() {
+    setRecognition(null);
+    setResumeNotice(null);
     setFlow("new");
     setStep(1);
   }
@@ -320,17 +369,17 @@ export default function InscriptionForm({
   }
 
   function handleBack() {
-    if (step === 0.5) {
-      setStep(0);
-      setPendingProfile(null);
-      setVerifyDob("");
-    } else if (step === 1) {
+    if (step === 1) {
       setStep(0);
       setFlow("unknown");
+      setRecognition(null);
+      setResumeNotice(null);
     } else if (step === 2) {
       if (flow === "returning_stale") {
         setStep(0);
         setFlow("unknown");
+        setRecognition(null);
+        setResumeNotice(null);
         setData(EMPTY);
       } else {
         setStep(1);
@@ -339,6 +388,8 @@ export default function InscriptionForm({
       if (flow === "returning_fresh") {
         setStep(0);
         setFlow("unknown");
+        setRecognition(null);
+        setResumeNotice(null);
         setData(EMPTY);
       } else {
         setStep(2);
@@ -386,7 +437,23 @@ export default function InscriptionForm({
   const totalSteps = flow === "returning_fresh" ? 1 : flow === "returning_stale" ? 2 : 3;
   const currentStepNum =
     step === 1 ? 1 : step === 2 ? (flow === "returning_stale" ? 1 : 2) : step === 3 ? totalSteps : 0;
-  const progress = step === 0 || step === 0.5 ? 0 : Math.round((currentStepNum / totalSteps) * 100);
+  const progress = step === 0 ? 0 : Math.round((currentStepNum / totalSteps) * 100);
+
+  if (consumingResume) {
+    return (
+      <Layout event={event} eventDateLabel={eventDateLabel} eventTimeLabel={eventTimeLabel}>
+        <div className="text-center py-16 space-y-4" aria-live="polite">
+          <div className="text-5xl">✨</div>
+          <h2 className="text-xl font-extrabold text-zinc-900">
+            On récupère ton profil…
+          </h2>
+          <p className="text-sm text-zinc-500 max-w-sm mx-auto">
+            Une seconde, on prépare ton formulaire pré-rempli.
+          </p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout
@@ -398,7 +465,7 @@ export default function InscriptionForm({
         step >= 1 && step <= 3 ? `Étape ${currentStepNum}/${totalSteps}` : undefined
       }
     >
-      {step === 0 && (
+      {step === 0 && flow !== "link_sent" && flow !== "link_expired" && (
         <Step0Email
           email={data.email}
           isPending={isPending}
@@ -407,18 +474,26 @@ export default function InscriptionForm({
         />
       )}
 
-      {step === 0.5 && pendingProfile && (
-        <StepVerify
-          firstName={pendingProfile.firstName}
-          birthDate={verifyDob}
-          error={verifyError}
+      {step === 0 && flow === "link_sent" && recognition && (
+        <Step0LinkSent
+          firstName={recognition.firstName}
+          maskedEmail={recognition.maskedEmail}
+          lastEventName={recognition.lastEventName}
+          notice={resumeNotice}
           isPending={isPending}
-          onChange={(v) => {
-            setVerifyDob(v);
-            setVerifyError(false);
-          }}
-          onConfirm={handleVerifyConfirm}
-          onFallback={handleVerifyFallback}
+          onResend={handleResumeResend}
+          onContinueAsNew={handleResumeFallbackNew}
+        />
+      )}
+
+      {step === 0 && flow === "link_expired" && (
+        <Step0LinkExpired
+          email={data.email}
+          notice={resumeNotice}
+          isPending={isPending}
+          onEmailChange={(v) => setField("email", v)}
+          onResend={handleResumeResend}
+          onContinueAsNew={handleResumeFallbackNew}
         />
       )}
 
@@ -578,7 +653,9 @@ function Step0Email({
           Commence par ton email
         </h2>
         <p className="text-sm text-zinc-500">
-          Si tu es déjà venue à un workshop, tes infos seront pré-remplies.
+          On l&apos;utilise pour te confirmer l&apos;inscription et te recontacter
+          avant l&apos;event. Si tu es déjà venue, on t&apos;enverra un lien pour
+          reprendre ton profil sans tout re-saisir.
         </p>
       </div>
       <Field label="Adresse email" required>
@@ -606,63 +683,137 @@ function Step0Email({
   );
 }
 
-// ─── Step 0.5 — verify DOB ───────────────────────────────────────────────────
+// ─── Step 0 — link sent (returning user) ─────────────────────────────────────
 
-function StepVerify({
+function Step0LinkSent({
   firstName,
-  birthDate,
-  error,
+  maskedEmail,
+  lastEventName,
+  notice,
   isPending,
-  onChange,
-  onConfirm,
-  onFallback,
+  onResend,
+  onContinueAsNew,
 }: {
   firstName: string;
-  birthDate: string;
-  error: boolean;
+  maskedEmail: string;
+  lastEventName: string | null;
+  notice: string | null;
   isPending: boolean;
-  onChange: (v: string) => void;
-  onConfirm: () => void;
-  onFallback: () => void;
+  onResend: () => void;
+  onContinueAsNew: () => void;
 }) {
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-extrabold text-zinc-900 mb-2">
-          On dirait qu&apos;on se connaît, {firstName} 👋
+    <div className="space-y-6" aria-live="polite">
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-orange-100 text-orange-600">
+          <Mail className="w-7 h-7" />
+        </div>
+        <h2 className="text-2xl font-extrabold text-zinc-900">
+          Re-bonjour {firstName} 👋
         </h2>
-        <p className="text-sm text-zinc-500">
-          Confirme ta date de naissance pour qu&apos;on retrouve ton profil.
+        <p className="text-sm text-zinc-500 max-w-sm mx-auto">
+          {lastEventName ? (
+            <>On se souvient — tu étais avec nous pour <strong>{lastEventName}</strong>. </>
+          ) : null}
+          On vient de t&apos;envoyer un lien à <strong>{maskedEmail}</strong> pour
+          reprendre ton inscription en un clic.
         </p>
       </div>
-      <Field label="Date de naissance" required>
-        <input
-          type="date"
-          value={birthDate}
-          onChange={(e) => onChange(e.target.value)}
-          className={`${inputCls} ${error ? "border-red-300 ring-2 ring-red-100" : ""}`}
-          autoFocus
-        />
-        {error && (
-          <p className="mt-1.5 text-xs text-red-600">
-            Cette date ne correspond pas à notre fiche. Vérifie et réessaie.
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 space-y-2">
+        <p>
+          <strong className="text-zinc-900">Étape suivante :</strong> va dans ta
+          boîte mail et clique sur <em>« Reprendre mon inscription »</em>. Le lien
+          est valable 15 minutes.
+        </p>
+        <p className="text-xs text-zinc-500">
+          Pas reçu&nbsp;? Vérifie tes spams, ou{" "}
+          <button
+            type="button"
+            onClick={onResend}
+            disabled={isPending}
+            className="font-semibold text-orange-600 hover:text-orange-700 underline underline-offset-2 disabled:opacity-50"
+          >
+            renvoie un lien
+          </button>
+          .
+        </p>
+        {notice && (
+          <p className="text-xs text-zinc-600 bg-white border border-zinc-200 rounded-lg px-3 py-2 mt-2">
+            {notice}
           </p>
         )}
-      </Field>
+      </div>
       <button
         type="button"
-        onClick={onConfirm}
-        disabled={!birthDate || isPending}
+        onClick={onContinueAsNew}
+        className="w-full text-sm text-zinc-500 hover:text-zinc-700 py-2 transition-colors"
+      >
+        Je préfère continuer comme nouvelle personne · re-saisir mes infos
+      </button>
+    </div>
+  );
+}
+
+// ─── Step 0 — link expired (clicked an old link) ─────────────────────────────
+
+function Step0LinkExpired({
+  email,
+  notice,
+  isPending,
+  onEmailChange,
+  onResend,
+  onContinueAsNew,
+}: {
+  email: string;
+  notice: string | null;
+  isPending: boolean;
+  onEmailChange: (v: string) => void;
+  onResend: () => void;
+  onContinueAsNew: () => void;
+}) {
+  return (
+    <div className="space-y-6" aria-live="polite">
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-100 text-amber-600">
+          <MailX className="w-7 h-7" />
+        </div>
+        <h2 className="text-2xl font-extrabold text-zinc-900">
+          Ce lien a expiré
+        </h2>
+        <p className="text-sm text-zinc-500 max-w-sm mx-auto">
+          Les liens magiques sont valables 15 minutes pour ta sécurité. Pas de
+          souci — saisis ton email, on t&apos;en renvoie un.
+        </p>
+      </div>
+      <Field label="Adresse email" required>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          placeholder="prenom.nom@exemple.fr"
+          className={inputCls}
+          autoFocus
+        />
+      </Field>
+      {notice && (
+        <p className="text-sm text-zinc-600 bg-white border border-zinc-200 rounded-lg px-3 py-2">
+          {notice}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={onResend}
+        disabled={!email.includes("@") || isPending}
         className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-200 disabled:text-zinc-400 text-white font-semibold rounded-xl transition-colors"
       >
-        {isPending ? "…" : "Confirmer →"}
+        {isPending ? "…" : "M'envoyer un nouveau lien →"}
       </button>
       <button
         type="button"
-        onClick={onFallback}
-        className="w-full text-sm text-zinc-400 hover:text-zinc-600 py-2 transition-colors"
+        onClick={onContinueAsNew}
+        className="w-full text-sm text-zinc-500 hover:text-zinc-700 py-2 transition-colors"
       >
-        Ce n&apos;est pas moi · m&apos;inscrire avec un nouvel email
+        Je préfère continuer comme nouvelle personne · re-saisir mes infos
       </button>
     </div>
   );

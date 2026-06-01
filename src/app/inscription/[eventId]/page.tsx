@@ -21,10 +21,13 @@ export async function generateMetadata({
 
 export default async function InscriptionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ eventId: string }>;
+  searchParams: Promise<{ resume?: string }>;
 }) {
   const { eventId } = await params;
+  const { resume } = await searchParams;
   const event = await prisma.event.findUnique({
     where: { id: eventId, deletedAt: null, status: { not: "brouillon" } },
     select: {
@@ -61,6 +64,7 @@ export default async function InscriptionPage({
         isClosed,
       }}
       formConfig={event.formConfig}
+      resumeToken={resume ?? null}
     />
   );
 }
