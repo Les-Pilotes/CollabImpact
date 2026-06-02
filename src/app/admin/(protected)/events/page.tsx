@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImmersionStatus } from "@prisma/client";
+import OnboardingChecklist from "../_components/OnboardingChecklist";
 
 export const metadata = { title: "Événements" };
 
@@ -42,7 +43,7 @@ export default async function EventsListPage({
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
-  await requireAdmin();
+  const { admin } = await requireAdmin();
   const sp = await searchParams;
   const view = sp.view === "archived" ? "archived" : "active";
 
@@ -72,6 +73,11 @@ export default async function EventsListPage({
 
   return (
     <div className="space-y-8 max-w-4xl">
+      <OnboardingChecklist
+        organisationId={admin.organisationId}
+        isSuperAdmin={admin.role === "SUPER_ADMIN"}
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-stone-900">Événements</h1>
