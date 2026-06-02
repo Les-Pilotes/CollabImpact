@@ -6,7 +6,10 @@ import { sendEmail } from "@/lib/email/client";
 import { createActionToken } from "@/lib/tokens";
 import { getAppUrl } from "@/lib/app-url";
 import { resolveEmail } from "@/lib/email/resolve";
+import { parallelLimit } from "@/lib/concurrency";
 import J7Reminder from "@/lib/email/templates/J7Reminder";
+
+const CONCURRENCY = 8;
 
 export async function GET(request: NextRequest) {
   const unauthorized = assertCronRequest(request);
@@ -30,9 +33,8 @@ export async function GET(request: NextRequest) {
   });
 
   const appUrl = getAppUrl();
-  let sent = 0;
 
-  for (const enrollment of enrollments) {
+  const results = await parallelLimit(enrollments, CONCURRENCY, async (enrollment) => {
     const dateLabel = enrollment.event.date.toLocaleDateString("fr-FR", {
       weekday: "long",
       day: "numeric",
@@ -59,31 +61,32 @@ export async function GET(request: NextRequest) {
       lieu: enrollment.event.address,
     });
 
-    try {
-      await sendEmail({
-        to: enrollment.user.email,
-        subject: resolved.subject,
-        replyTo: enrollment.event.replyToEmail ?? undefined,
-        react: React.createElement(J7Reminder, {
-          heading: resolved.heading,
-          body: resolved.body,
-          immersionName: enrollment.event.name,
-          confirmUrl: `${appUrl}/confirm/${confirmToken}`,
-          declineUrl: `${appUrl}/decline/${declineToken}`,
-          isMinor,
-          customNote: resolved.note ?? undefined,
-          signature: enrollment.event.emailSignature ?? undefined,
-        }),
-      });
-      await prisma.enrollment.update({
-        where: { id: enrollment.id },
-        data: { j7SentAt: new Date() },
-      });
-      sent++;
-    } catch (err) {
-      console.error(`[cron/j7] failed for enrollment ${enrollment.id}:`, err);
-    }
-  }
+    await sendEmail({
+      to: enrollment.user.email,
+      subject: resolved.subject,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
+      react: React.createElement(J7Reminder, {
+        heading: resolved.heading,
+        body: resolved.body,
+        immersionName: enrollment.event.name,
+        confirmUrl: `${appUrl}/confirm/${confirmToken}`,
+        declineUrl: `${appUrl}/decline/${declineToken}`,
+        isMinor,
+        customNote: resolved.note ?? undefined,
+        signature: enrollment.event.emailSignature ?? undefined,
+      }),
+    });
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { j7SentAt: new Date() },
+    });
+  });
+
+  let sent = 0;
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") sent++;
+    else console.error(`[cron/j7] failed for enrollment ${enrollments[i].id}:`, r.reason);
+  });
 
   return NextResponse.json({ ok: true, sent });
 }

@@ -4,7 +4,10 @@ import { assertCronRequest } from "@/lib/cron";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/client";
 import { getAppUrl } from "@/lib/app-url";
+import { parallelLimit } from "@/lib/concurrency";
 import FeedbackInvite from "@/lib/email/templates/FeedbackInvite";
+
+const CONCURRENCY = 8;
 
 // Relance les participantes qui n'ont pas répondu au questionnaire 3 jours après
 // l'envoi initial. La fenêtre 3-4 jours garantit qu'on n'envoie qu'une seule
@@ -29,10 +32,9 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  let sent = 0;
-  for (const enrollment of enrollments) {
-    if (!enrollment.feedbackToken) continue;
+  const withToken = enrollments.filter((e) => e.feedbackToken !== null);
 
+  const results = await parallelLimit(withToken, CONCURRENCY, async (enrollment) => {
     const feedbackUrl = `${getAppUrl()}/feedback/${enrollment.feedbackToken}`;
     const eventDateLabel = enrollment.event.date.toLocaleDateString("fr-FR", {
       weekday: "long",
@@ -41,24 +43,29 @@ export async function GET(request: NextRequest) {
       year: "numeric",
     });
 
-    try {
-      await sendEmail({
-        to: enrollment.user.email,
-        subject: `Rappel : ton avis sur ${enrollment.event.name}`,
-        replyTo: enrollment.event.replyToEmail ?? undefined,
-        react: React.createElement(FeedbackInvite, {
-          heading: `Tu n'as pas encore répondu, ${enrollment.user.firstName} !`,
-          body: `C'est le dernier rappel pour donner ton avis sur l'immersion "${enrollment.event.name}" du ${eventDateLabel}.\n\n3 minutes suffisent et c'est très utile pour améliorer les prochaines éditions.`,
-          immersionName: enrollment.event.name,
-          feedbackUrl,
-          signature: enrollment.event.emailSignature ?? undefined,
-        }),
-      });
-      sent++;
-    } catch (err) {
-      console.error(`[cron/feedback-relance] failed for enrollment ${enrollment.id}:`, err);
-    }
-  }
+    await sendEmail({
+      to: enrollment.user.email,
+      subject: `Rappel : ton avis sur ${enrollment.event.name}`,
+      replyTo: enrollment.event.replyToEmail ?? undefined,
+      react: React.createElement(FeedbackInvite, {
+        heading: `Tu n'as pas encore répondu, ${enrollment.user.firstName} !`,
+        body: `C'est le dernier rappel pour donner ton avis sur l'immersion "${enrollment.event.name}" du ${eventDateLabel}.\n\n3 minutes suffisent et c'est très utile pour améliorer les prochaines éditions.`,
+        immersionName: enrollment.event.name,
+        feedbackUrl,
+        signature: enrollment.event.emailSignature ?? undefined,
+      }),
+    });
+  });
+
+  let sent = 0;
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") sent++;
+    else
+      console.error(
+        `[cron/feedback-relance] failed for enrollment ${withToken[i].id}:`,
+        r.reason,
+      );
+  });
 
   return NextResponse.json({ ok: true, sent });
 }

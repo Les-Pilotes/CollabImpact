@@ -6,7 +6,10 @@ import { sendEmail } from "@/lib/email/client";
 import { createFeedbackToken } from "@/lib/tokens";
 import { getAppUrl } from "@/lib/app-url";
 import { resolveEmail } from "@/lib/email/resolve";
+import { parallelLimit } from "@/lib/concurrency";
 import FeedbackInvite from "@/lib/email/templates/FeedbackInvite";
+
+const CONCURRENCY = 8;
 
 export async function GET(request: NextRequest) {
   const unauthorized = assertCronRequest(request);
@@ -27,8 +30,7 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  let sent = 0;
-  for (const enrollment of enrollments) {
+  const results = await parallelLimit(enrollments, CONCURRENCY, async (enrollment) => {
     const token = createFeedbackToken(enrollment.id);
     const feedbackUrl = `${getAppUrl()}/feedback/${token}`;
 
@@ -69,9 +71,13 @@ export async function GET(request: NextRequest) {
         signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
+  });
 
-    sent++;
-  }
+  let sent = 0;
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") sent++;
+    else console.error(`[cron/feedback] failed for enrollment ${enrollments[i].id}:`, r.reason);
+  });
 
   return NextResponse.json({ ok: true, sent });
 }
