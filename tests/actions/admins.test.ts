@@ -28,6 +28,16 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+const { sendAdminInvitationMock } = vi.hoisted(() => ({
+  sendAdminInvitationMock: vi
+    .fn()
+    .mockResolvedValue({ sent: true, id: "email-id" }),
+}));
+
+vi.mock("@/lib/email/admin-invitation", () => ({
+  sendAdminInvitation: sendAdminInvitationMock,
+}));
+
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth";
 import {
@@ -41,9 +51,9 @@ const ad = vi.mocked(prisma.admin);
 describe("inviteAdmin", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("creates an admin from valid input", async () => {
+  it("creates an admin from valid input and sends an invitation email", async () => {
     ad.findUnique.mockResolvedValue(null as never);
-    ad.create.mockResolvedValue({ id: "new" } as never);
+    ad.create.mockResolvedValue({ id: "new", firstName: "Léa" } as never);
 
     const result = await inviteAdmin({
       email: "lea@les-pilotes.fr",
@@ -57,6 +67,33 @@ describe("inviteAdmin", () => {
     const args = ad.create.mock.calls[0][0];
     expect(args.data.email).toBe("lea@les-pilotes.fr");
     expect(args.data.role).toBe("ADMIN");
+
+    // Invitation is fired and not awaited inside the action — the mock is
+    // sync-resolved so it has been called by the time we assert.
+    expect(sendAdminInvitationMock).toHaveBeenCalledTimes(1);
+    expect(sendAdminInvitationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "lea@les-pilotes.fr",
+        firstName: "Léa",
+      }),
+    );
+  });
+
+  it("rejects an email outside the allowed domain", async () => {
+    const result = await inviteAdmin({
+      email: "stranger@gmail.com",
+      firstName: "X",
+      lastName: "Y",
+      role: "ADMIN",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.fieldErrors?.email?.[0]).toMatch(/les-pilotes\.fr/i);
+    }
+    expect(ad.findUnique).not.toHaveBeenCalled();
+    expect(ad.create).not.toHaveBeenCalled();
+    expect(sendAdminInvitationMock).not.toHaveBeenCalled();
   });
 
   it("normalizes email to lowercase + trims", async () => {

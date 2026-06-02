@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
 import Image from "next/image";
