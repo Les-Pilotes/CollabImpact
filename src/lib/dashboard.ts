@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import type { EnrollmentStatus } from "@prisma/client";
 
 // =====================
 // Types
@@ -42,39 +43,84 @@ const ZEROED_KPI: KpiData = {
   eventAddress: "",
 };
 
+/**
+ * Statuses that count as "confirmed" for the next-action threshold below.
+ * Anything outside this set is considered "not yet confirmed" and may
+ * surface a follow-up reminder when the event is approaching.
+ */
+const CONFIRMED_STATUSES: ReadonlySet<EnrollmentStatus> = new Set<EnrollmentStatus>([
+  "confirmee_j2",
+  "presente",
+  "absente",
+  "feedback_recu",
+  "desistement",
+]);
+
+type StatusCounts = Partial<Record<EnrollmentStatus, number>> & {
+  __total: number;
+};
+
+/**
+ * Aggregates enrollment counts by status in a single SQL roundtrip. Replaces
+ * the previous pattern of loading every enrollment into RAM and filtering
+ * in JS — that scaled linearly with attendance.
+ */
+async function getEnrollmentCounts(eventId: string): Promise<{
+  byStatus: StatusCounts;
+  feedbackReceived: number;
+}> {
+  const [groups, feedbackReceived] = await Promise.all([
+    prisma.enrollment.groupBy({
+      by: ["status"],
+      where: { eventId, deletedAt: null },
+      _count: { _all: true },
+    }),
+    // Union of (status=feedback_recu) and (feedback row exists) — matches
+    // the prior JS predicate `e.status === "feedback_recu" || e.feedback !== null`.
+    prisma.enrollment.count({
+      where: {
+        eventId,
+        deletedAt: null,
+        OR: [{ status: "feedback_recu" }, { feedback: { isNot: null } }],
+      },
+    }),
+  ]);
+
+  const byStatus: StatusCounts = { __total: 0 };
+  for (const g of groups) {
+    const n = g._count?._all ?? 0;
+    byStatus[g.status] = n;
+    byStatus.__total += n;
+  }
+
+  return { byStatus, feedbackReceived };
+}
+
 // =====================
 // Functions
 // =====================
 
 export async function getKpis(eventId: string): Promise<KpiData> {
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    include: {
-      enrollments: {
-        where: { deletedAt: null },
-        include: { feedback: { select: { id: true } } },
+  const [event, counts] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        capacity: true,
+        date: true,
+        name: true,
+        address: true,
       },
-    },
-  });
+    }),
+    getEnrollmentCounts(eventId),
+  ]);
 
   if (!event) return ZEROED_KPI;
 
-  const enrollments = event.enrollments;
-
-  const totalEnrolled = enrollments.length;
-  const confirmed = enrollments.filter(
-    (e) => e.status === "confirmee_j2"
-  ).length;
-  const attended = enrollments.filter((e) => e.status === "presente").length;
-  const feedbackReceived = enrollments.filter(
-    (e) => e.status === "feedback_recu" || e.feedback !== null
-  ).length;
-
   return {
-    totalEnrolled,
-    confirmed,
-    attended,
-    feedbackReceived,
+    totalEnrolled: counts.byStatus.__total,
+    confirmed: counts.byStatus.confirmee_j2 ?? 0,
+    attended: counts.byStatus.presente ?? 0,
+    feedbackReceived: counts.feedbackReceived,
     capacity: event.capacity,
     eventDate: event.date,
     eventName: event.name,
@@ -110,39 +156,31 @@ export async function getNextActions(eventId: string): Promise<NextAction[]> {
   const now = new Date();
   const actions: NextAction[] = [];
 
-  const [event, tasks] = await Promise.all([
+  const [event, counts, overdueTasks] = await Promise.all([
     prisma.event.findUnique({
       where: { id: eventId },
-      include: {
-        enrollments: {
-          where: { deletedAt: null },
-          include: { feedback: { select: { id: true } } },
-        },
-      },
+      select: { date: true },
     }),
+    getEnrollmentCounts(eventId),
     prisma.task.findMany({
       where: { eventId, doneAt: null, dueAt: { lt: now } },
+      select: { id: true },
     }),
   ]);
 
   if (!event) return actions;
 
-  const enrollments = event.enrollments;
   const daysUntilEvent = Math.floor(
     (event.date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  // Action: unconfirmed enrollments within 9 days of event
-  const confirmedStatuses = new Set([
-    "confirmee_j2",
-    "presente",
-    "absente",
-    "feedback_recu",
-    "desistement",
-  ]);
-  const notYetConfirmed = enrollments.filter(
-    (e) => !confirmedStatuses.has(e.status)
-  ).length;
+  let notYetConfirmed = 0;
+  for (const [status, n] of Object.entries(counts.byStatus)) {
+    if (status === "__total") continue;
+    if (!CONFIRMED_STATUSES.has(status as EnrollmentStatus)) {
+      notYetConfirmed += n ?? 0;
+    }
+  }
 
   if (notYetConfirmed > 0 && daysUntilEvent <= 9 && daysUntilEvent >= 0) {
     actions.push({
@@ -152,13 +190,8 @@ export async function getNextActions(eventId: string): Promise<NextAction[]> {
     });
   }
 
-  // Action: pending feedbacks (attended but no feedback yet)
-  const attended = enrollments.filter((e) => e.status === "presente").length;
-  const feedbackReceived = enrollments.filter(
-    (e) => e.status === "feedback_recu" || e.feedback !== null
-  ).length;
-  const pendingFeedbacks = attended - feedbackReceived;
-
+  const attended = counts.byStatus.presente ?? 0;
+  const pendingFeedbacks = attended - counts.feedbackReceived;
   if (attended > 0 && pendingFeedbacks > 0) {
     actions.push({
       label: `${pendingFeedbacks} feedback${pendingFeedbacks > 1 ? "s" : ""} en attente`,
@@ -167,10 +200,9 @@ export async function getNextActions(eventId: string): Promise<NextAction[]> {
     });
   }
 
-  // Action: overdue tasks
-  if (tasks.length > 0) {
+  if (overdueTasks.length > 0) {
     actions.push({
-      label: `${tasks.length} tâche${tasks.length > 1 ? "s" : ""} en retard`,
+      label: `${overdueTasks.length} tâche${overdueTasks.length > 1 ? "s" : ""} en retard`,
       href: `/admin/events/${eventId}/taches`,
       urgency: "high",
     });
