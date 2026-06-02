@@ -5,16 +5,22 @@ import { z } from "zod";
 import { AdminRole } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin, requireSuperAdmin } from "@/lib/auth";
+import { isAllowedAdminEmail } from "@/lib/auth/allowed-domains";
+import { sendAdminInvitation } from "@/lib/email/admin-invitation";
 
 type Result =
   | { ok: true }
   | { ok: false; error: string; fieldErrors?: Record<string, string[] | undefined> };
 
 const inviteSchema = z.object({
-  email: z.preprocess(
-    (v) => (typeof v === "string" ? v.trim() : v),
-    z.string().email("Email invalide"),
-  ),
+  email: z
+    .preprocess(
+      (v) => (typeof v === "string" ? v.trim() : v),
+      z.string().email("Email invalide"),
+    )
+    .refine(isAllowedAdminEmail, {
+      message: "Email hors domaine autorisé (@les-pilotes.fr requis).",
+    }),
   firstName: z.string().min(1, "Prénom requis"),
   lastName: z.string().min(1, "Nom requis"),
   role: z.enum(["ADMIN", "SUPER_ADMIN"]),
@@ -49,7 +55,7 @@ export async function inviteAdmin(input: InviteAdminInput): Promise<Result> {
       return { ok: false, error: "Cet email est déjà administrateur." };
     }
 
-    await prisma.admin.create({
+    const created = await prisma.admin.create({
       data: {
         email: normalizedEmail,
         firstName: data.firstName.trim(),
@@ -57,7 +63,21 @@ export async function inviteAdmin(input: InviteAdminInput): Promise<Result> {
         role: data.role as AdminRole,
         organisationId: ctx.admin.organisationId,
       },
+      select: { id: true, firstName: true },
     });
+
+    const inviterName =
+      [ctx.admin.firstName, ctx.admin.lastName].filter(Boolean).join(" ").trim() ||
+      null;
+
+    void sendAdminInvitation({
+      email: normalizedEmail,
+      firstName: created.firstName,
+      invitedByName: inviterName,
+    }).catch((err) => {
+      console.error("[inviteAdmin] invitation email failed:", err);
+    });
+
     revalidatePath("/admin/parametres/admins");
     return { ok: true };
   } catch (err) {
