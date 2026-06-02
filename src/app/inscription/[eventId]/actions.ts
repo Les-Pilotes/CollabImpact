@@ -265,12 +265,24 @@ export async function submitInscription(
     }
 
     const normalizedEmail = data.email.toLowerCase().trim();
-    const isMinor = computeIsMinor(data.birthDate, event.date);
-    const droitsImageStatus = isMinor
-      ? "minor_parental_pending"
-      : data.droitsImageAccepted
-        ? "accepted"
-        : "refused";
+    // Fields are individually toggleable per-event via FormConfig. If a field
+    // was disabled in the form, the corresponding payload key is absent —
+    // persist NULL rather than failing.
+    const birthDateValue = data.birthDate ? new Date(data.birthDate) : null;
+    const isMinor = birthDateValue
+      ? computeIsMinor(data.birthDate as string, event.date)
+      : false;
+    // Si le toggle "droit à l'image" est off pour cet event, on n'a pas
+    // demandé le consentement → on reste sur "pending" (jamais demandé)
+    // plutôt que de marquer "refused" par erreur.
+    const droitsImageStatus =
+      data.droitsImageAccepted === undefined
+        ? "pending"
+        : isMinor
+          ? "minor_parental_pending"
+          : data.droitsImageAccepted
+            ? "accepted"
+            : "refused";
 
     const user = await prisma.user.upsert({
       where: { email: normalizedEmail },
@@ -279,35 +291,35 @@ export async function submitInscription(
         firstName: data.firstName,
         lastName: data.lastName,
         email: normalizedEmail,
-        phone: data.phone,
-        birthDate: new Date(data.birthDate),
+        phone: data.phone ?? null,
+        birthDate: birthDateValue,
         gender: data.gender,
-        city: data.city,
-        niveauScolaire: data.niveauScolaire,
-        niveauScolaireAutre: data.niveauScolaireAutre,
-        etablissement: data.etablissement,
-        region: data.region,
-        projetPro: data.projetPro,
-        motivation: data.motivation,
-        motivationDetail: data.motivationDetail,
-        commentConnu: data.commentConnu,
+        city: data.city ?? null,
+        niveauScolaire: data.niveauScolaire ?? null,
+        niveauScolaireAutre: data.niveauScolaireAutre ?? null,
+        etablissement: data.etablissement ?? null,
+        region: data.region ?? null,
+        projetPro: data.projetPro ?? null,
+        motivation: data.motivation ?? [],
+        motivationDetail: data.motivationDetail ?? null,
+        commentConnu: data.commentConnu ?? null,
         orientationUpdatedAt: new Date(),
       },
       update: {
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone,
-        birthDate: new Date(data.birthDate),
+        phone: data.phone ?? null,
+        birthDate: birthDateValue,
         gender: data.gender ?? undefined,
-        city: data.city,
-        niveauScolaire: data.niveauScolaire,
-        niveauScolaireAutre: data.niveauScolaireAutre,
-        etablissement: data.etablissement,
-        region: data.region,
-        projetPro: data.projetPro,
-        motivation: data.motivation,
-        motivationDetail: data.motivationDetail,
-        commentConnu: data.commentConnu,
+        city: data.city ?? null,
+        niveauScolaire: data.niveauScolaire ?? null,
+        niveauScolaireAutre: data.niveauScolaireAutre ?? null,
+        etablissement: data.etablissement ?? null,
+        region: data.region ?? null,
+        projetPro: data.projetPro ?? null,
+        motivation: data.motivation ?? [],
+        motivationDetail: data.motivationDetail ?? null,
+        commentConnu: data.commentConnu ?? null,
         orientationUpdatedAt: new Date(),
       },
     });
@@ -330,20 +342,20 @@ export async function submitInscription(
         userId: user.id,
         droitsImageStatus,
         droitsImageSignedAt: data.droitsImageAccepted ? new Date() : null,
-        droitsImageSignature: isMinor ? null : data.droitsImageSignature,
-        regime: data.regime,
-        accessibilite: data.accessibilite,
+        droitsImageSignature: isMinor ? null : (data.droitsImageSignature ?? null),
+        regime: data.regime ?? [],
+        accessibilite: data.accessibilite ?? null,
         accompagnateur: data.accompagnateur,
-        commentaire: data.commentaire,
+        commentaire: data.commentaire ?? null,
       },
       update: {
         droitsImageStatus,
         droitsImageSignedAt: data.droitsImageAccepted ? new Date() : null,
-        droitsImageSignature: isMinor ? null : data.droitsImageSignature,
-        regime: data.regime,
-        accessibilite: data.accessibilite,
+        droitsImageSignature: isMinor ? null : (data.droitsImageSignature ?? null),
+        regime: data.regime ?? [],
+        accessibilite: data.accessibilite ?? null,
         accompagnateur: data.accompagnateur,
-        commentaire: data.commentaire,
+        commentaire: data.commentaire ?? null,
       },
     });
 

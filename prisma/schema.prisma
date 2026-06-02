@@ -349,6 +349,18 @@ model FormConfig {
   cityEnabled      Boolean @default(true)
   sourceEnabled    Boolean @default(true)
 
+  // Couche Orientation
+  niveauScolaireEnabled Boolean @default(true)
+  regionEnabled         Boolean @default(true)
+  projetProEnabled      Boolean @default(true)
+  motivationEnabled     Boolean @default(true)
+
+  // Couche Événement
+  droitsImageEnabled   Boolean @default(true)
+  regimeEnabled        Boolean @default(true)
+  accessibiliteEnabled Boolean @default(true)
+  commentaireEnabled   Boolean @default(true)
+
   // Format: [{ "id": "cuid", "label": "...", "type": "text|select", "required": bool, "options": [...] }]
   customFields Json @default("[]")
 
