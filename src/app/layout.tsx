@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   },
   description:
     "Workshop 100% Féminin by Les Pilotes — suivi des participantes, groupes et mesure d'impact.",
-  applicationName: "Les Pilotes — Workshop",
+  applicationName: "Les Pilotes — Admin",
   keywords: ["workshop", "100% féminin", "orientation", "jeunes", "Les Pilotes"],
   authors: [{ name: "Les Pilotes" }],
   robots: { index: true, follow: true },

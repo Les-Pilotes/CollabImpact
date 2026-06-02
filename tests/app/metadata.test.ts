@@ -13,7 +13,7 @@ describe("root metadata", () => {
     delete process.env.APP_URL;
     delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
     delete process.env.VERCEL_URL;
-    process.env.APP_URL = "https://workshop.les-pilotes.fr";
+    process.env.APP_URL = "https://admin.les-pilotes.fr";
   });
 
   afterAll(() => {
@@ -28,12 +28,12 @@ describe("root metadata", () => {
     const { metadata } = await import("@/app/layout");
 
     expect(metadata.metadataBase?.toString()).toBe(
-      "https://workshop.les-pilotes.fr/",
+      "https://admin.les-pilotes.fr/",
     );
     expect(metadata.robots).toEqual({ index: true, follow: true });
     expect(metadata.openGraph?.locale).toBe("fr_FR");
     expect(metadata.twitter).toBeDefined();
-    expect(metadata.applicationName).toBe("Les Pilotes — Workshop");
+    expect(metadata.applicationName).toBe("Les Pilotes — Admin");
   });
 
   it("exposes a viewport with the brand theme color", async () => {
