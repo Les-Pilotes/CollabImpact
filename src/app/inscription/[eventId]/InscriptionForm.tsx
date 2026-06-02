@@ -49,7 +49,7 @@ type FormData = {
   email: string;
   phone: string;
   birthDate: string;
-  gender: "Fille" | "Garçon" | "Autre" | "";
+  gender: "Fille";
   city: string;
   // orientation
   niveauScolaire: string;
@@ -75,7 +75,7 @@ const EMPTY: FormData = {
   email: "",
   phone: "",
   birthDate: "",
-  gender: "",
+  gender: "Fille",
   city: "",
   niveauScolaire: "",
   niveauScolaireAutre: "",
@@ -182,7 +182,7 @@ export default function InscriptionForm({
       email: profile.email,
       phone: profile.phone,
       birthDate: profile.birthDate,
-      gender: (profile.gender as FormData["gender"]) ?? "",
+      gender: "Fille",
       city: profile.city,
       niveauScolaire: profile.niveauScolaire ?? "",
       etablissement: profile.etablissement ?? "",
@@ -881,24 +881,6 @@ function Step1Fondamentale({
           />
         </Field>
       )}
-      <Field label="Tu es">
-        <div className="grid grid-cols-3 gap-2">
-          {(["Fille", "Garçon", "Autre"] as const).map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setField("gender", g)}
-              className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                data.gender === g
-                  ? "bg-orange-500 text-white border-orange-500"
-                  : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300"
-              }`}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-      </Field>
       {fc.cityEnabled && (
         <Field label="Ville de résidence" required>
           <input

@@ -27,7 +27,10 @@ export default function PageHeader({
 }: Props) {
   return (
     <div className="bg-white border-b border-zinc-100 px-4 md:px-6 pt-5 pb-0 shrink-0">
-      <div className="flex items-start justify-between gap-4 mb-4">
+      {/* md:pr-14 reserves the top-right corner for the floating notification
+          bell (fixed top-4 right-6 in the admin layout), so action buttons
+          like "Exporter CSV" don't sit underneath it. */}
+      <div className="flex items-start justify-between gap-4 mb-4 md:pr-14">
         <div>
           <h1 className="text-lg font-extrabold text-zinc-900">{title}</h1>
           {subtitle && (

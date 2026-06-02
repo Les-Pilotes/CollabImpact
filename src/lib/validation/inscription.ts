@@ -9,7 +9,8 @@ export const fondamentaleSchema = z.object({
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date de naissance invalide (YYYY-MM-DD)"),
-  gender: z.enum(["Fille", "Garçon", "Autre"]).optional(),
+  // 100% féminin : pas de choix de genre, toujours "Fille".
+  gender: z.literal("Fille").default("Fille"),
   city: z.string().min(1, "La ville est requise"),
 });
 
