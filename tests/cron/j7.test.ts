@@ -119,4 +119,54 @@ describe("GET /api/cron/j7", () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
+
+  it("caps concurrency at 8 even with many enrollments", async () => {
+    const enrollments = Array.from({ length: 20 }, (_, i) =>
+      makeEnrollment(`e-${i}`),
+    );
+    mockFindMany.mockResolvedValue(enrollments as never);
+
+    let inflight = 0;
+    let peak = 0;
+    mockSendEmail.mockImplementation(async () => {
+      inflight++;
+      peak = Math.max(peak, inflight);
+      await new Promise((r) => setTimeout(r, 3));
+      inflight--;
+      return { sent: false, reason: "no-api-key" } as never;
+    });
+
+    const response = await GET(makeRequest() as never);
+    const json = await response.json();
+
+    expect(json.sent).toBe(20);
+    expect(peak).toBeLessThanOrEqual(8);
+    expect(peak).toBeGreaterThan(1);
+  });
+
+  it("counts a failed send as not-sent without aborting the batch", async () => {
+    const enrollments = [
+      makeEnrollment("ok-1"),
+      makeEnrollment("fail-1"),
+      makeEnrollment("ok-2"),
+    ];
+    mockFindMany.mockResolvedValue(enrollments as never);
+
+    mockSendEmail.mockImplementation(async ({ to }) => {
+      if (String(to).includes("yasmine") === false) {
+        // never matched — we differentiate via update instead below.
+      }
+      return { sent: false, reason: "no-api-key" } as never;
+    });
+    // Make the middle update reject; the route should still return sent=2.
+    mockUpdate.mockImplementation((async (args: { where: { id?: string } }) => {
+      if (args.where.id === "fail-1") throw new Error("db blip");
+      return {};
+    }) as never);
+
+    const response = await GET(makeRequest() as never);
+    const json = await response.json();
+
+    expect(json.sent).toBe(2);
+  });
 });
