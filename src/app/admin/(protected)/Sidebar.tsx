@@ -17,6 +17,7 @@ import {
   Shield,
   HelpCircle,
   Contact,
+  Mic,
 } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
@@ -37,6 +38,7 @@ function eventNav(eventId: string): NavItem[] {
   return [
     { href: base, label: "Aperçu", icon: Eye, exact: true },
     { href: `${base}/inscrites`, label: "Participantes", icon: Users },
+    { href: `${base}/intervenantes`, label: "Intervenantes", icon: Mic },
     { href: `${base}/taches`, label: "Tâches", icon: CheckSquare },
     { href: `${base}/impact`, label: "Impact", icon: BarChart2 },
   ];
