@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   Shield,
   HelpCircle,
+  Contact,
 } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
@@ -28,6 +29,7 @@ type NavItem = {
 
 const GLOBAL_NAV: NavItem[] = [
   { href: "/admin/events", label: "Evenements", icon: Calendar },
+  { href: "/admin/personnes", label: "Carnet", icon: Contact },
 ];
 
 function eventNav(eventId: string): NavItem[] {
