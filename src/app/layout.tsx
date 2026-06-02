@@ -15,18 +15,19 @@ const APP_URL = getAppUrl();
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: "Workshop 100% Féminin · Les Pilotes",
+    default: "Les Pilotes · Admin",
     template: "%s · Les Pilotes",
   },
   description:
-    "Workshop 100% Féminin by Les Pilotes — suivi des participantes, groupes et mesure d'impact.",
+    "Espace d'administration Les Pilotes — gestion des événements, inscriptions et impact.",
   applicationName: "Les Pilotes — Admin",
-  keywords: ["workshop", "100% féminin", "orientation", "jeunes", "Les Pilotes"],
+  keywords: ["Les Pilotes", "orientation", "événements", "admin"],
   authors: [{ name: "Les Pilotes" }],
-  robots: { index: true, follow: true },
+  // Private admin tool — no need to surface it in search engines.
+  robots: { index: false, follow: false },
   openGraph: {
-    title: "Workshop 100% Féminin · Les Pilotes",
-    description: "Workshop 100% Féminin by Les Pilotes.",
+    title: "Les Pilotes · Admin",
+    description: "Espace d'administration Les Pilotes.",
     url: APP_URL,
     siteName: "Les Pilotes",
     locale: "fr_FR",
@@ -34,8 +35,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "Workshop 100% Féminin · Les Pilotes",
-    description: "Workshop 100% Féminin by Les Pilotes.",
+    title: "Les Pilotes · Admin",
+    description: "Espace d'administration Les Pilotes.",
   },
 };
 

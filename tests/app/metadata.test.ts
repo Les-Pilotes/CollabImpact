@@ -30,7 +30,7 @@ describe("root metadata", () => {
     expect(metadata.metadataBase?.toString()).toBe(
       "https://admin.les-pilotes.fr/",
     );
-    expect(metadata.robots).toEqual({ index: true, follow: true });
+    expect(metadata.robots).toEqual({ index: false, follow: false });
     expect(metadata.openGraph?.locale).toBe("fr_FR");
     expect(metadata.twitter).toBeDefined();
     expect(metadata.applicationName).toBe("Les Pilotes — Admin");
