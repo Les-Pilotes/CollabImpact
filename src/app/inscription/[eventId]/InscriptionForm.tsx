@@ -131,17 +131,36 @@ function Field({
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 type FormConfig = {
+  // Couche Fondamentale
   phoneEnabled: boolean;
   birthDateEnabled: boolean;
   cityEnabled: boolean;
+  // Couche Orientation
+  niveauScolaireEnabled: boolean;
+  regionEnabled: boolean;
+  projetProEnabled: boolean;
+  motivationEnabled: boolean;
   sourceEnabled: boolean;
+  // Couche Événement
+  droitsImageEnabled: boolean;
+  regimeEnabled: boolean;
+  accessibiliteEnabled: boolean;
+  commentaireEnabled: boolean;
 };
 
 const DEFAULT_FORM_CONFIG: FormConfig = {
   phoneEnabled: true,
   birthDateEnabled: true,
   cityEnabled: true,
+  niveauScolaireEnabled: true,
+  regionEnabled: true,
+  projetProEnabled: true,
+  motivationEnabled: true,
   sourceEnabled: true,
+  droitsImageEnabled: true,
+  regimeEnabled: true,
+  accessibiliteEnabled: true,
+  commentaireEnabled: true,
 };
 
 export default function InscriptionForm({
@@ -347,18 +366,20 @@ export default function InscriptionForm({
     (!fc.cityEnabled || data.city.trim());
 
   const step2Valid =
-    data.niveauScolaire &&
-    data.region &&
-    data.projetPro.trim() &&
-    data.motivation.length > 0 &&
+    (!fc.niveauScolaireEnabled || data.niveauScolaire) &&
+    (!fc.regionEnabled || data.region) &&
+    (!fc.projetProEnabled || data.projetPro.trim()) &&
+    (!fc.motivationEnabled || data.motivation.length > 0) &&
     (!fc.sourceEnabled || data.commentConnu.trim());
 
-  const step3Valid =
-    // Pour majeure : doit accepter droits image + signer
-    // Pour mineure : doit cocher "je m'engage à apporter le doc signé"
-    (isMinor
+  // Si le toggle "droit à l'image" est off, l'étape 3 ne requiert pas le
+  // consentement — sinon comportement historique (signature pour majeure,
+  // engagement pour mineure).
+  const step3Valid = !fc.droitsImageEnabled
+    ? true
+    : isMinor
       ? data.droitsImageAccepted // = "je m'engage à apporter le doc"
-      : data.droitsImageAccepted && data.droitsImageSignature.trim().length > 2);
+      : data.droitsImageAccepted && data.droitsImageSignature.trim().length > 2;
 
   function handleNext() {
     if (step === 1 && step1Valid) {
@@ -405,24 +426,33 @@ export default function InscriptionForm({
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
-        phone: data.phone,
-        birthDate: data.birthDate,
+        phone: fc.phoneEnabled ? data.phone : undefined,
+        birthDate: fc.birthDateEnabled ? data.birthDate : undefined,
         gender: data.gender || undefined,
-        city: data.city,
-        niveauScolaire: data.niveauScolaire as (typeof NIVEAUX_SCOLAIRES)[number],
+        city: fc.cityEnabled ? data.city : undefined,
+        niveauScolaire: fc.niveauScolaireEnabled
+          ? (data.niveauScolaire as (typeof NIVEAUX_SCOLAIRES)[number])
+          : undefined,
         niveauScolaireAutre: data.niveauScolaireAutre || undefined,
         etablissement: data.etablissement || undefined,
-        region: data.region as (typeof REGIONS_FR)[number],
-        projetPro: data.projetPro,
-        motivation: data.motivation,
+        region: fc.regionEnabled
+          ? (data.region as (typeof REGIONS_FR)[number])
+          : undefined,
+        projetPro: fc.projetProEnabled ? data.projetPro : undefined,
+        motivation: fc.motivationEnabled ? data.motivation : undefined,
         motivationDetail: data.motivationDetail || undefined,
-        commentConnu: data.commentConnu,
-        droitsImageAccepted: data.droitsImageAccepted,
-        droitsImageSignature: isMinor ? undefined : data.droitsImageSignature,
-        regime: data.regime,
-        accessibilite: data.accessibilite || undefined,
+        commentConnu: fc.sourceEnabled ? data.commentConnu : undefined,
+        droitsImageAccepted: fc.droitsImageEnabled
+          ? data.droitsImageAccepted
+          : undefined,
+        droitsImageSignature:
+          fc.droitsImageEnabled && !isMinor ? data.droitsImageSignature : undefined,
+        regime: fc.regimeEnabled ? data.regime : undefined,
+        accessibilite: fc.accessibiliteEnabled
+          ? data.accessibilite || undefined
+          : undefined,
         accompagnateur: data.accompagnateur,
-        commentaire: data.commentaire || undefined,
+        commentaire: fc.commentaireEnabled ? data.commentaire || undefined : undefined,
       });
       if (result.ok) {
         router.push(
@@ -522,6 +552,7 @@ export default function InscriptionForm({
           isMinor={isMinor}
           setField={setField}
           toggleRegime={(v) => toggleArray("regime", v)}
+          fc={fc}
           onOpenVideo={(idx) => {
             setVideoIdx(idx);
             setVideoOpen(true);
@@ -926,19 +957,21 @@ function Step2Orientation({
             : "Ces infos nous aident à te connecter avec les bonnes intervenantes et programmes."}
         </p>
       </div>
-      <Field label="Niveau scolaire" required>
-        <select
-          value={data.niveauScolaire}
-          onChange={(e) => setField("niveauScolaire", e.target.value)}
-          className={inputCls}
-        >
-          <option value="">Sélectionne…</option>
-          {NIVEAUX_SCOLAIRES.map((l) => (
-            <option key={l}>{l}</option>
-          ))}
-        </select>
-      </Field>
-      {data.niveauScolaire === "Autres" && (
+      {fc.niveauScolaireEnabled && (
+        <Field label="Niveau scolaire" required>
+          <select
+            value={data.niveauScolaire}
+            onChange={(e) => setField("niveauScolaire", e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Sélectionne…</option>
+            {NIVEAUX_SCOLAIRES.map((l) => (
+              <option key={l}>{l}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {fc.niveauScolaireEnabled && data.niveauScolaire === "Autres" && (
         <Field label="Précise ton niveau">
           <input
             value={data.niveauScolaireAutre}
@@ -956,58 +989,66 @@ function Step2Orientation({
           className={inputCls}
         />
       </Field>
-      <Field label="Région" required>
-        <select
-          value={data.region}
-          onChange={(e) => setField("region", e.target.value)}
-          className={inputCls}
+      {fc.regionEnabled && (
+        <Field label="Région" required>
+          <select
+            value={data.region}
+            onChange={(e) => setField("region", e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Sélectionne…</option>
+            {REGIONS_FR.map((r) => (
+              <option key={r}>{r}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {fc.projetProEnabled && (
+        <Field
+          label="Sais-tu ce que tu veux faire plus tard ?"
+          required
+          hint="Si oui, précise ton projet. Sinon écris 'pas encore' ou 'en construction'."
         >
-          <option value="">Sélectionne…</option>
-          {REGIONS_FR.map((r) => (
-            <option key={r}>{r}</option>
-          ))}
-        </select>
-      </Field>
-      <Field
-        label="Sais-tu ce que tu veux faire plus tard ?"
-        required
-        hint="Si oui, précise ton projet. Sinon écris 'pas encore' ou 'en construction'."
-      >
-        <textarea
-          value={data.projetPro}
-          onChange={(e) => setField("projetPro", e.target.value)}
-          rows={3}
-          placeholder="Ex : marketing digital, médecine, je cherche encore…"
-          className={inputCls}
-        />
-      </Field>
-      <Field label="Ce qui te motive à rejoindre Les Pilotes" required>
-        <div className="flex flex-wrap gap-2 mt-1">
-          {MOTIVATIONS.map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => toggleMotivation(m)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                data.motivation.includes(m)
-                  ? "bg-orange-500 text-white border-orange-500"
-                  : "bg-white text-zinc-600 border-zinc-200 hover:border-orange-300"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      </Field>
-      <Field label="Détaille ta motivation (optionnel)">
-        <textarea
-          value={data.motivationDetail}
-          onChange={(e) => setField("motivationDetail", e.target.value)}
-          rows={2}
-          placeholder="Quelque chose de plus précis à nous dire ?"
-          className={inputCls}
-        />
-      </Field>
+          <textarea
+            value={data.projetPro}
+            onChange={(e) => setField("projetPro", e.target.value)}
+            rows={3}
+            placeholder="Ex : marketing digital, médecine, je cherche encore…"
+            className={inputCls}
+          />
+        </Field>
+      )}
+      {fc.motivationEnabled && (
+        <>
+          <Field label="Ce qui te motive à rejoindre Les Pilotes" required>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {MOTIVATIONS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => toggleMotivation(m)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                    data.motivation.includes(m)
+                      ? "bg-orange-500 text-white border-orange-500"
+                      : "bg-white text-zinc-600 border-zinc-200 hover:border-orange-300"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Détaille ta motivation (optionnel)">
+            <textarea
+              value={data.motivationDetail}
+              onChange={(e) => setField("motivationDetail", e.target.value)}
+              rows={2}
+              placeholder="Quelque chose de plus précis à nous dire ?"
+              className={inputCls}
+            />
+          </Field>
+        </>
+      )}
       {fc.sourceEnabled && (
         <Field label="Comment as-tu connu Les Pilotes ?" required>
           <select
@@ -1033,6 +1074,7 @@ function Step3Evenement({
   isMinor,
   setField,
   toggleRegime,
+  fc,
   onOpenVideo,
 }: {
   data: FormData;
@@ -1040,6 +1082,7 @@ function Step3Evenement({
   isMinor: boolean;
   setField: <K extends keyof FormData>(k: K, v: FormData[K]) => void;
   toggleRegime: (v: string) => void;
+  fc: FormConfig;
   onOpenVideo: (idx: number) => void;
 }) {
   return (
@@ -1055,6 +1098,7 @@ function Step3Evenement({
       </div>
 
       {/* Droits image */}
+      {fc.droitsImageEnabled && (
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 space-y-4">
         <div>
           <h3 className="text-base font-bold text-zinc-900 mb-1">
@@ -1133,43 +1177,48 @@ function Step3Evenement({
           </div>
         )}
       </section>
+      )}
 
       {/* Régime alimentaire */}
-      <Field
-        label="Régime alimentaire"
-        hint="Au cas où il y a un repas ou un snack — coche ce qui s'applique."
-      >
-        <div className="flex flex-wrap gap-2 mt-1">
-          {REGIMES.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => toggleRegime(r)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                data.regime.includes(r)
-                  ? "bg-orange-500 text-white border-orange-500"
-                  : "bg-white text-zinc-600 border-zinc-200 hover:border-orange-300"
-              }`}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
-      </Field>
+      {fc.regimeEnabled && (
+        <Field
+          label="Régime alimentaire"
+          hint="Au cas où il y a un repas ou un snack — coche ce qui s'applique."
+        >
+          <div className="flex flex-wrap gap-2 mt-1">
+            {REGIMES.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => toggleRegime(r)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  data.regime.includes(r)
+                    ? "bg-orange-500 text-white border-orange-500"
+                    : "bg-white text-zinc-600 border-zinc-200 hover:border-orange-300"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
 
       {/* Accessibilité */}
-      <Field
-        label="Besoin spécifique / accessibilité"
-        hint="Mobilité réduite, neurodivergence, troubles dys, malentendante, etc. — dis-nous ce qu'il te faut."
-      >
-        <textarea
-          value={data.accessibilite}
-          onChange={(e) => setField("accessibilite", e.target.value)}
-          rows={2}
-          placeholder="Ex : besoin d'un accès PMR, présence d'un chien guide…"
-          className={inputCls}
-        />
-      </Field>
+      {fc.accessibiliteEnabled && (
+        <Field
+          label="Besoin spécifique / accessibilité"
+          hint="Mobilité réduite, neurodivergence, troubles dys, malentendante, etc. — dis-nous ce qu'il te faut."
+        >
+          <textarea
+            value={data.accessibilite}
+            onChange={(e) => setField("accessibilite", e.target.value)}
+            rows={2}
+            placeholder="Ex : besoin d'un accès PMR, présence d'un chien guide…"
+            className={inputCls}
+          />
+        </Field>
+      )}
 
       {/* Accompagnateur */}
       <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-zinc-200 hover:bg-zinc-50">
@@ -1185,15 +1234,17 @@ function Step3Evenement({
       </label>
 
       {/* Commentaire libre */}
-      <Field label="Commentaire / question (optionnel)">
-        <textarea
-          value={data.commentaire}
-          onChange={(e) => setField("commentaire", e.target.value)}
-          rows={3}
-          placeholder="Une question, une attente, un truc à nous dire ?"
-          className={inputCls}
-        />
-      </Field>
+      {fc.commentaireEnabled && (
+        <Field label="Commentaire / question (optionnel)">
+          <textarea
+            value={data.commentaire}
+            onChange={(e) => setField("commentaire", e.target.value)}
+            rows={3}
+            placeholder="Une question, une attente, un truc à nous dire ?"
+            className={inputCls}
+          />
+        </Field>
+      )}
     </div>
   );
 }

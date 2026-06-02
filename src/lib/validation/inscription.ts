@@ -1,17 +1,25 @@
 import { z } from "zod";
 
 // ─── Couche Fondamentale ─────────────────────────────────────────────────────
+// Note: only email/firstName/lastName are structurally required. The remaining
+// fields here can be disabled per-event via FormConfig — schema accepts them
+// as optional so an inscription that omits a disabled field still validates.
 export const fondamentaleSchema = z.object({
   firstName: z.string().min(1, "Le prénom est requis"),
   lastName: z.string().min(1, "Le nom est requis"),
   email: z.string().email("Email invalide"),
-  phone: z.string().min(8, "Téléphone invalide").max(20, "Téléphone invalide"),
+  phone: z
+    .string()
+    .min(8, "Téléphone invalide")
+    .max(20, "Téléphone invalide")
+    .optional(),
   birthDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date de naissance invalide (YYYY-MM-DD)"),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date de naissance invalide (YYYY-MM-DD)")
+    .optional(),
   // 100% féminin : pas de choix de genre, toujours "Fille".
   gender: z.literal("Fille").default("Fille"),
-  city: z.string().min(1, "La ville est requise"),
+  city: z.string().min(1, "La ville est requise").optional(),
 });
 
 // ─── Couche Orientation ──────────────────────────────────────────────────────
@@ -35,23 +43,24 @@ export const REGIONS = [
 ] as const;
 
 export const orientationSchema = z.object({
-  niveauScolaire: z.enum(NIVEAUX),
+  niveauScolaire: z.enum(NIVEAUX).optional(),
   niveauScolaireAutre: z.string().optional(),
   etablissement: z.string().optional(),
-  region: z.enum(REGIONS),
-  projetPro: z.string().min(1, "Décris ton projet ou indique 'pas encore' ou 'en construction'"),
-  motivation: z
-    .array(z.string())
-    .min(1, "Au moins une motivation requise"),
+  region: z.enum(REGIONS).optional(),
+  projetPro: z
+    .string()
+    .min(1, "Décris ton projet ou indique 'pas encore' ou 'en construction'")
+    .optional(),
+  motivation: z.array(z.string()).optional(),
   motivationDetail: z.string().optional(),
-  commentConnu: z.string().min(1, "Indique comment tu nous as connus"),
+  commentConnu: z.string().min(1, "Indique comment tu nous as connus").optional(),
 });
 
 // ─── Couche Événement ────────────────────────────────────────────────────────
 export const evenementSchema = z.object({
-  droitsImageAccepted: z.boolean(),
+  droitsImageAccepted: z.boolean().optional(),
   droitsImageSignature: z.string().optional(), // required if accepted + majeure
-  regime: z.array(z.string()).default([]),
+  regime: z.array(z.string()).optional(),
   accessibilite: z.string().optional(),
   accompagnateur: z.boolean().default(false),
   commentaire: z.string().optional(),

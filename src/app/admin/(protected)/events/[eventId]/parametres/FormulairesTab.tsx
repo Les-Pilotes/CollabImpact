@@ -7,10 +7,21 @@ import { Button } from "@/components/ui/button";
 import { upsertFormConfig } from "./actions";
 
 type FormCfg = {
+  // Couche Fondamentale
   phoneEnabled: boolean;
   birthDateEnabled: boolean;
   cityEnabled: boolean;
+  // Couche Orientation
+  niveauScolaireEnabled: boolean;
+  regionEnabled: boolean;
+  projetProEnabled: boolean;
+  motivationEnabled: boolean;
   sourceEnabled: boolean;
+  // Couche Événement
+  droitsImageEnabled: boolean;
+  regimeEnabled: boolean;
+  accessibiliteEnabled: boolean;
+  commentaireEnabled: boolean;
 };
 
 type FeedbackCfg = {
@@ -75,24 +86,28 @@ const INSCRIPTION_LAYERS: Layer[] = [
       "Parcours scolaire et projection professionnelle. Évolue au fil des années — on redemande après 6 mois.",
     fields: [
       {
-        kind: "locked",
+        kind: "toggle",
         label: "Niveau scolaire",
         description: "Classe / diplôme en cours.",
+        configKey: "niveauScolaireEnabled",
       },
       {
-        kind: "locked",
+        kind: "toggle",
         label: "Région",
         description: "Région française de résidence.",
+        configKey: "regionEnabled",
       },
       {
-        kind: "locked",
+        kind: "toggle",
         label: "Projet professionnel",
         description: "Texte libre — ce qu'elle envisage de faire.",
+        configKey: "projetProEnabled",
       },
       {
-        kind: "locked",
+        kind: "toggle",
         label: "Motivation",
         description: "Pourquoi elle rejoint Les Pilotes (choix multiples).",
+        configKey: "motivationEnabled",
       },
       {
         kind: "toggle",
@@ -108,24 +123,28 @@ const INSCRIPTION_LAYERS: Layer[] = [
     intro: "Spécifique à cet événement précis — toujours redemandé à chaque inscription.",
     fields: [
       {
-        kind: "locked",
+        kind: "toggle",
         label: "Droit à l'image",
-        description: "Accord pour utiliser photos / vidéos. Adapté automatiquement pour les mineures.",
+        description: "Accord pour utiliser photos / vidéos. Adapté automatiquement pour les mineures. Consentement légal — garder activé en cas de doute.",
+        configKey: "droitsImageEnabled",
       },
       {
-        kind: "locked",
+        kind: "toggle",
         label: "Régime alimentaire",
         description: "Pour le déjeuner (végétarien, sans gluten, etc.).",
+        configKey: "regimeEnabled",
       },
       {
-        kind: "locked",
+        kind: "toggle",
         label: "Accessibilité",
         description: "Besoins spécifiques (mobilité, sensoriel…). Champ libre.",
+        configKey: "accessibiliteEnabled",
       },
       {
-        kind: "locked",
+        kind: "toggle",
         label: "Commentaire libre",
         description: "Tout ce qui n'entre pas ailleurs.",
+        configKey: "commentaireEnabled",
       },
     ],
   },
@@ -279,20 +298,34 @@ function FormPreview({ cfg }: { cfg: FormCfg }) {
         </PreviewGroup>
 
         <PreviewGroup label="Ton orientation">
-          <PreviewField label="Niveau scolaire" required type="select" />
-          <PreviewField label="Région" required type="select" />
-          <PreviewField label="Projet professionnel" required />
-          <PreviewField label="Motivation" required type="chips" />
+          {cfg.niveauScolaireEnabled && (
+            <PreviewField label="Niveau scolaire" required type="select" />
+          )}
+          {cfg.regionEnabled && (
+            <PreviewField label="Région" required type="select" />
+          )}
+          {cfg.projetProEnabled && (
+            <PreviewField label="Projet professionnel" required />
+          )}
+          {cfg.motivationEnabled && (
+            <PreviewField label="Motivation" required type="chips" />
+          )}
           {cfg.sourceEnabled && (
             <PreviewField label="Comment as-tu connu Les Pilotes ?" />
           )}
         </PreviewGroup>
 
         <PreviewGroup label="Pour cet événement">
-          <PreviewField label="Droit à l'image" type="check" />
-          <PreviewField label="Régime alimentaire" type="chips" />
-          <PreviewField label="Accessibilité" />
-          <PreviewField label="Commentaire libre" type="area" />
+          {cfg.droitsImageEnabled && (
+            <PreviewField label="Droit à l'image" type="check" />
+          )}
+          {cfg.regimeEnabled && (
+            <PreviewField label="Régime alimentaire" type="chips" />
+          )}
+          {cfg.accessibiliteEnabled && <PreviewField label="Accessibilité" />}
+          {cfg.commentaireEnabled && (
+            <PreviewField label="Commentaire libre" type="area" />
+          )}
         </PreviewGroup>
       </div>
     </div>

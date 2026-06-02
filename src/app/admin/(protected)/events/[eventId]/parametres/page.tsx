@@ -46,6 +46,14 @@ export default async function EventParametresPage({
     birthDateEnabled: true,
     cityEnabled: true,
     sourceEnabled: true,
+    niveauScolaireEnabled: true,
+    regionEnabled: true,
+    projetProEnabled: true,
+    motivationEnabled: true,
+    droitsImageEnabled: true,
+    regimeEnabled: true,
+    accessibiliteEnabled: true,
+    commentaireEnabled: true,
   };
 
   const feedbackCfg = event.feedbackConfig ?? {
@@ -97,6 +105,14 @@ export default async function EventParametresPage({
                 birthDateEnabled: formCfg.birthDateEnabled,
                 cityEnabled: formCfg.cityEnabled,
                 sourceEnabled: formCfg.sourceEnabled,
+                niveauScolaireEnabled: formCfg.niveauScolaireEnabled,
+                regionEnabled: formCfg.regionEnabled,
+                projetProEnabled: formCfg.projetProEnabled,
+                motivationEnabled: formCfg.motivationEnabled,
+                droitsImageEnabled: formCfg.droitsImageEnabled,
+                regimeEnabled: formCfg.regimeEnabled,
+                accessibiliteEnabled: formCfg.accessibiliteEnabled,
+                commentaireEnabled: formCfg.commentaireEnabled,
               }}
               feedbackCfg={{
                 satisfactionEnabled: feedbackCfg.satisfactionEnabled,

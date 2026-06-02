@@ -4,14 +4,27 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+export type FormConfigInput = {
+  // Couche Fondamentale
+  phoneEnabled: boolean;
+  birthDateEnabled: boolean;
+  cityEnabled: boolean;
+  // Couche Orientation
+  niveauScolaireEnabled: boolean;
+  regionEnabled: boolean;
+  projetProEnabled: boolean;
+  motivationEnabled: boolean;
+  sourceEnabled: boolean;
+  // Couche Événement
+  droitsImageEnabled: boolean;
+  regimeEnabled: boolean;
+  accessibiliteEnabled: boolean;
+  commentaireEnabled: boolean;
+};
+
 export async function upsertFormConfig(
   eventId: string,
-  data: {
-    phoneEnabled: boolean;
-    birthDateEnabled: boolean;
-    cityEnabled: boolean;
-    sourceEnabled: boolean;
-  },
+  data: FormConfigInput,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     await requireAdmin();
