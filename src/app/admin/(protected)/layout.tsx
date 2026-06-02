@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import AdminSignOutButton from "./AdminSignOutButton";
 import Sidebar from "./Sidebar";
 import NotificationBell from "./_components/NotificationBell";
+import WelcomeDialog from "./_components/WelcomeDialog";
 import {
   countUnread,
   listNotifications,
@@ -53,6 +54,11 @@ export default async function AdminLayout({
       <main className="flex-1 min-w-0 md:p-10 p-4 pt-16 md:pt-10 overflow-y-auto">
         {children}
       </main>
+
+      <WelcomeDialog
+        firstName={admin.firstName ?? null}
+        adminCreatedAt={admin.createdAt.toISOString()}
+      />
 
       <Toaster position="bottom-right" richColors closeButton />
     </div>

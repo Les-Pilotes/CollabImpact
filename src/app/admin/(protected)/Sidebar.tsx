@@ -15,6 +15,7 @@ import {
   Settings,
   ArrowLeft,
   Shield,
+  HelpCircle,
 } from "lucide-react";
 import AdminSignOutButton from "./AdminSignOutButton";
 
@@ -198,6 +199,24 @@ export default function Sidebar({ adminName, adminEmail }: Props) {
           )}
         </div>
       </nav>
+
+      {/* Help link — always available */}
+      <div className="px-2 pb-2">
+        <Link
+          href="/admin/aide"
+          title={collapsed ? "Aide" : undefined}
+          className={`flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors ${
+            collapsed ? "justify-center" : ""
+          } ${
+            pathname.startsWith("/admin/aide")
+              ? "bg-stone-800 text-white"
+              : "text-stone-400 hover:text-white hover:bg-stone-800/70"
+          }`}
+        >
+          <HelpCircle className="w-4 h-4 shrink-0" />
+          {!collapsed && "Aide"}
+        </Link>
+      </div>
 
       {/* Bottom: user + toggle */}
       <div className="border-t border-stone-800 p-3 space-y-2">
