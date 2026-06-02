@@ -7,6 +7,9 @@ vi.mock("@/lib/db", () => ({
       findFirst: vi.fn(),
       count: vi.fn(),
     },
+    event: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -15,13 +18,19 @@ import {
   listPeople,
   countPeople,
   getPersonDetail,
+  listEventsForFilter,
 } from "@/lib/people/queries";
 
 const um = vi.mocked(prisma.user.findMany);
 const uf = vi.mocked(prisma.user.findFirst);
 const uc = vi.mocked(prisma.user.count);
+const ef = vi.mocked(prisma.event.findMany);
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  uc.mockResolvedValue(0 as never);
+  um.mockResolvedValue([] as never);
+});
 
 function makeRow(id: string, extra: Partial<Record<string, unknown>> = {}) {
   return {
@@ -31,71 +40,135 @@ function makeRow(id: string, extra: Partial<Record<string, unknown>> = {}) {
     email: `${id}@example.test`,
     phone: null,
     city: "Paris",
+    niveauScolaire: null,
+    region: null,
+    birthDate: null,
     _count: { enrollments: 0 },
     enrollments: [],
     ...extra,
   };
 }
 
-describe("listPeople", () => {
-  it("scopes the where clause to the organisation and filters soft-deleted", async () => {
-    um.mockResolvedValue([] as never);
-
+describe("listPeople — where clause", () => {
+  it("scopes to the org and filters soft-deleted, no OR without search", async () => {
     await listPeople({ organisationId: "org-1" });
 
     const args = um.mock.calls[0][0]!;
-    expect(args.where).toMatchObject({
-      organisationId: "org-1",
-      deletedAt: null,
-    });
+    expect(args.where).toMatchObject({ organisationId: "org-1", deletedAt: null });
     expect(args.where!.OR).toBeUndefined();
   });
 
   it("builds an OR clause for search (name, email, phone)", async () => {
-    um.mockResolvedValue([] as never);
-
     await listPeople({ organisationId: "org-1", search: "Léa" });
 
-    const args = um.mock.calls[0][0]!;
-    const or = args.where!.OR as Array<Record<string, unknown>>;
+    const or = um.mock.calls[0][0]!.where!.OR as Array<Record<string, unknown>>;
     expect(or).toHaveLength(4);
     expect(or[0]).toEqual({ firstName: { contains: "Léa", mode: "insensitive" } });
     expect(or[3]).toEqual({ phone: { contains: "Léa" } });
   });
 
   it("ignores blank search strings", async () => {
-    um.mockResolvedValue([] as never);
-
     await listPeople({ organisationId: "org-1", search: "   " });
-
     expect(um.mock.calls[0][0]!.where!.OR).toBeUndefined();
   });
 
-  it("returns a nextCursor when more rows exist than the limit", async () => {
-    const rows = Array.from({ length: 4 }, (_, i) => makeRow(`u-${i}`));
-    um.mockResolvedValue(rows as never);
+  it("filters by niveau scolaire and region", async () => {
+    await listPeople({
+      organisationId: "org-1",
+      niveauScolaire: "Terminale",
+      region: "Île-De-France",
+    });
+
+    const where = um.mock.calls[0][0]!.where!;
+    expect(where.niveauScolaire).toBe("Terminale");
+    expect(where.region).toBe("Île-De-France");
+  });
+
+  it("filters by event participation via a some() relation", async () => {
+    await listPeople({ organisationId: "org-1", eventId: "ev-9" });
+
+    const where = um.mock.calls[0][0]!.where!;
+    expect(where.enrollments).toEqual({
+      some: { eventId: "ev-9", deletedAt: null },
+    });
+  });
+
+  it("translates an age window into a birthDate range", async () => {
+    await listPeople({ organisationId: "org-1", ageMin: 16, ageMax: 25 });
+
+    const bd = um.mock.calls[0][0]!.where!.birthDate as {
+      lte: Date;
+      gte: Date;
+    };
+    // ageMin=16 → born on/before ~16y ago (lte). ageMax=25 → born on/after ~26y ago (gte).
+    const now = new Date();
+    expect(bd.lte.getFullYear()).toBe(now.getFullYear() - 16);
+    expect(bd.gte.getFullYear()).toBe(now.getFullYear() - 26);
+    expect(bd.lte.getTime()).toBeGreaterThan(bd.gte.getTime());
+  });
+});
+
+describe("listPeople — sorting", () => {
+  it("defaults to recent activity (updatedAt desc)", async () => {
+    await listPeople({ organisationId: "org-1" });
+    expect(um.mock.calls[0][0]!.orderBy).toEqual([
+      { updatedAt: "desc" },
+      { id: "desc" },
+    ]);
+  });
+
+  it("sorts by name", async () => {
+    await listPeople({ organisationId: "org-1", sort: "name" });
+    expect(um.mock.calls[0][0]!.orderBy).toEqual([
+      { lastName: "asc" },
+      { firstName: "asc" },
+      { id: "asc" },
+    ]);
+  });
+
+  it("sorts by youngest (birthDate desc)", async () => {
+    await listPeople({ organisationId: "org-1", sort: "age_young" });
+    expect(um.mock.calls[0][0]!.orderBy).toEqual([
+      { birthDate: "desc" },
+      { id: "asc" },
+    ]);
+  });
+
+  it("sorts by enrollment count", async () => {
+    await listPeople({ organisationId: "org-1", sort: "events" });
+    expect(um.mock.calls[0][0]!.orderBy).toEqual([
+      { enrollments: { _count: "desc" } },
+      { id: "asc" },
+    ]);
+  });
+});
+
+describe("listPeople — pagination", () => {
+  it("computes skip/take and totalPages from total + pageSize", async () => {
+    uc.mockResolvedValue(120 as never);
+    um.mockResolvedValue([makeRow("u-1")] as never);
 
     const result = await listPeople({
       organisationId: "org-1",
-      limit: 3,
+      page: 2,
+      pageSize: 50,
     });
 
-    expect(result.items).toHaveLength(3);
-    expect(result.nextCursor).toBe("u-2");
+    const args = um.mock.calls[0][0]!;
+    expect(args.skip).toBe(50);
+    expect(args.take).toBe(50);
+    expect(result.total).toBe(120);
+    expect(result.totalPages).toBe(3);
+    expect(result.page).toBe(2);
   });
 
-  it("returns null cursor when the page is the last one", async () => {
-    const rows = [makeRow("u-1"), makeRow("u-2")];
-    um.mockResolvedValue(rows as never);
-
-    const result = await listPeople({ organisationId: "org-1", limit: 50 });
-
-    expect(result.items).toHaveLength(2);
-    expect(result.nextCursor).toBeNull();
+  it("clamps page to a minimum of 1", async () => {
+    await listPeople({ organisationId: "org-1", page: 0 });
+    expect(um.mock.calls[0][0]!.skip).toBe(0);
   });
 
   it("maps enrollment count and last event from the include", async () => {
-    const rows = [
+    um.mockResolvedValue([
       makeRow("u-1", {
         _count: { enrollments: 3 },
         enrollments: [
@@ -105,8 +178,7 @@ describe("listPeople", () => {
           },
         ],
       }),
-    ];
-    um.mockResolvedValue(rows as never);
+    ] as never);
 
     const result = await listPeople({ organisationId: "org-1" });
 
@@ -115,26 +187,19 @@ describe("listPeople", () => {
     expect(result.items[0].lastEnrollmentAt).toEqual(new Date("2026-05-01"));
   });
 
-  it("skips the cursor row when paginating", async () => {
-    um.mockResolvedValue([] as never);
+  it("uses the same where for count and findMany so total matches filters", async () => {
+    await listPeople({ organisationId: "org-1", niveauScolaire: "BTS" });
 
-    await listPeople({
-      organisationId: "org-1",
-      cursor: "u-cursor-id",
-    });
-
-    const args = um.mock.calls[0][0]!;
-    expect(args.cursor).toEqual({ id: "u-cursor-id" });
-    expect(args.skip).toBe(1);
+    const countWhere = uc.mock.calls[0][0]!.where;
+    const listWhere = um.mock.calls[0][0]!.where;
+    expect(countWhere).toEqual(listWhere);
   });
 });
 
 describe("countPeople", () => {
   it("counts non-deleted users in the org only", async () => {
     uc.mockResolvedValue(42 as never);
-
     const n = await countPeople("org-9");
-
     expect(n).toBe(42);
     expect(uc.mock.calls[0][0]).toEqual({
       where: { organisationId: "org-9", deletedAt: null },
@@ -142,14 +207,24 @@ describe("countPeople", () => {
   });
 });
 
+describe("listEventsForFilter", () => {
+  it("returns org events newest-first with minimal fields", async () => {
+    ef.mockResolvedValue([] as never);
+    await listEventsForFilter("org-1");
+
+    const args = ef.mock.calls[0][0]!;
+    expect(args.where).toEqual({ organisationId: "org-1", deletedAt: null });
+    expect(args.orderBy).toEqual({ date: "desc" });
+    expect(args.select).toEqual({ id: true, name: true, date: true });
+  });
+});
+
 describe("getPersonDetail", () => {
   it("scopes to the org and excludes soft-deleted users", async () => {
     uf.mockResolvedValue(null as never);
-
     await getPersonDetail("u-1", "org-1");
 
-    const args = uf.mock.calls[0][0]!;
-    expect(args.where).toEqual({
+    expect(uf.mock.calls[0][0]!.where).toEqual({
       id: "u-1",
       organisationId: "org-1",
       deletedAt: null,
@@ -158,11 +233,9 @@ describe("getPersonDetail", () => {
 
   it("requests enrollments newest-first with event + feedback hydrated", async () => {
     uf.mockResolvedValue({ id: "u-1", enrollments: [] } as never);
-
     await getPersonDetail("u-1", "org-1");
 
-    const args = uf.mock.calls[0][0]!;
-    const enr = args.include!.enrollments as Record<string, unknown>;
+    const enr = uf.mock.calls[0][0]!.include!.enrollments as Record<string, unknown>;
     expect(enr.where).toEqual({ deletedAt: null });
     expect(enr.orderBy).toEqual({ enrolledAt: "desc" });
     expect(enr.include).toMatchObject({ event: expect.any(Object), feedback: true });
@@ -170,7 +243,6 @@ describe("getPersonDetail", () => {
 
   it("returns null when the user doesn't exist or is in another org", async () => {
     uf.mockResolvedValue(null as never);
-    const result = await getPersonDetail("u-1", "org-1");
-    expect(result).toBeNull();
+    expect(await getPersonDetail("u-1", "org-1")).toBeNull();
   });
 });

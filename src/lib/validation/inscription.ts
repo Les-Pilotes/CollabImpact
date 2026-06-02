@@ -14,7 +14,7 @@ export const fondamentaleSchema = z.object({
 });
 
 // ─── Couche Orientation ──────────────────────────────────────────────────────
-const NIVEAUX = [
+export const NIVEAUX = [
   "3ème",
   "2nde",
   "1ère",
@@ -25,7 +25,7 @@ const NIVEAUX = [
   "Autres",
 ] as const;
 
-const REGIONS = [
+export const REGIONS = [
   "Île-De-France",
   "Hauts-de-France",
   "Auvergne-Rhône-Alpes",
