@@ -219,24 +219,139 @@ function FormSubsection({
         <p className="text-sm text-stone-500 mt-1 max-w-prose">{hint}</p>
       </div>
 
-      <div className="space-y-10">
-        {INSCRIPTION_LAYERS.map((layer) => (
-          <LayerCard key={layer.number} layer={layer} cfg={cfg} onToggle={toggle} />
-        ))}
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        {/* Left: field toggles */}
+        <div className="space-y-10 min-w-0">
+          {INSCRIPTION_LAYERS.map((layer) => (
+            <LayerCard key={layer.number} layer={layer} cfg={cfg} onToggle={toggle} />
+          ))}
 
-      <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
-        {isDirty ? (
-          <p className="text-xs text-stone-500">Modifications non enregistrées</p>
-        ) : (
-          <p className="text-xs text-emerald-600">À jour</p>
-        )}
-        <div className="flex-1" />
-        <Button size="sm" onClick={handleSave} disabled={isPending || !isDirty}>
-          {isPending ? "Enregistrement…" : "Enregistrer"}
-        </Button>
+          <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
+            {isDirty ? (
+              <p className="text-xs text-stone-500">Modifications non enregistrées</p>
+            ) : (
+              <p className="text-xs text-emerald-600">À jour</p>
+            )}
+            <div className="flex-1" />
+            <Button size="sm" onClick={handleSave} disabled={isPending || !isDirty}>
+              {isPending ? "Enregistrement…" : "Enregistrer"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Right: live preview */}
+        <div className="lg:sticky lg:top-4 self-start">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-stone-400 mb-3">
+            Aperçu en temps réel
+          </p>
+          <FormPreview cfg={cfg} />
+        </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Read-only mock of the public inscription form, mirroring what participants
+ * see. Reflects the live FormConfig toggles so admins immediately see the
+ * effect of enabling/disabling a field. Locked fields are always shown
+ * (they're structurally required). Gender isn't shown — the program is
+ * women-only, so it's always "Fille".
+ */
+function FormPreview({ cfg }: { cfg: FormCfg }) {
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+      <div className="bg-stone-900 px-5 py-4">
+        <p className="text-white font-semibold text-sm">Inscription</p>
+        <p className="text-stone-400 text-xs mt-0.5">
+          Workshop 100% Féminin · Les Pilotes
+        </p>
+      </div>
+
+      <div className="p-5 space-y-5">
+        <PreviewGroup label="Tes infos">
+          <PreviewField label="Email" required />
+          <PreviewField label="Prénom" required />
+          <PreviewField label="Nom" required />
+          {cfg.phoneEnabled && <PreviewField label="Téléphone" />}
+          {cfg.birthDateEnabled && <PreviewField label="Date de naissance" />}
+          {cfg.cityEnabled && <PreviewField label="Ville de résidence" />}
+        </PreviewGroup>
+
+        <PreviewGroup label="Ton orientation">
+          <PreviewField label="Niveau scolaire" required type="select" />
+          <PreviewField label="Région" required type="select" />
+          <PreviewField label="Projet professionnel" required />
+          <PreviewField label="Motivation" required type="chips" />
+          {cfg.sourceEnabled && (
+            <PreviewField label="Comment as-tu connu Les Pilotes ?" />
+          )}
+        </PreviewGroup>
+
+        <PreviewGroup label="Pour cet événement">
+          <PreviewField label="Droit à l'image" type="check" />
+          <PreviewField label="Régime alimentaire" type="chips" />
+          <PreviewField label="Accessibilité" />
+          <PreviewField label="Commentaire libre" type="area" />
+        </PreviewGroup>
+      </div>
+    </div>
+  );
+}
+
+function PreviewGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2.5">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-orange-600">
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function PreviewField({
+  label,
+  required = false,
+  type = "text",
+}: {
+  label: string;
+  required?: boolean;
+  type?: "text" | "select" | "area" | "chips" | "check";
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-stone-600">
+        {label}
+        {required && <span className="text-orange-500"> *</span>}
+      </p>
+      {type === "area" ? (
+        <div className="h-12 rounded-lg border border-stone-200 bg-stone-50" />
+      ) : type === "chips" ? (
+        <div className="flex gap-1.5">
+          <span className="h-6 w-16 rounded-full bg-stone-100" />
+          <span className="h-6 w-20 rounded-full bg-stone-100" />
+          <span className="h-6 w-14 rounded-full bg-stone-100" />
+        </div>
+      ) : type === "check" ? (
+        <div className="flex items-center gap-2">
+          <span className="w-4 h-4 rounded border border-stone-300 bg-stone-50" />
+          <span className="h-3 w-40 rounded bg-stone-100" />
+        </div>
+      ) : (
+        <div className="h-9 rounded-lg border border-stone-200 bg-stone-50 flex items-center px-3">
+          {type === "select" && (
+            <span className="ml-auto text-stone-300 text-xs">▾</span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
