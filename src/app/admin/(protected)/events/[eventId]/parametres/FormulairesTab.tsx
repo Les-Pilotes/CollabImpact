@@ -455,7 +455,7 @@ function FieldRow({
         role="switch"
         aria-checked={checked}
         onClick={() => onToggle(field.configKey)}
-        className={`relative w-9 h-5 rounded-full transition-colors mt-0.5 shrink-0 ${
+        className={`relative w-9 h-5 rounded-full transition-colors mt-0.5 shrink-0 overflow-hidden ${
           checked ? "bg-stone-900" : "bg-stone-300"
         }`}
       >

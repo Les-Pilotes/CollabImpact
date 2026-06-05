@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import KanbanBoard, { type ParticipantRow } from "./KanbanBoard";
+import KanbanBoard, { type ParticipantRow, type SpeakerRow } from "./KanbanBoard";
 import { capitalizeName } from "@/lib/normalize";
 import { createCheckinToken } from "@/lib/tokens";
 
@@ -24,18 +24,27 @@ export default async function ParticipantesPage({
 }: {
   params: Promise<{ eventId: string }>;
 }) {
-  await requireAdmin();
+  const { admin } = await requireAdmin();
   const { eventId } = await params;
 
-  const enrollments = await prisma.enrollment.findMany({
-    where: {
-      eventId,
-      deletedAt: null,
-      status: { notIn: ["desistement", "absente", "presente", "feedback_recu"] },
-    },
-    include: { user: true },
-    orderBy: { enrolledAt: "asc" },
-  });
+  const [enrollments, speakersRaw] = await Promise.all([
+    prisma.enrollment.findMany({
+      where: {
+        eventId,
+        deletedAt: null,
+        status: { notIn: ["desistement", "absente", "presente", "feedback_recu"] },
+      },
+      include: { user: true },
+      orderBy: { enrolledAt: "asc" },
+    }),
+    prisma.speaker.findMany({
+      where: { eventId, organisationId: admin.organisationId, deletedAt: null },
+      orderBy: [{ createdAt: "asc" }],
+      select: { id: true, firstName: true, lastName: true, domain: true },
+    }),
+  ]);
+
+  const speakers: SpeakerRow[] = speakersRaw;
 
   const participants: ParticipantRow[] = enrollments.map((e) => {
     const history: ParticipantRow["history"] = [
@@ -114,5 +123,5 @@ export default async function ParticipantesPage({
     };
   });
 
-  return <KanbanBoard initialParticipants={participants} eventId={eventId} />;
+  return <KanbanBoard initialParticipants={participants} eventId={eventId} speakers={speakers} />;
 }

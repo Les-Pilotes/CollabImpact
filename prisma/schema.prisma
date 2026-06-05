@@ -110,6 +110,10 @@ model Admin {
   role           AdminRole    @default(ADMIN)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  // Set the first time the admin signs in (and refreshed on subsequent
+  // sessions). Used to differentiate "invitée, jamais connectée" from
+  // "active" admins — see notification settings UI in event parametres.
+  lastLoginAt    DateTime?
   organisation   Organisation @relation(fields: [organisationId], references: [id])
 
   notificationReads NotificationRead[]
@@ -180,6 +184,11 @@ model Event {
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  // Per-event admin notification settings (which alerts get sent, to whom).
+  // JSON shape — see src/lib/notifications/config.ts:
+  //   { newEnrollmentEnabled: boolean, recipientAdminIds: string[] }
+  notificationConfig Json?
 
   enrollments    Enrollment[]
   tasks          Task[]

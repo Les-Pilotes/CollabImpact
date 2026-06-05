@@ -21,6 +21,13 @@ export type HistoryItem = {
 
 export type DroitsImageStatus = "pending" | "accepted" | "refused" | "minor_parental_pending";
 
+export type SpeakerRow = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  domain: string | null;
+};
+
 export type ParticipantRow = {
   id: string;
   firstName: string;
@@ -153,9 +160,11 @@ function avatarColor(id: string) {
 export default function KanbanBoard({
   initialParticipants,
   eventId,
+  speakers,
 }: {
   initialParticipants: ParticipantRow[];
   eventId: string;
+  speakers: SpeakerRow[];
 }) {
   const router = useRouter();
   const [isSending, startSending] = useTransition();
@@ -165,7 +174,7 @@ export default function KanbanBoard({
   const [simOpen, setSimOpen] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState("listing");
+  const [activeTab, setActiveTab] = useState("suivi");
   const [emargState, setEmargState] = useState<Record<string, string>>({});
 
   const markEmarg = useCallback((id: string, st: string) => {
@@ -362,6 +371,7 @@ export default function KanbanBoard({
           <WorkshopTab
             participants={participants}
             archived={archived}
+            speakers={speakers}
             emargState={emargState}
             onMarkEmarg={markEmarg}
             avatarColor={avatarColor}
@@ -613,23 +623,26 @@ export default function KanbanBoard({
 
 // ─── Workshop tab component ───────────────────────────────────────────────────
 
-const INTERVENANTES = [
-  { id: "emna",     name: "Emna",     domain: "Informatique", color: "bg-teal-50 text-teal-700 border-teal-200" },
-  { id: "fabienne", name: "Fabienne", domain: "Marketing",    color: "bg-amber-50 text-amber-700 border-amber-200" },
-  { id: "sophie",   name: "Sophie",   domain: "DRH",          color: "bg-blue-50 text-blue-700 border-blue-200" },
-  { id: "imane",    name: "Imane",    domain: "Banque",        color: "bg-violet-50 text-violet-700 border-violet-200" },
-  { id: "sonia",    name: "Sonia",    domain: "Gestion",       color: "bg-zinc-100 text-zinc-600 border-zinc-200" },
-  { id: "gaelle",   name: "Gaëlle",   domain: "Assurance",     color: "bg-orange-50 text-orange-700 border-orange-200" },
+const SPEAKER_COLORS = [
+  "bg-teal-50 text-teal-700 border-teal-200",
+  "bg-amber-50 text-amber-700 border-amber-200",
+  "bg-blue-50 text-blue-700 border-blue-200",
+  "bg-violet-50 text-violet-700 border-violet-200",
+  "bg-zinc-100 text-zinc-600 border-zinc-200",
+  "bg-orange-50 text-orange-700 border-orange-200",
+  "bg-rose-50 text-rose-700 border-rose-200",
+  "bg-green-50 text-green-700 border-green-200",
 ];
 
-function EmargRow({ p, st, groups, onMarkEmarg, avatarColor, initials }: {
+function EmargRow({ p, st, groups, speakers, onMarkEmarg, avatarColor, initials }: {
   p: ParticipantRow; st: string;
   groups: Record<string, string>;
+  speakers: SpeakerRow[];
   onMarkEmarg: (id: string, st: string) => void;
   avatarColor: (id: string) => string;
   initials: (p: ParticipantRow) => string;
 }) {
-  const inv = INTERVENANTES.find((i) => i.id === groups[p.id]);
+  const inv = speakers.find((i) => i.id === groups[p.id]);
   return (
     <div className={`flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-50 transition-colors ${
       st === "present" ? "bg-green-50/50" : st === "absent" ? "bg-red-50/50" : ""
@@ -640,7 +653,7 @@ function EmargRow({ p, st, groups, onMarkEmarg, avatarColor, initials }: {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-zinc-900 truncate">{p.firstName} {p.lastName}</p>
-          <p className="text-[10px] text-zinc-400">{inv ? `${inv.name} · ${inv.domain}` : "—"}</p>
+          <p className="text-[10px] text-zinc-400">{inv ? `${inv.firstName} ${inv.lastName} · ${inv.domain ?? "—"}` : "—"}</p>
         </div>
       </div>
       <div className="flex gap-2 shrink-0">
@@ -666,9 +679,10 @@ function EmargRow({ p, st, groups, onMarkEmarg, avatarColor, initials }: {
   );
 }
 
-function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initials }: {
+function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarColor, initials }: {
   participants: ParticipantRow[];
   archived: ParticipantRow[];
+  speakers: SpeakerRow[];
   emargState: Record<string, string>;
   onMarkEmarg: (id: string, st: string) => void;
   avatarColor: (id: string) => string;
@@ -692,9 +706,11 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
 
   const [groups, setGroups] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
-    eligible.forEach((p, i) => {
-      initial[p.id] = INTERVENANTES[i % INTERVENANTES.length].id;
-    });
+    if (speakers.length > 0) {
+      eligible.forEach((p, i) => {
+        initial[p.id] = speakers[i % speakers.length].id;
+      });
+    }
     return initial;
   });
 
@@ -759,7 +775,15 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
       {/* Groupes view */}
       {mode === "groupes" && (
         <div className="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-3 content-start auto-rows-min">
-          {INTERVENANTES.map((inv) => {
+          {speakers.length === 0 && (
+            <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+              <p className="text-3xl mb-3">🎤</p>
+              <p className="text-sm font-semibold text-zinc-700">Aucune intervenante configurée</p>
+              <p className="text-xs text-zinc-400 mt-1">Ajoutez des intervenantes dans l&apos;onglet Intervenantes pour composer les groupes.</p>
+            </div>
+          )}
+          {speakers.map((inv, speakerIdx) => {
+            const speakerColor = SPEAKER_COLORS[speakerIdx % SPEAKER_COLORS.length];
             const members = [...eligible.filter((p) => groups[p.id] === inv.id)]
               .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName));
             const isTapTarget = !!picking;
@@ -790,9 +814,9 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
                   isDragTarget ? "bg-orange-50" : isTapTarget ? "bg-orange-50" : "border-b border-zinc-100"
                 }`}>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-zinc-900">{inv.name}</span>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${inv.color}`}>
-                      {inv.domain}
+                    <span className="font-bold text-sm text-zinc-900">{inv.firstName} {inv.lastName}</span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${speakerColor}`}>
+                      {inv.domain ?? "—"}
                     </span>
                     {(isTapTarget || isDragTarget) && (
                       <span className="text-xs text-orange-500 font-medium">← déposer ici</span>
@@ -860,7 +884,7 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
                 En attente — {emargList.filter((p) => !emargState[p.id] || emargState[p.id] === "pending").length}
               </div>
               {emargList.filter((p) => !emargState[p.id] || emargState[p.id] === "pending").map((p) => (
-                <EmargRow key={p.id} p={p} st="pending" groups={groups} onMarkEmarg={onMarkEmarg} avatarColor={avatarColor} initials={initials} />
+                <EmargRow key={p.id} p={p} st="pending" groups={groups} speakers={speakers} onMarkEmarg={onMarkEmarg} avatarColor={avatarColor} initials={initials} />
               ))}
             </>
           )}
@@ -872,7 +896,7 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
                 Présentes — {emargList.filter((p) => emargState[p.id] === "present").length}
               </div>
               {emargList.filter((p) => emargState[p.id] === "present").map((p) => (
-                <EmargRow key={p.id} p={p} st="present" groups={groups} onMarkEmarg={onMarkEmarg} avatarColor={avatarColor} initials={initials} />
+                <EmargRow key={p.id} p={p} st="present" groups={groups} speakers={speakers} onMarkEmarg={onMarkEmarg} avatarColor={avatarColor} initials={initials} />
               ))}
             </>
           )}
@@ -884,7 +908,7 @@ function WorkshopTab({ participants, emargState, onMarkEmarg, avatarColor, initi
                 Absentes — {emargList.filter((p) => emargState[p.id] === "absent").length}
               </div>
               {emargList.filter((p) => emargState[p.id] === "absent").map((p) => (
-                <EmargRow key={p.id} p={p} st="absent" groups={groups} onMarkEmarg={onMarkEmarg} avatarColor={avatarColor} initials={initials} />
+                <EmargRow key={p.id} p={p} st="absent" groups={groups} speakers={speakers} onMarkEmarg={onMarkEmarg} avatarColor={avatarColor} initials={initials} />
               ))}
             </>
           )}

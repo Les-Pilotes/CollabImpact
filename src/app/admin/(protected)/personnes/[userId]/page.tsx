@@ -73,7 +73,7 @@ export default async function PersonDetailPage({
         className="inline-flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-900 transition-colors"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
-        Carnet
+        {"Carnet d'adresses"}
       </Link>
 
       {/* Identity card */}

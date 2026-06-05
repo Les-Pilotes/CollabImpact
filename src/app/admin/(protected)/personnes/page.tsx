@@ -5,7 +5,7 @@ import { listPeople, listEventsForFilter } from "@/lib/people/queries";
 import type { PeopleSort } from "@/lib/people/queries";
 import { NIVEAUX, REGIONS } from "@/lib/validation/inscription";
 
-export const metadata = { title: "Carnet" };
+export const metadata = { title: "Carnet d'adresses" };
 
 const SORT_OPTIONS: { value: PeopleSort; label: string }[] = [
   { value: "recent", label: "Activité récente" },
@@ -102,7 +102,7 @@ export default async function PeopleListPage({
   return (
     <div className="space-y-6 max-w-5xl">
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Carnet</h1>
+        <h1 className="text-2xl font-bold text-stone-900">{"Carnet d'adresses"}</h1>
         <p className="text-sm text-stone-500 mt-1">
           {result.total} personne{result.total !== 1 ? "s" : ""}
           {hasFilters ? " (filtré)" : " dans la base"}.
