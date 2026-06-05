@@ -29,8 +29,8 @@ type NavItem = {
 };
 
 const GLOBAL_NAV: NavItem[] = [
-  { href: "/admin/events", label: "Evenements", icon: Calendar },
-  { href: "/admin/personnes", label: "Carnet", icon: Contact },
+  { href: "/admin/events", label: "Évènements", icon: Calendar },
+  { href: "/admin/personnes", label: "Carnet d'adresses", icon: Contact },
 ];
 
 function eventNav(eventId: string): NavItem[] {
