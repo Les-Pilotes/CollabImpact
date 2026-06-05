@@ -83,6 +83,19 @@ export async function requireAdmin() {
     redirect("/admin/login?reason=not-authorized");
   }
 
+  // Track first/last successful sign-in. Throttled to one write per minute so
+  // we don't hammer the DB on every page render. Fire-and-forget — must never
+  // block the request or surface as an auth failure.
+  const LOGIN_TOUCH_THROTTLE_MS = 60_000;
+  const shouldTouch =
+    !admin.lastLoginAt ||
+    Date.now() - admin.lastLoginAt.getTime() > LOGIN_TOUCH_THROTTLE_MS;
+  if (shouldTouch) {
+    prisma.admin
+      .update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } })
+      .catch((err) => console.warn("[requireAdmin] lastLoginAt update failed:", err));
+  }
+
   return { admin, user: { email: userEmail } };
 }
 

@@ -28,6 +28,7 @@ vi.mock("@/lib/db", () => ({
     admin: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      update: vi.fn().mockResolvedValue({}),
     },
   },
 }));

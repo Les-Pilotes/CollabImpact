@@ -102,7 +102,7 @@ export default async function PeopleListPage({
   return (
     <div className="space-y-6 max-w-5xl">
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Carnet d'adresses</h1>
+        <h1 className="text-2xl font-bold text-stone-900">{"Carnet d'adresses"}</h1>
         <p className="text-sm text-stone-500 mt-1">
           {result.total} personne{result.total !== 1 ? "s" : ""}
           {hasFilters ? " (filtré)" : " dans la base"}.

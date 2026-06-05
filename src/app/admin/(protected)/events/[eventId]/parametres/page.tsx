@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import EventSettingsForm from "./EventSettingsForm";
 import FormulairesTab from "./FormulairesTab";
 import CommunicationsTab from "./CommunicationsTab";
+import NotificationsTab, { type AdminOption } from "./NotificationsTab";
 import ParametresShell from "./ParametresShell";
+import { parseNotificationConfig } from "@/lib/notifications/config";
 
 export const metadata = { title: "Paramètres — Event" };
 
@@ -13,30 +15,53 @@ export default async function EventParametresPage({
 }: {
   params: Promise<{ eventId: string }>;
 }) {
-  await requireAdmin();
+  const { admin } = await requireAdmin();
   const { eventId } = await params;
 
-  const event = await prisma.event.findUnique({
-    where: { id: eventId, deletedAt: null },
-    select: {
-      id: true,
-      name: true,
-      type: true,
-      date: true,
-      endTime: true,
-      address: true,
-      capacity: true,
-      description: true,
-      status: true,
-      replyToEmail: true,
-      emailSignature: true,
-      formConfig: true,
-      feedbackConfig: true,
-      emailConfig: true,
-    },
-  });
+  const [event, admins] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id: eventId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        date: true,
+        endTime: true,
+        address: true,
+        capacity: true,
+        description: true,
+        status: true,
+        replyToEmail: true,
+        emailSignature: true,
+        formConfig: true,
+        feedbackConfig: true,
+        emailConfig: true,
+        notificationConfig: true,
+      },
+    }),
+    prisma.admin.findMany({
+      where: { organisationId: admin.organisationId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        lastLoginAt: true,
+      },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+    }),
+  ]);
 
   if (!event) notFound();
+
+  const adminOptions: AdminOption[] = admins.map((a) => ({
+    id: a.id,
+    email: a.email,
+    firstName: a.firstName,
+    lastName: a.lastName,
+    validated: a.lastLoginAt !== null,
+  }));
+  const notificationCfg = parseNotificationConfig(event.notificationConfig);
 
   const dateISO = event.date.toISOString();
   const endTimeISO = event.endTime?.toISOString();
@@ -77,6 +102,7 @@ export default async function EventParametresPage({
           { key: "informations", label: "Informations" },
           { key: "formulaires", label: "Formulaires" },
           { key: "communications", label: "Communications" },
+          { key: "notifications", label: "Notifications" },
         ]}
         initialTab="informations"
         panels={{
@@ -140,6 +166,13 @@ export default async function EventParametresPage({
                 feedbackBody: emailCfg?.feedbackBody ?? "",
                 feedbackNote: emailCfg?.feedbackNote ?? "",
               }}
+            />
+          ),
+          notifications: (
+            <NotificationsTab
+              eventId={event.id}
+              admins={adminOptions}
+              initial={notificationCfg}
             />
           ),
         }}

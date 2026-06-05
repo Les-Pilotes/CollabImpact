@@ -779,7 +779,7 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
             <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
               <p className="text-3xl mb-3">🎤</p>
               <p className="text-sm font-semibold text-zinc-700">Aucune intervenante configurée</p>
-              <p className="text-xs text-zinc-400 mt-1">Ajoutez des intervenantes dans l'onglet Intervenantes pour composer les groupes.</p>
+              <p className="text-xs text-zinc-400 mt-1">Ajoutez des intervenantes dans l&apos;onglet Intervenantes pour composer les groupes.</p>
             </div>
           )}
           {speakers.map((inv, speakerIdx) => {

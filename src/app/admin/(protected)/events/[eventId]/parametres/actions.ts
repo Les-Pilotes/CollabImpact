@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import type { NotificationConfig } from "@/lib/notifications/config";
 
 export type FormConfigInput = {
   // Couche Fondamentale
@@ -77,6 +78,58 @@ export async function upsertEmailConfig(
     return { ok: true };
   } catch (err) {
     console.error("[upsertEmailConfig]", err);
+    return { ok: false, error: "Erreur lors de la sauvegarde." };
+  }
+}
+
+/**
+ * Persist per-event admin notification settings. We trust the toggle but
+ * sanitize the recipient list: only admins of the same organisation that have
+ * already validated their access (lastLoginAt !== null) are kept. This is the
+ * server-side enforcement — the UI also hides never-connected admins, but we
+ * defend in depth so a stale client state can't enrol an invited-but-inactive
+ * admin into the alert flow.
+ */
+export async function upsertNotificationConfig(
+  eventId: string,
+  data: NotificationConfig,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { admin } = await requireAdmin();
+
+    // Ensure the event belongs to the caller's organisation — prevents
+    // cross-tenant writes via a forged eventId.
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, organisationId: admin.organisationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!event) return { ok: false, error: "Événement introuvable." };
+
+    const validatedAdmins = await prisma.admin.findMany({
+      where: {
+        organisationId: admin.organisationId,
+        lastLoginAt: { not: null },
+        id: { in: data.recipientAdminIds },
+      },
+      select: { id: true },
+    });
+    const allowedIds = new Set(validatedAdmins.map((a) => a.id));
+    const cleanIds = data.recipientAdminIds.filter((id) => allowedIds.has(id));
+
+    const next: NotificationConfig = {
+      newEnrollmentEnabled: Boolean(data.newEnrollmentEnabled),
+      recipientAdminIds: cleanIds,
+    };
+
+    await prisma.event.update({
+      where: { id: eventId },
+      data: { notificationConfig: next },
+    });
+
+    revalidatePath(`/admin/events/${eventId}/parametres`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[upsertNotificationConfig]", err);
     return { ok: false, error: "Erreur lors de la sauvegarde." };
   }
 }

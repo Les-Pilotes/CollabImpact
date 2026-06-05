@@ -53,7 +53,9 @@ describe("issue #32 — personnes page renaming", () => {
   });
 
   it("h1 heading is 'Carnet d\\'adresses'", () => {
-    expect(src).toContain(">Carnet d'adresses<");
+    // JSX expression form ({"Carnet d'adresses"}) keeps the apostrophe literal
+    // while satisfying react/no-unescaped-entities.
+    expect(src).toMatch(/<h1[^>]*>\{"Carnet d'adresses"\}<\/h1>/);
   });
 
   it("breadcrumb in [userId] page uses 'Carnet d\\'adresses'", () => {

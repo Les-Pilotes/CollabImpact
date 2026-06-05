@@ -7,6 +7,7 @@ import InscriptionConfirmation from "@/lib/email/templates/InscriptionConfirmati
 import ResumeInscription from "@/lib/email/templates/ResumeInscription";
 import { resolveEmail } from "@/lib/email/resolve";
 import { emitNotification } from "@/lib/notifications/emit";
+import { dispatchEnrollmentAlerts } from "@/lib/notifications/admin-alerts";
 import { getAppUrl } from "@/lib/app-url";
 import { createResumeToken, verifyResumeToken } from "@/lib/tokens";
 import React from "react";
@@ -367,6 +368,13 @@ export async function submitInscription(
         body: user.city ? `Depuis ${user.city}.` : undefined,
         eventId: event.id,
         enrollmentId: enrollment.id,
+      });
+
+      // Fan-out email alert to admins who opted in (best-effort, never blocks).
+      void dispatchEnrollmentAlerts({
+        eventId: event.id,
+        enrollmentId: enrollment.id,
+        organisationId: event.organisationId,
       });
 
       if (event.capacity > 0) {
