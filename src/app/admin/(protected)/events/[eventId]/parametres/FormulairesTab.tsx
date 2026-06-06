@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/Toggle";
 import { upsertFormConfig } from "./actions";
 
 type FormCfg = {
@@ -450,21 +451,12 @@ function FieldRow({
     <li
       className={`flex items-start gap-3 py-3 pl-4 -ml-px border-l border-transparent hover:bg-stone-50/50 -mx-2 px-2 rounded transition-colors`}
     >
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onToggle(field.configKey)}
-        className={`relative w-9 h-5 rounded-full transition-colors mt-0.5 shrink-0 overflow-hidden ${
-          checked ? "bg-stone-900" : "bg-stone-300"
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-            checked ? "translate-x-[18px]" : "translate-x-0.5"
-          }`}
-        />
-      </button>
+      <Toggle
+        checked={checked}
+        onChange={() => onToggle(field.configKey)}
+        label={field.label}
+        className="mt-0.5"
+      />
       <div className="flex-1 min-w-0">
         <p className="text-sm text-stone-800">{field.label}</p>
         <p className="text-xs text-stone-500 max-w-prose">{field.description}</p>
@@ -494,17 +486,13 @@ function FeedbackSubsection({
       <ul className="space-y-px pl-9 border-l border-stone-100">
         {FEEDBACK_FIELDS.map((f) => (
           <li key={f.key} className="flex items-start gap-3 py-3 pl-4">
-            <div
-              className={`relative w-9 h-5 rounded-full mt-0.5 shrink-0 ${
-                cfg[f.key] ? "bg-stone-900" : "bg-stone-300"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full ${
-                  cfg[f.key] ? "translate-x-[18px]" : "translate-x-0.5"
-                }`}
-              />
-            </div>
+            <Toggle
+              checked={cfg[f.key]}
+              onChange={() => {}}
+              disabled
+              label={f.label}
+              className="mt-0.5"
+            />
             <div className="flex-1 min-w-0">
               <p className="text-sm text-stone-800">{f.label}</p>
               <p className="text-xs text-stone-500 max-w-prose">{f.description}</p>

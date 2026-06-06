@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Bell, Check, Mail, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/Toggle";
 import type { NotificationConfig } from "@/lib/notifications/config";
 import { upsertNotificationConfig } from "./actions";
 
@@ -92,21 +93,12 @@ export default function NotificationsTab({
               Envoyé immédiatement aux destinataires sélectionnés ci-dessous.
             </p>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={cfg.newEnrollmentEnabled}
-            onClick={toggleEnabled}
-            className={`relative w-9 h-5 rounded-full transition-colors mt-0.5 shrink-0 overflow-hidden ${
-              cfg.newEnrollmentEnabled ? "bg-stone-900" : "bg-stone-300"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                cfg.newEnrollmentEnabled ? "translate-x-[18px]" : "translate-x-0.5"
-              }`}
-            />
-          </button>
+          <Toggle
+            checked={cfg.newEnrollmentEnabled}
+            onChange={toggleEnabled}
+            label="Activer la notification de nouvelle inscription"
+            className="mt-0.5"
+          />
         </div>
       </div>
 
