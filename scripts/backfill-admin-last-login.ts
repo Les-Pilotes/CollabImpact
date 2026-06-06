@@ -12,12 +12,22 @@
  */
 import { PrismaClient } from "@prisma/client";
 
+function buildDatasourceUrl(): string {
+  // Prefer DIRECT_URL (bypasses PgBouncer) for one-off scripts.
+  // If not set, disable prepared statements on the pooler URL.
+  const direct = process.env.DIRECT_URL;
+  if (direct) return direct;
+  const url = process.env.DATABASE_URL ?? "";
+  const sep = url.includes("?") ? "&" : "?";
+  return url.includes("pgbouncer=true") ? url : `${url}${sep}pgbouncer=true`;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const apply = args.includes("--apply");
   const emails = args.filter((a) => !a.startsWith("--")).map((e) => e.toLowerCase());
 
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({ datasourceUrl: buildDatasourceUrl() });
   try {
     const where = {
       lastLoginAt: null,
