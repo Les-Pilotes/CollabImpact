@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { requireAdmin } from "@/lib/auth";
 import { getPersonDetail, type PersonDetail } from "@/lib/people/queries";
+import DroitsImagePanel from "./DroitsImagePanel";
 
 export const metadata = { title: "Personne" };
 
@@ -192,6 +193,20 @@ export default async function PersonDetailPage({
             {person.emailVerified ? "Oui" : "Non"}
           </Definition>
         </DefinitionList>
+      </Section>
+
+      <Section title="Consentements">
+        <DroitsImagePanel
+          userId={person.id}
+          status={
+            person.droitsImageStatus === "accepted" ||
+            person.droitsImageStatus === "refused"
+              ? person.droitsImageStatus
+              : null
+          }
+          signedAt={person.droitsImageSignedAt}
+          signature={person.droitsImageSignature}
+        />
       </Section>
 
       {/* Event history */}
