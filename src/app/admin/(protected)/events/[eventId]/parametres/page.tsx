@@ -81,12 +81,12 @@ export default async function EventParametresPage({
     commentaireEnabled: true,
   };
 
-  const feedbackCfg = event.feedbackConfig ?? {
-    satisfactionEnabled: true,
-    highlightsEnabled: true,
-    favoriteSpeakerEnabled: true,
-    recommendEnabled: true,
-  };
+  // Feedback question toggles live in FeedbackConfig.customFields (JSON) —
+  // shape: { fields: { [questionKey]: boolean } }. Null when never configured,
+  // the client defaults every question to enabled.
+  const feedbackFields =
+    (event.feedbackConfig?.customFields as { fields?: Record<string, boolean> } | null)?.fields ??
+    null;
 
   const emailCfg = event.emailConfig;
 
@@ -140,12 +140,7 @@ export default async function EventParametresPage({
                 accessibiliteEnabled: formCfg.accessibiliteEnabled,
                 commentaireEnabled: formCfg.commentaireEnabled,
               }}
-              feedbackCfg={{
-                satisfactionEnabled: feedbackCfg.satisfactionEnabled,
-                highlightsEnabled: feedbackCfg.highlightsEnabled,
-                favoriteSpeakerEnabled: feedbackCfg.favoriteSpeakerEnabled,
-                recommendEnabled: feedbackCfg.recommendEnabled,
-              }}
+              feedbackFields={feedbackFields}
             />
           ),
           communications: (

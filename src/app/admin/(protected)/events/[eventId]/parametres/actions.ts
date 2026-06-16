@@ -42,6 +42,33 @@ export async function upsertFormConfig(
   }
 }
 
+/**
+ * Persist the feedback form configuration. Each question of the canonical
+ * feedback questionnaire is toggled on/off; we store that map in the existing
+ * `FeedbackConfig.customFields` JSON column so no migration is needed (cf.
+ * AGENTS.md — JSON pour éviter les migrations à chaque champ). The legacy
+ * boolean columns (satisfactionEnabled…) are left at their defaults — the new
+ * UI is driven entirely by `customFields.fields`.
+ */
+export async function upsertFeedbackConfig(
+  eventId: string,
+  enabledFields: Record<string, boolean>,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    await prisma.feedbackConfig.upsert({
+      where: { eventId },
+      create: { eventId, customFields: { fields: enabledFields } },
+      update: { customFields: { fields: enabledFields } },
+    });
+    revalidatePath(`/admin/events/${eventId}/parametres`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[upsertFeedbackConfig]", err);
+    return { ok: false, error: "Erreur lors de la sauvegarde." };
+  }
+}
+
 export type EmailFieldKey =
   | "confirmationSubject"
   | "confirmationBody"

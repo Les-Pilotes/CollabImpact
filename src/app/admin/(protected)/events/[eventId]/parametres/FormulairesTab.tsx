@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Lock } from "lucide-react";
+import { ChevronRight, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/Toggle";
-import { upsertFormConfig } from "./actions";
+import { upsertFormConfig, upsertFeedbackConfig } from "./actions";
 
 type FormCfg = {
   // Couche Fondamentale
@@ -23,13 +23,6 @@ type FormCfg = {
   regimeEnabled: boolean;
   accessibiliteEnabled: boolean;
   commentaireEnabled: boolean;
-};
-
-type FeedbackCfg = {
-  satisfactionEnabled: boolean;
-  highlightsEnabled: boolean;
-  favoriteSpeakerEnabled: boolean;
-  recommendEnabled: boolean;
 };
 
 type Field =
@@ -151,66 +144,230 @@ const INSCRIPTION_LAYERS: Layer[] = [
   },
 ];
 
-const FEEDBACK_FIELDS: { label: string; description: string; key: keyof FeedbackCfg }[] = [
+// =====================================================================
+// Feedback questionnaire — canonical question set (modèle Les Pilotes).
+// Les questions sont fixes ; seules les options « intervenante » et les
+// prénoms des animatrices changent d'un event à l'autre (résolus au
+// rendu du formulaire public). Chaque question est activable/désactivable
+// et l'état est persisté dans FeedbackConfig.customFields (JSON).
+// =====================================================================
+
+type PreviewType = "text" | "long" | "select" | "multi" | "scale" | "yesno";
+
+type FeedbackQuestion = {
+  key: string;
+  label: string;
+  description?: string;
+  type: PreviewType;
+  options?: string[];
+  /** Question structurelle, toujours collectée (non désactivable). */
+  locked?: boolean;
+  /** Options résolues dynamiquement depuis les intervenantes de l'event. */
+  dynamicOptions?: boolean;
+};
+
+type FeedbackSection = {
+  number: string;
+  title: string;
+  intro: string;
+  questions: FeedbackQuestion[];
+};
+
+const FEEDBACK_SECTIONS: FeedbackSection[] = [
   {
-    key: "satisfactionEnabled",
-    label: "Note de satisfaction globale",
-    description: "1 à 5 étoiles sur l'expérience globale.",
+    number: "01",
+    title: "Identité",
+    intro: "Qui répond. Le prénom et le nom rattachent le feedback à la participante.",
+    questions: [
+      { key: "prenom", label: "Prénom", type: "text", locked: true },
+      { key: "nom", label: "Nom", type: "text", locked: true },
+      { key: "ville", label: "Ville de résidence", type: "text" },
+      {
+        key: "classe",
+        label: "T'es en quelle classe ?",
+        type: "select",
+        options: ["3ème", "Seconde", "Première", "Terminale", "Études supérieures", "Autres"],
+      },
+      {
+        key: "projetClair",
+        label: "Est-ce que tu sais ce que tu veux faire plus tard ?",
+        description: "Détaille ton projet professionnel ou le domaine qui t'intéresse.",
+        type: "long",
+      },
+    ],
   },
   {
-    key: "highlightsEnabled",
-    label: "Moments préférés",
-    description: "Champ libre — qu'est-ce qui l'a marquée ?",
+    number: "02",
+    title: "Déroulé",
+    intro: "Ressenti sur l'expérience vécue pendant l'événement.",
+    questions: [
+      {
+        key: "raisonsVenue",
+        label: "Quelles étaient tes raisons de venir à cet événement ?",
+        type: "multi",
+        options: [
+          "Networking professionnel",
+          "Rencontrer des amis",
+          "Apprendre de nouvelles choses",
+          "Être inspirée",
+          "Autres",
+        ],
+      },
+      { key: "motivationDetail", label: "Détaille ta motivation", type: "long" },
+      {
+        key: "momentPrefere",
+        label: "C'était quoi ton moment préféré ?",
+        type: "select",
+        options: [
+          "Jeu de cohésion",
+          "Jeu des intervenantes mystères",
+          "Travail en groupe avec mon intervenante",
+          "Présentations & Questions",
+          "Réseautage de fin",
+        ],
+      },
+      { key: "momentPreferePourquoi", label: "Pourquoi c'était ton moment préféré ?", type: "long" },
+      {
+        key: "intervenantePreferee",
+        label: "Quelle était ton intervenante préférée ?",
+        description: "Options générées depuis les intervenantes de l'event.",
+        type: "select",
+        dynamicOptions: true,
+      },
+      {
+        key: "intervenantePrefereePourquoi",
+        label: "Pourquoi c'était ton intervenante préférée ?",
+        type: "long",
+      },
+      {
+        key: "parleToutesIntervenantes",
+        label: "Est-ce que t'as parlé avec toutes les intervenantes ?",
+        type: "long",
+      },
+      {
+        key: "rencontresAide",
+        label:
+          "Est-ce que ces rencontres t'ont aidée par rapport à ton orientation et ton projet professionnel ?",
+        type: "yesno",
+      },
+      { key: "rencontresAideDetail", label: "En quoi est-ce que ces rencontres t'ont aidée ?", type: "long" },
+      { key: "plusMarque", label: "Qu'est-ce qui t'a le plus marqué ?", type: "long" },
+      { key: "domaineProchaineFois", label: "Quel domaine aimerais-tu voir la prochaine fois ?", type: "long" },
+    ],
   },
   {
-    key: "favoriteSpeakerEnabled",
-    label: "Intervenante préférée",
-    description: "Avec qui a-t-elle le plus échangé ? À activer pour les workshops avec plusieurs intervenantes.",
+    number: "03",
+    title: "Organisation",
+    intro: "Qualité de l'animation et de la logistique de la demi-journée.",
+    questions: [
+      {
+        key: "noteAnimation",
+        label: "Qualité de l'animation de l'atelier",
+        description: "Note de 1 à 5. Le nom des animatrices est inséré automatiquement.",
+        type: "scale",
+      },
+      { key: "commentaireAnimation", label: "Laisse un commentaire sur l'animation de la demi-journée", type: "long" },
+      { key: "avisOrganisation", label: "T'as pensé quoi de l'organisation de la demi-journée ?", type: "long" },
+      { key: "ameliorations", label: "Qu'est-ce qu'on aurait pu améliorer dans l'ensemble ?", type: "long" },
+    ],
   },
   {
-    key: "recommendEnabled",
-    label: "Recommanderais-tu Les Pilotes ?",
-    description: "Net Promoter Score équivalent — utile pour les rapports impact.",
+    number: "04",
+    title: "La suite",
+    intro: "Intention de revenir et mot de la fin.",
+    questions: [
+      {
+        key: "interesseAutresEvents",
+        label: "Es-tu intéressée par d'autres événements avec Les Pilotes ?",
+        type: "select",
+        options: [
+          "Oui, par d'autres événements 100% Féminin",
+          "Oui, 100% Féminin et plus avec Les Pilotes",
+          "Non, je ne suis pas intéressée",
+          "Je ne sais pas encore",
+        ],
+      },
+      { key: "motDeLaFin", label: "Mot de la fin", type: "long" },
+    ],
   },
 ];
+
+const ALL_FEEDBACK_KEYS = FEEDBACK_SECTIONS.flatMap((s) => s.questions.map((q) => q.key));
+
+/** Default enabled-state: every question on, unless the saved config says otherwise. */
+function resolveFeedbackState(
+  initial: Record<string, boolean> | null,
+): Record<string, boolean> {
+  const state: Record<string, boolean> = {};
+  for (const key of ALL_FEEDBACK_KEYS) {
+    state[key] = initial?.[key] ?? true;
+  }
+  return state;
+}
 
 export default function FormulairesTab({
   eventId,
   formCfg,
-  feedbackCfg,
+  feedbackFields,
 }: {
   eventId: string;
   formCfg: FormCfg;
-  feedbackCfg: FeedbackCfg;
+  feedbackFields: Record<string, boolean> | null;
 }) {
   return (
-    <div className="space-y-14">
-      <FormSubsection
+    <div className="space-y-4">
+      <CollapsibleSection
         title="Inscription"
         hint="Le formulaire que les participantes remplissent pour s'inscrire."
-        eventId={eventId}
-        initial={formCfg}
-      />
-      <FeedbackSubsection
+        defaultOpen
+      >
+        <InscriptionBody eventId={eventId} initial={formCfg} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
         title="Feedback"
         hint="Le formulaire envoyé après l'événement pour mesurer l'impact."
-        cfg={feedbackCfg}
-      />
+        defaultOpen
+      >
+        <FeedbackBody eventId={eventId} initial={feedbackFields} />
+      </CollapsibleSection>
     </div>
   );
 }
 
-function FormSubsection({
+function CollapsibleSection({
   title,
   hint,
-  eventId,
-  initial,
+  defaultOpen = true,
+  children,
 }: {
   title: string;
   hint: string;
-  eventId: string;
-  initial: FormCfg;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="border-b border-stone-200 last:border-b-0 pb-4">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-3 py-4 text-left hover:bg-stone-50 -mx-2 px-2 rounded transition-colors"
+      >
+        <ChevronRight
+          className={`w-4 h-4 text-stone-400 transition-transform ${open ? "rotate-90" : ""}`}
+        />
+        <div className="flex-1 min-w-0">
+          <h2 className="text-xl font-semibold text-stone-900">{title}</h2>
+          <p className="text-sm text-stone-500 mt-0.5 max-w-prose">{hint}</p>
+        </div>
+      </button>
+      {open && <div className="pt-4">{children}</div>}
+    </section>
+  );
+}
+
+function InscriptionBody({ eventId, initial }: { eventId: string; initial: FormCfg }) {
   const [cfg, setCfg] = useState(initial);
   const [isDirty, setIsDirty] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -233,41 +390,34 @@ function FormSubsection({
   }
 
   return (
-    <section className="space-y-8">
-      <div>
-        <h2 className="text-xl font-semibold text-stone-900">{title}</h2>
-        <p className="text-sm text-stone-500 mt-1 max-w-prose">{hint}</p>
-      </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+      {/* Left: field toggles */}
+      <div className="space-y-10 min-w-0">
+        {INSCRIPTION_LAYERS.map((layer) => (
+          <LayerCard key={layer.number} layer={layer} cfg={cfg} onToggle={toggle} />
+        ))}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* Left: field toggles */}
-        <div className="space-y-10 min-w-0">
-          {INSCRIPTION_LAYERS.map((layer) => (
-            <LayerCard key={layer.number} layer={layer} cfg={cfg} onToggle={toggle} />
-          ))}
-
-          <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
-            {isDirty ? (
-              <p className="text-xs text-stone-500">Modifications non enregistrées</p>
-            ) : (
-              <p className="text-xs text-emerald-600">À jour</p>
-            )}
-            <div className="flex-1" />
-            <Button size="sm" onClick={handleSave} disabled={isPending || !isDirty}>
-              {isPending ? "Enregistrement…" : "Enregistrer"}
-            </Button>
-          </div>
-        </div>
-
-        {/* Right: live preview */}
-        <div className="lg:sticky lg:top-4 self-start">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-stone-400 mb-3">
-            Aperçu en temps réel
-          </p>
-          <FormPreview cfg={cfg} />
+        <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
+          {isDirty ? (
+            <p className="text-xs text-stone-500">Modifications non enregistrées</p>
+          ) : (
+            <p className="text-xs text-emerald-600">À jour</p>
+          )}
+          <div className="flex-1" />
+          <Button size="sm" onClick={handleSave} disabled={isPending || !isDirty}>
+            {isPending ? "Enregistrement…" : "Enregistrer"}
+          </Button>
         </div>
       </div>
-    </section>
+
+      {/* Right: live preview */}
+      <div className="lg:sticky lg:top-4 self-start">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-stone-400 mb-3">
+          Aperçu en temps réel
+        </p>
+        <FormPreview cfg={cfg} />
+      </div>
+    </div>
   );
 }
 
@@ -465,46 +615,235 @@ function FieldRow({
   );
 }
 
-function FeedbackSubsection({
-  title,
-  hint,
-  cfg,
+// =====================================================================
+// Feedback subsection — mirrors the inscription UX: editable toggles on
+// the left, live preview of the public feedback form on the right.
+// =====================================================================
+
+function FeedbackBody({
+  eventId,
+  initial,
 }: {
-  title: string;
-  hint: string;
-  cfg: FeedbackCfg;
+  eventId: string;
+  initial: Record<string, boolean> | null;
 }) {
-  // Future: wire to upsertFeedbackConfig when feedback form respects this config.
-  // For now, read-only display reflecting the current default (all on).
+  const [state, setState] = useState(() => resolveFeedbackState(initial));
+  const [isDirty, setIsDirty] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  function toggle(key: string) {
+    setState((p) => ({ ...p, [key]: !p[key] }));
+    setIsDirty(true);
+  }
+
+  function handleSave() {
+    startTransition(async () => {
+      const result = await upsertFeedbackConfig(eventId, state);
+      if (result.ok) {
+        toast.success("Formulaire de feedback mis à jour");
+        setIsDirty(false);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
   return (
-    <section className="space-y-8">
-      <div>
-        <h2 className="text-xl font-semibold text-stone-900">{title}</h2>
-        <p className="text-sm text-stone-500 mt-1 max-w-prose">{hint}</p>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+      {/* Left: question toggles, grouped by section */}
+      <div className="space-y-10 min-w-0">
+        {FEEDBACK_SECTIONS.map((section) => (
+          <FeedbackSectionCard
+            key={section.number}
+            section={section}
+            state={state}
+            onToggle={toggle}
+          />
+        ))}
+
+        <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
+          {isDirty ? (
+            <p className="text-xs text-stone-500">Modifications non enregistrées</p>
+          ) : (
+            <p className="text-xs text-emerald-600">À jour</p>
+          )}
+          <div className="flex-1" />
+          <Button size="sm" onClick={handleSave} disabled={isPending || !isDirty}>
+            {isPending ? "Enregistrement…" : "Enregistrer"}
+          </Button>
+        </div>
       </div>
 
+      {/* Right: live preview */}
+      <div className="lg:sticky lg:top-4 self-start">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-stone-400 mb-3">
+          Aperçu en temps réel
+        </p>
+        <FeedbackPreview state={state} />
+      </div>
+    </div>
+  );
+}
+
+function FeedbackSectionCard({
+  section,
+  state,
+  onToggle,
+}: {
+  section: FeedbackSection;
+  state: Record<string, boolean>;
+  onToggle: (key: string) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline gap-3 mb-1">
+        <span className="text-xs font-mono text-stone-400 tabular-nums">{section.number}</span>
+        <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-700">
+          {section.title}
+        </h3>
+      </div>
+      <p className="text-xs text-stone-500 max-w-prose mb-4 pl-9">{section.intro}</p>
+
       <ul className="space-y-px pl-9 border-l border-stone-100">
-        {FEEDBACK_FIELDS.map((f) => (
-          <li key={f.key} className="flex items-start gap-3 py-3 pl-4">
-            <Toggle
-              checked={cfg[f.key]}
-              onChange={() => {}}
-              disabled
-              label={f.label}
-              className="mt-0.5"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-stone-800">{f.label}</p>
-              <p className="text-xs text-stone-500 max-w-prose">{f.description}</p>
-            </div>
-          </li>
+        {section.questions.map((q) => (
+          <FeedbackQuestionRow
+            key={q.key}
+            question={q}
+            checked={state[q.key]}
+            onToggle={() => onToggle(q.key)}
+          />
         ))}
       </ul>
+    </div>
+  );
+}
 
-      <p className="text-xs text-stone-400 italic max-w-prose">
-        L&apos;activation des champs feedback arrive dans une prochaine itération. Pour
-        l&apos;instant tous les champs sont collectés par défaut.
+function FeedbackQuestionRow({
+  question,
+  checked,
+  onToggle,
+}: {
+  question: FeedbackQuestion;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  if (question.locked) {
+    return (
+      <li className="flex items-start gap-3 py-3 pl-4 -ml-px border-l border-transparent">
+        <Lock className="w-3.5 h-3.5 mt-0.5 text-stone-300 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-stone-800">{question.label}</p>
+          {question.description && (
+            <p className="text-xs text-stone-500">{question.description}</p>
+          )}
+        </div>
+        <span className="text-[10px] uppercase tracking-wider text-stone-400 mt-0.5">
+          Obligatoire
+        </span>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-start gap-3 py-3 pl-4 -ml-px border-l border-transparent hover:bg-stone-50/50 -mx-2 px-2 rounded transition-colors">
+      <Toggle checked={checked} onChange={onToggle} label={question.label} className="mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-stone-800">{question.label}</p>
+        {question.description && (
+          <p className="text-xs text-stone-500 max-w-prose">{question.description}</p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/**
+ * Read-only mock of the public feedback form. Renders every enabled question
+ * grouped by section, so the admin sees exactly what the participante will get.
+ * The "intervenante préférée" options are resolved from the event's speakers at
+ * send time — here we show a placeholder.
+ */
+function FeedbackPreview({ state }: { state: Record<string, boolean> }) {
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+      <div className="bg-gradient-to-r from-pink-500 to-orange-400 px-5 py-4">
+        <p className="text-white font-semibold text-sm">Formulaire de feedback</p>
+        <p className="text-white/80 text-xs mt-0.5">100% Féminin · Les Pilotes</p>
+      </div>
+
+      <div className="p-5 space-y-5 max-h-[680px] overflow-y-auto">
+        {FEEDBACK_SECTIONS.map((section) => {
+          const visible = section.questions.filter((q) => q.locked || state[q.key]);
+          if (visible.length === 0) return null;
+          return (
+            <PreviewGroup key={section.number} label={section.title}>
+              {visible.map((q) => (
+                <FeedbackPreviewField key={q.key} question={q} />
+              ))}
+            </PreviewGroup>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FeedbackPreviewField({ question }: { question: FeedbackQuestion }) {
+  const options = question.dynamicOptions
+    ? ["Intervenante A", "Intervenante B", "Intervenante C"]
+    : question.options;
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-stone-600">
+        {question.label}
+        {!question.dynamicOptions && <span className="text-orange-500"> *</span>}
       </p>
-    </section>
+
+      {question.type === "long" ? (
+        <div className="h-12 rounded-lg border border-stone-200 bg-stone-50" />
+      ) : question.type === "text" ? (
+        <div className="h-9 rounded-lg border border-stone-200 bg-stone-50" />
+      ) : question.type === "scale" ? (
+        <div className="flex gap-1.5">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <span
+              key={n}
+              className="w-7 h-7 rounded-full border border-stone-200 bg-stone-50 flex items-center justify-center text-[10px] text-stone-400"
+            >
+              {n}
+            </span>
+          ))}
+        </div>
+      ) : question.type === "yesno" ? (
+        <div className="flex gap-2">
+          <span className="px-3 h-7 rounded-full border border-stone-200 bg-stone-50 flex items-center text-[11px] text-stone-500">
+            Oui
+          </span>
+          <span className="px-3 h-7 rounded-full border border-stone-200 bg-stone-50 flex items-center text-[11px] text-stone-500">
+            Non
+          </span>
+        </div>
+      ) : question.type === "multi" ? (
+        <div className="space-y-1">
+          {(options ?? []).map((opt) => (
+            <div key={opt} className="flex items-center gap-2">
+              <span className="w-3.5 h-3.5 rounded border border-stone-300 bg-stone-50 shrink-0" />
+              <span className="text-[11px] text-stone-500">{opt}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        // select
+        <div className="space-y-1">
+          {(options ?? []).map((opt) => (
+            <div key={opt} className="flex items-center gap-2">
+              <span className="w-3.5 h-3.5 rounded-full border border-stone-300 bg-stone-50 shrink-0" />
+              <span className="text-[11px] text-stone-500">{opt}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
