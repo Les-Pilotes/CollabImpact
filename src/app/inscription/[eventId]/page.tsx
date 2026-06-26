@@ -35,18 +35,18 @@ export default async function InscriptionPage({
       name: true,
       date: true,
       address: true,
-      capacity: true,
       description: true,
       status: true,
       formConfig: true,
-      _count: { select: { enrollments: { where: { deletedAt: null } } } },
     },
   });
 
   if (!event) notFound();
 
+  // Capacity is an admin-side target (alerts admins when reached) — never a
+  // public-facing gate. Inscriptions stay open in all cases to anticipate
+  // late drop-outs and avoid frustrating the user.
   const now = new Date();
-  const isFull = event._count.enrollments >= event.capacity;
   const isPast = event.date.getTime() < now.getTime() - 86400000;
   const isClosed = event.status === "termine" || isPast;
 
@@ -57,10 +57,7 @@ export default async function InscriptionPage({
         name: event.name,
         date: event.date.toISOString(),
         address: event.address,
-        capacity: event.capacity,
         description: event.description,
-        currentEnrolled: event._count.enrollments,
-        isFull,
         isClosed,
       }}
       formConfig={event.formConfig}
