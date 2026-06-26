@@ -160,6 +160,7 @@ export function makeFeedback(overrides: Partial<Feedback> = {}): Feedback {
     changedVision: false,
     improvements: null,
     verbatim: null,
+    answers: null,
     submittedAt: new Date("2026-06-16T18:00:00Z"),
     ...overrides,
   } as Feedback;

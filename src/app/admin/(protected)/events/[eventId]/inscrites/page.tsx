@@ -6,7 +6,7 @@ import { createCheckinToken } from "@/lib/tokens";
 
 function mapStatus(s: string): ParticipantRow["status"] {
   if (s === "confirmee_j7") return "attente_j2";
-  if (s === "confirmee_j2") return "confirmee";
+  if (s === "confirmee_j2" || s === "presente") return "confirmee";
   return "attente_j7"; // inscrit, contactee
 }
 
@@ -32,7 +32,10 @@ export default async function ParticipantesPage({
       where: {
         eventId,
         deletedAt: null,
-        status: { notIn: ["desistement", "absente", "presente", "feedback_recu"] },
+        // `presente` stays on the board (mapped to the "Attendues le Jour J"
+        // column) so marking a participante présente — manually or via
+        // émargement — doesn't hide her from Suivi / Workshop on the day.
+        status: { notIn: ["desistement", "absente", "feedback_recu"] },
       },
       include: { user: true },
       orderBy: { enrolledAt: "asc" },
@@ -108,6 +111,7 @@ export default async function ParticipantesPage({
       source: e.source ?? e.user.source ?? "inconnu",
       enrolledAt: e.enrolledAt.toISOString(),
       status: mapStatus(e.status),
+      realStatus: e.status,
       j7EmailSent: !!e.j7SentAt,
       j2EmailSent: !!e.j2SentAt,
       droitsImageStatus: e.droitsImageStatus,

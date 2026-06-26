@@ -1,83 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import React from "react";
 import { assertCronRequest } from "@/lib/cron";
-import { prisma } from "@/lib/db";
-import { sendEmail } from "@/lib/email/client";
-import { createFeedbackToken } from "@/lib/tokens";
-import { getAppUrl } from "@/lib/app-url";
-import { resolveEmail } from "@/lib/email/resolve";
-import { parallelLimit } from "@/lib/concurrency";
-import FeedbackInvite from "@/lib/email/templates/FeedbackInvite";
 
-const CONCURRENCY = 8;
-
+/**
+ * Feedback invites are sent MANUALLY by an admin (server action
+ * `sendFeedbackInvite` on the inscrites page), never automatically — decision
+ * produit : on contrôle l'envoi des feedbacks à la main.
+ *
+ * This cron is intentionally a no-op so any existing Vercel schedule does
+ * nothing. Re-enabling automatic sending should go through a per-event toggle
+ * (cf. issue #42) rather than restoring this bulk send.
+ */
 export async function GET(request: NextRequest) {
   const unauthorized = assertCronRequest(request);
   if (unauthorized) return unauthorized;
 
-  const now = new Date();
-
-  const enrollments = await prisma.enrollment.findMany({
-    where: {
-      event: { date: { lt: now }, deletedAt: null },
-      status: "presente",
-      feedbackSentAt: null,
-      deletedAt: null,
-    },
-    include: {
-      user: true,
-      event: { include: { emailConfig: true } },
-    },
-  });
-
-  const results = await parallelLimit(enrollments, CONCURRENCY, async (enrollment) => {
-    const token = createFeedbackToken(enrollment.id);
-    const feedbackUrl = `${getAppUrl()}/feedback/${token}`;
-
-    await prisma.enrollment.update({
-      where: { id: enrollment.id },
-      data: { feedbackToken: token, feedbackSentAt: new Date() },
-    });
-
-    const dateLabel = enrollment.event.date.toLocaleDateString("fr-FR", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-    const timeLabel = enrollment.event.date.toLocaleTimeString("fr-FR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    const resolved = resolveEmail("feedback", enrollment.event.emailConfig, {
-      prenom: enrollment.user.firstName,
-      event: enrollment.event.name,
-      date: dateLabel,
-      horaire: timeLabel,
-      lieu: enrollment.event.address,
-    });
-
-    await sendEmail({
-      to: enrollment.user.email,
-      subject: resolved.subject,
-      replyTo: enrollment.event.replyToEmail ?? undefined,
-      react: React.createElement(FeedbackInvite, {
-        heading: resolved.heading,
-        body: resolved.body,
-        immersionName: enrollment.event.name,
-        feedbackUrl,
-        customNote: resolved.note ?? undefined,
-        signature: enrollment.event.emailSignature ?? undefined,
-      }),
-    });
-  });
-
-  let sent = 0;
-  results.forEach((r, i) => {
-    if (r.status === "fulfilled") sent++;
-    else console.error(`[cron/feedback] failed for enrollment ${enrollments[i].id}:`, r.reason);
-  });
-
-  return NextResponse.json({ ok: true, sent });
+  return NextResponse.json({ ok: true, sent: 0, disabled: true });
 }

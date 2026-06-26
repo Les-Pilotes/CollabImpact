@@ -13,6 +13,7 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     enrollment: {
       update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       findUnique: vi.fn(),
     },
   },
@@ -32,6 +33,7 @@ import { prisma } from '@/lib/db';
 import {
   updateEnrollmentStatus,
   markAttendance,
+  bulkUpdateStatus,
   sendFeedbackInvite,
 } from '@/app/admin/(protected)/events/[eventId]/inscrites/actions';
 
@@ -40,6 +42,7 @@ describe('participants server actions', () => {
     vi.clearAllMocks();
     // Re-apply default mock implementations after clearAllMocks
     vi.mocked(prisma.enrollment.update).mockResolvedValue({} as never);
+    vi.mocked(prisma.enrollment.updateMany).mockResolvedValue({ count: 0 } as never);
     vi.mocked(prisma.enrollment.findUnique).mockResolvedValue(null as never);
   });
 
@@ -81,6 +84,49 @@ describe('participants server actions', () => {
       },
     });
     expect(result).toEqual({ ok: true });
+  });
+
+  it('bulkUpdateStatus(presente) updates many with attendedAt + noShow=false', async () => {
+    vi.mocked(prisma.enrollment.updateMany).mockResolvedValueOnce({ count: 3 } as never);
+
+    const result = await bulkUpdateStatus(['a', 'b', 'c'], EnrollmentStatus.presente);
+
+    expect(prisma.enrollment.updateMany).toHaveBeenCalledOnce();
+    expect(prisma.enrollment.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['a', 'b', 'c'] } },
+      data: { status: EnrollmentStatus.presente, attendedAt: expect.any(Date), noShow: false },
+    });
+    expect(result).toEqual({ ok: true, count: 3 });
+  });
+
+  it('bulkUpdateStatus(absente) sets noShow=true (no attendedAt)', async () => {
+    vi.mocked(prisma.enrollment.updateMany).mockResolvedValueOnce({ count: 2 } as never);
+
+    const result = await bulkUpdateStatus(['a', 'b'], EnrollmentStatus.absente);
+
+    expect(prisma.enrollment.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['a', 'b'] } },
+      data: { status: EnrollmentStatus.absente, noShow: true },
+    });
+    expect(result).toEqual({ ok: true, count: 2 });
+  });
+
+  it('bulkUpdateStatus(confirmee_j2) sets only the status, no attendance side-effects', async () => {
+    vi.mocked(prisma.enrollment.updateMany).mockResolvedValueOnce({ count: 1 } as never);
+
+    await bulkUpdateStatus(['a'], EnrollmentStatus.confirmee_j2);
+
+    expect(prisma.enrollment.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['a'] } },
+      data: { status: EnrollmentStatus.confirmee_j2 },
+    });
+  });
+
+  it('bulkUpdateStatus([]) short-circuits without touching the DB', async () => {
+    const result = await bulkUpdateStatus([], EnrollmentStatus.presente);
+
+    expect(prisma.enrollment.updateMany).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, count: 0 });
   });
 
   it('sendFeedbackInvite calls prisma.enrollment.update with feedbackToken and feedbackSentAt', async () => {

@@ -269,12 +269,19 @@ model Feedback {
   enrollmentId String     @unique
   enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
 
-  overallRating  Int // 1-5
-  orgRating      Int // 1-5
+  // Legacy v1 columns — kept (and still populated when the new form has a
+  // natural mapping) for the existing Impact dashboard / FeedbackCard. Now
+  // nullable because the v2 questionnaire doesn't always supply them.
+  overallRating  Int? // 1-5
+  orgRating      Int? // 1-5
   favoriteMoment String?
-  changedVision  Boolean
+  changedVision  Boolean?
   improvements   String?
   verbatim       String?
+
+  // v2 questionnaire — every answer indexed by question key (cf.
+  // src/lib/feedback/questions.ts). Shape: { [questionKey]: string | string[] | number }.
+  answers Json?
 
   submittedAt DateTime @default(now())
 

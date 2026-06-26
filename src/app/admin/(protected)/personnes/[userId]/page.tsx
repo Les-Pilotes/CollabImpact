@@ -251,7 +251,7 @@ function EnrollmentRow({
           </div>
         </div>
         <div className="shrink-0 flex items-center gap-2">
-          {e.feedback && (
+          {e.feedback && e.feedback.overallRating != null && (
             <span
               className="inline-flex items-center gap-1 text-xs text-amber-700"
               title={`Note globale ${e.feedback.overallRating}/5`}

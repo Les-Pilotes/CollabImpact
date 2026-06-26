@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { verifyFeedbackToken } from "@/lib/tokens";
 import { feedbackSchema } from "@/lib/validation/feedback";
 import { emitNotification } from "@/lib/notifications/emit";
+import { ALL_FEEDBACK_KEYS } from "@/lib/feedback/questions";
 
 export async function POST(
   request: NextRequest,
@@ -49,10 +50,34 @@ export async function POST(
     );
   }
 
+  // Keep only known question keys (defends against arbitrary keys).
+  const answers: Record<string, string | string[]> = {};
+  for (const key of ALL_FEEDBACK_KEYS) {
+    if (key in parsed.data.answers) answers[key] = parsed.data.answers[key];
+  }
+
+  // Derive the legacy v1 columns from the v2 answers, where there's a natural
+  // mapping, so the existing Impact dashboard / FeedbackCard keep working. The
+  // full questionnaire lives in `answers`.
+  const str = (k: string): string | null =>
+    typeof answers[k] === "string" && (answers[k] as string).trim() ? (answers[k] as string) : null;
+  const noteAnimation = str("noteAnimation");
+  const overallRating =
+    noteAnimation && /^[1-5]$/.test(noteAnimation) ? Number(noteAnimation) : null;
+  const rencontresAide = str("rencontresAide");
+  const changedVision =
+    rencontresAide === "Oui" ? true : rencontresAide === "Non" ? false : null;
+
   await prisma.feedback.create({
     data: {
       enrollmentId,
-      ...parsed.data,
+      answers,
+      overallRating,
+      orgRating: null,
+      changedVision,
+      favoriteMoment: str("momentPrefere"),
+      improvements: str("ameliorations"),
+      verbatim: str("motDeLaFin"),
     },
   });
 
@@ -65,13 +90,13 @@ export async function POST(
     organisationId: enrollment.organisationId,
     type: "feedback.received",
     title: `${enrollment.user.firstName} ${enrollment.user.lastName} a laissé un feedback sur ${enrollment.event.name}`,
-    body: `Note globale : ${parsed.data.overallRating}/5 · Orga : ${parsed.data.orgRating}/5`,
+    body:
+      overallRating != null
+        ? `Note animation : ${overallRating}/5 · ${Object.keys(answers).length} réponses`
+        : `${Object.keys(answers).length} réponses`,
     eventId: enrollment.event.id,
     enrollmentId,
-    metadata: {
-      overallRating: parsed.data.overallRating,
-      orgRating: parsed.data.orgRating,
-    },
+    metadata: { overallRating, answerCount: Object.keys(answers).length },
   });
 
   return NextResponse.json({ ok: true });

@@ -26,10 +26,7 @@ type EventProps = {
   name: string;
   date: string; // ISO
   address: string;
-  capacity: number;
   description: string | null;
-  currentEnrolled: number;
-  isFull: boolean;
   isClosed: boolean;
 };
 
@@ -275,23 +272,6 @@ export default function InscriptionForm({
           </h2>
           <p className="text-sm text-zinc-500 max-w-sm mx-auto">
             Cet événement est terminé. Reviens bientôt pour découvrir nos prochains rendez-vous.
-          </p>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (event.isFull) {
-    return (
-      <Layout event={event} eventDateLabel={eventDateLabel} eventTimeLabel={eventTimeLabel}>
-        <div className="text-center py-16 space-y-4">
-          <div className="text-5xl">📋</div>
-          <h2 className="text-xl font-extrabold text-zinc-900">
-            Toutes les places sont prises
-          </h2>
-          <p className="text-sm text-zinc-500 max-w-sm mx-auto">
-            L&apos;événement affiche complet. Tu peux quand même renseigner ton email
-            ci-dessous pour être contactée en cas de désistement.
           </p>
         </div>
       </Layout>

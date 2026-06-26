@@ -54,9 +54,15 @@ export default async function ImpactPage({
   ]);
 
   const total = feedbacks.length;
-  const overalls = feedbacks.map((f) => f.feedback!.overallRating);
-  const orgs = feedbacks.map((f) => f.feedback!.orgRating);
-  const changedVisionCount = feedbacks.filter((f) => f.feedback!.changedVision).length;
+  // Ratings are nullable since the v2 questionnaire doesn't always supply them —
+  // average only over the feedbacks that have a value.
+  const overalls = feedbacks
+    .map((f) => f.feedback!.overallRating)
+    .filter((n): n is number => n != null);
+  const orgs = feedbacks
+    .map((f) => f.feedback!.orgRating)
+    .filter((n): n is number => n != null);
+  const changedVisionCount = feedbacks.filter((f) => f.feedback!.changedVision === true).length;
 
   const favoriteMoments = feedbacks
     .filter((f) => (f.feedback!.favoriteMoment ?? "").length > 5)

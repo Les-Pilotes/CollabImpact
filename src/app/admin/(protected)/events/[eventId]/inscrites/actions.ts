@@ -57,6 +57,44 @@ export async function updateEnrollmentStatus(
 }
 
 /**
+ * Bulk status change (admin manual control, Jour J). Lets an admin move many
+ * participantes at once — typically marking the room "présentes" on the day
+ * without waiting for each one to self-confirm. Applies the same side effects
+ * as markAttendance for présente/absente (attendedAt / noShow).
+ */
+export async function bulkUpdateStatus(
+  enrollmentIds: string[],
+  status: EnrollmentStatus,
+): Promise<{ ok: boolean; count?: number; error?: string }> {
+  await requireAdmin();
+
+  if (enrollmentIds.length === 0) return { ok: true, count: 0 };
+
+  const data: {
+    status: EnrollmentStatus;
+    attendedAt?: Date;
+    noShow?: boolean;
+  } = { status };
+  if (status === EnrollmentStatus.presente) {
+    data.attendedAt = new Date();
+    data.noShow = false;
+  } else if (status === EnrollmentStatus.absente) {
+    data.noShow = true;
+  }
+
+  try {
+    const result = await prisma.enrollment.updateMany({
+      where: { id: { in: enrollmentIds } },
+      data,
+    });
+    return { ok: true, count: result.count };
+  } catch (err) {
+    console.error('[bulkUpdateStatus]', err);
+    return { ok: false, error: 'Erreur lors de la mise à jour des statuts.' };
+  }
+}
+
+/**
  * Mark attendance (Jour J emargement)
  * true = presente, false = absente
  */

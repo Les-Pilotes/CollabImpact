@@ -34,12 +34,13 @@ function makeRequest(body: unknown): Request {
 }
 
 const validBody = {
-  overallRating: 5,
-  orgRating: 4,
-  favoriteMoment: "Le partage",
-  changedVision: true,
-  improvements: "",
-  verbatim: "Top",
+  answers: {
+    noteAnimation: "5",
+    rencontresAide: "Oui",
+    momentPrefere: "Réseautage de fin",
+    ameliorations: "",
+    motDeLaFin: "Top",
+  },
 };
 
 beforeEach(() => vi.clearAllMocks());
@@ -69,12 +70,24 @@ describe("POST /api/feedback/[token] — notification trigger", () => {
       type: "feedback.received",
       eventId: "ev-1",
       enrollmentId: "en-1",
-      metadata: { overallRating: 5, orgRating: 4 },
+      metadata: { overallRating: 5 },
     });
     expect(emit.mock.calls[0][0].title).toContain("Lisa Martin");
     expect(emit.mock.calls[0][0].title).toContain("Workshop 7");
     expect(emit.mock.calls[0][0].body).toContain("5/5");
-    expect(emit.mock.calls[0][0].body).toContain("4/5");
+
+    // The v2 questionnaire is persisted under `answers`, with the legacy
+    // overallRating derived from the animation score.
+    expect(fb.create).toHaveBeenCalledOnce();
+    expect(fb.create.mock.calls[0][0].data).toMatchObject({
+      enrollmentId: "en-1",
+      overallRating: 5,
+      changedVision: true,
+    });
+    expect(fb.create.mock.calls[0][0].data.answers).toMatchObject({
+      noteAnimation: "5",
+      motDeLaFin: "Top",
+    });
   });
 
   it("does NOT emit when the token is invalid", async () => {

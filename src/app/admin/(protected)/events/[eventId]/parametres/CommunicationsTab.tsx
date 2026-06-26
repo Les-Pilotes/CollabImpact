@@ -45,8 +45,9 @@ export default function CommunicationsTab({
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-stone-900">Emails transactionnels</h2>
         <p className="text-sm text-stone-500 mt-1 max-w-prose">
-          Personnalise l&apos;objet, le corps et la note finale de chaque email. Laisse vide pour
-          utiliser le texte par défaut. Insère <code className="text-stone-700 bg-stone-100 px-1 rounded text-xs">{"{prenom}"}</code>,{" "}
+          Le texte par défaut est déjà pré-rempli — modifie-le directement.{" "}
+          <span className="text-stone-600">« Restaurer »</span> remet le texte par défaut.
+          Insère <code className="text-stone-700 bg-stone-100 px-1 rounded text-xs">{"{prenom}"}</code>,{" "}
           <code className="text-stone-700 bg-stone-100 px-1 rounded text-xs">{"{event}"}</code>,{" "}
           <code className="text-stone-700 bg-stone-100 px-1 rounded text-xs">{"{date}"}</code>,{" "}
           <code className="text-stone-700 bg-stone-100 px-1 rounded text-xs">{"{horaire}"}</code>,{" "}
@@ -93,25 +94,34 @@ function EmailRow({
   initial: { subject: string; body: string; note: string };
 }) {
   const def = DEFAULTS[emailKey];
-  const [subject, setSubject] = useState(initial.subject);
-  const [body, setBody] = useState(initial.body);
+  // Pre-fill the editor with the full default copy so the admin edits real text
+  // instead of starting from an empty field with a placeholder. An empty DB
+  // override means "use the default", so we hydrate from the default here.
+  const [subject, setSubject] = useState(initial.subject || def.subject);
+  const [body, setBody] = useState(initial.body || def.body);
   const [note, setNote] = useState(initial.note);
   const [isDirty, setIsDirty] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const customCount = [subject, body, note].filter((v) => v.trim().length > 0).length;
+  const subjectCustom = subject.trim() !== def.subject.trim();
+  const bodyCustom = body.trim() !== def.body.trim();
+  const noteCustom = note.trim().length > 0;
+  const customCount = [subjectCustom, bodyCustom, noteCustom].filter(Boolean).length;
 
   function reset(field: EmailField) {
-    if (field === "Subject") setSubject("");
-    if (field === "Body") setBody("");
+    if (field === "Subject") setSubject(def.subject);
+    if (field === "Body") setBody(def.body);
     if (field === "Note") setNote("");
     setIsDirty(true);
   }
 
   function handleSave() {
+    // Store an override only when the text actually differs from the default.
+    // Sending "" lets upsertEmailConfig persist NULL, so the event keeps
+    // tracking the default copy (and inherits future edits to it).
     const payload: Partial<Record<string, string>> = {
-      [`${emailKey}Subject`]: subject,
-      [`${emailKey}Body`]: body,
+      [`${emailKey}Subject`]: subjectCustom ? subject : "",
+      [`${emailKey}Body`]: bodyCustom ? body : "",
       [`${emailKey}Note`]: note,
     };
     startTransition(async () => {
@@ -154,7 +164,7 @@ function EmailRow({
             <div className="space-y-1.5">
               <FieldHeader
                 label="Objet"
-                hasCustom={subject.trim().length > 0}
+                hasCustom={subjectCustom}
                 onReset={() => reset("Subject")}
               />
               <Input
@@ -165,13 +175,12 @@ function EmailRow({
                 }}
                 placeholder={def.subject}
               />
-              <Hint defaultText={def.subject} />
             </div>
 
             <div className="space-y-1.5">
               <FieldHeader
                 label="Corps du message"
-                hasCustom={body.trim().length > 0}
+                hasCustom={bodyCustom}
                 onReset={() => reset("Body")}
               />
               <textarea
@@ -184,7 +193,6 @@ function EmailRow({
                 placeholder={def.body}
                 className="w-full border border-stone-200 rounded-md px-3 py-2 text-sm bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none font-mono leading-relaxed"
               />
-              <Hint defaultText={def.body} />
             </div>
 
             <div className="space-y-1.5">
@@ -284,10 +292,3 @@ function FieldHeader({
   );
 }
 
-function Hint({ defaultText }: { defaultText: string }) {
-  return (
-    <p className="text-xs text-stone-400 truncate">
-      Par défaut : <span className="italic">{defaultText.split("\n")[0]}</span>
-    </p>
-  );
-}
