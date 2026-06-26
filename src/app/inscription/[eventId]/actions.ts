@@ -27,6 +27,10 @@ export type LookupResult =
       maskedEmail: string;
       lastEventName: string | null;
       lastEventDate: string | null;
+      // Statut global du droit à l'image (majeure). Si "accepted" ou "refused",
+      // l'étape de consentement est skippée sur le formulaire et on snapshotte
+      // ce choix sur l'Enrollment. NULL = jamais demandé globalement.
+      droitsImageGlobalStatus: "accepted" | "refused" | null;
     };
 
 /**
@@ -47,6 +51,7 @@ export async function lookupUserByEmail(email: string): Promise<LookupResult> {
       lastName: true,
       birthDate: true,
       orientationUpdatedAt: true,
+      droitsImageStatus: true,
       enrollments: {
         where: { deletedAt: null },
         orderBy: { enrolledAt: "desc" },
@@ -78,6 +83,10 @@ export async function lookupUserByEmail(email: string): Promise<LookupResult> {
     maskedEmail: maskEmail(normalizedEmail),
     lastEventName: lastEnrollment?.event.name ?? null,
     lastEventDate: lastEnrollment?.event.date.toISOString() ?? null,
+    droitsImageGlobalStatus:
+      user.droitsImageStatus === "accepted" || user.droitsImageStatus === "refused"
+        ? user.droitsImageStatus
+        : null,
   };
 }
 
@@ -98,6 +107,9 @@ export type ReturningProfile = {
   motivationDetail: string | null;
   commentConnu: string | null;
   orientationUpdatedAt: string | null;
+  // Statut global du droit à l'image. Sert au formulaire pour skipper l'étape
+  // de consentement quand la personne a déjà donné son avis globalement.
+  droitsImageGlobalStatus: "accepted" | "refused" | null;
 };
 
 export type SendResumeLinkResult =
@@ -214,6 +226,10 @@ export async function consumeResumeToken(
       motivationDetail: user.motivationDetail,
       commentConnu: user.commentConnu,
       orientationUpdatedAt: user.orientationUpdatedAt?.toISOString() ?? null,
+      droitsImageGlobalStatus:
+        user.droitsImageStatus === "accepted" || user.droitsImageStatus === "refused"
+          ? user.droitsImageStatus
+          : null,
     },
   };
 }
@@ -273,17 +289,71 @@ export async function submitInscription(
     const isMinor = birthDateValue
       ? computeIsMinor(data.birthDate as string, event.date)
       : false;
-    // Si le toggle "droit à l'image" est off pour cet event, on n'a pas
-    // demandé le consentement → on reste sur "pending" (jamais demandé)
-    // plutôt que de marquer "refused" par erreur.
-    const droitsImageStatus =
-      data.droitsImageAccepted === undefined
-        ? "pending"
-        : isMinor
-          ? "minor_parental_pending"
-          : data.droitsImageAccepted
-            ? "accepted"
-            : "refused";
+
+    // Read existing global droit-à-l'image state BEFORE upsert so we can:
+    //   1) snapshot it into Enrollment when the form skipped the step
+    //      (returning majeure already consented once globally)
+    //   2) avoid wiping the global status when this enrollment doesn't ask
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        droitsImageStatus: true,
+        droitsImageSignedAt: true,
+        droitsImageSignature: true,
+      },
+    });
+
+    // Did the form ASK the droit-image question on this submit?
+    // - true  → user is new, or majeure with no global status yet, or minor
+    // - false → form skipped it (majeure inherits global) OR toggle is off
+    const formAskedDroitImage = data.droitsImageAccepted !== undefined;
+
+    // Enrollment snapshot (per-event copy for legal traceability).
+    let enrollmentDroitsStatus:
+      | "pending"
+      | "accepted"
+      | "refused"
+      | "minor_parental_pending" = "pending";
+    let enrollmentDroitsSignedAt: Date | null = null;
+    let enrollmentDroitsSignature: string | null = null;
+
+    if (formAskedDroitImage) {
+      if (isMinor) {
+        enrollmentDroitsStatus = "minor_parental_pending";
+      } else if (data.droitsImageAccepted) {
+        enrollmentDroitsStatus = "accepted";
+        enrollmentDroitsSignedAt = new Date();
+        enrollmentDroitsSignature = data.droitsImageSignature ?? null;
+      } else {
+        enrollmentDroitsStatus = "refused";
+      }
+    } else if (
+      !isMinor &&
+      (existingUser?.droitsImageStatus === "accepted" ||
+        existingUser?.droitsImageStatus === "refused")
+    ) {
+      // Form skipped the step because user has a global decision — inherit it.
+      enrollmentDroitsStatus = existingUser.droitsImageStatus;
+      enrollmentDroitsSignedAt = existingUser.droitsImageSignedAt;
+      enrollmentDroitsSignature = existingUser.droitsImageSignature;
+    }
+
+    // Global User update : only majeures, only when they expressed a fresh
+    // choice on this submit. Minors stay per-event (parental consent doesn't
+    // transfer to global). When form is skipped, we don't touch the global
+    // value so a prior "accepted" / "refused" survives.
+    const userDroitsUpdate =
+      formAskedDroitImage && !isMinor
+        ? {
+            droitsImageStatus: (data.droitsImageAccepted ? "accepted" : "refused") as
+              | "accepted"
+              | "refused",
+            droitsImageSignedAt: data.droitsImageAccepted ? new Date() : null,
+            droitsImageSignature: data.droitsImageAccepted
+              ? (data.droitsImageSignature ?? null)
+              : null,
+          }
+        : {};
 
     const user = await prisma.user.upsert({
       where: { email: normalizedEmail },
@@ -305,6 +375,7 @@ export async function submitInscription(
         motivationDetail: data.motivationDetail ?? null,
         commentConnu: data.commentConnu ?? null,
         orientationUpdatedAt: new Date(),
+        ...userDroitsUpdate,
       },
       update: {
         firstName: data.firstName,
@@ -322,6 +393,7 @@ export async function submitInscription(
         motivationDetail: data.motivationDetail ?? null,
         commentConnu: data.commentConnu ?? null,
         orientationUpdatedAt: new Date(),
+        ...userDroitsUpdate,
       },
     });
 
@@ -341,18 +413,18 @@ export async function submitInscription(
         organisationId: event.organisationId,
         eventId: event.id,
         userId: user.id,
-        droitsImageStatus,
-        droitsImageSignedAt: data.droitsImageAccepted ? new Date() : null,
-        droitsImageSignature: isMinor ? null : (data.droitsImageSignature ?? null),
+        droitsImageStatus: enrollmentDroitsStatus,
+        droitsImageSignedAt: enrollmentDroitsSignedAt,
+        droitsImageSignature: enrollmentDroitsSignature,
         regime: data.regime ?? [],
         accessibilite: data.accessibilite ?? null,
         accompagnateur: data.accompagnateur,
         commentaire: data.commentaire ?? null,
       },
       update: {
-        droitsImageStatus,
-        droitsImageSignedAt: data.droitsImageAccepted ? new Date() : null,
-        droitsImageSignature: isMinor ? null : (data.droitsImageSignature ?? null),
+        droitsImageStatus: enrollmentDroitsStatus,
+        droitsImageSignedAt: enrollmentDroitsSignedAt,
+        droitsImageSignature: enrollmentDroitsSignature,
         regime: data.regime ?? [],
         accessibilite: data.accessibilite ?? null,
         accompagnateur: data.accompagnateur,

@@ -4,7 +4,7 @@ import type { InscriptionInput } from "@/lib/validation/inscription";
 vi.mock("@/lib/db", () => ({
   prisma: {
     event: { findUnique: vi.fn() },
-    user: { upsert: vi.fn() },
+    user: { findUnique: vi.fn(), upsert: vi.fn() },
     enrollment: { findUnique: vi.fn(), upsert: vi.fn(), count: vi.fn() },
   },
 }));
@@ -80,6 +80,9 @@ function mockEvent(overrides: { capacity?: number } = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
+  // No prior global droit-image consent by default — submitInscription's new
+  // pre-upsert read returns null and the inscription flows like a first-timer.
+  usr.findUnique.mockResolvedValue(null as never);
   usr.upsert.mockResolvedValue({
     id: "user-1",
     firstName: "Lisa",

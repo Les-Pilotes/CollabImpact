@@ -183,6 +183,12 @@ export default function InscriptionForm({
   const [consumingResume, setConsumingResume] = useState<boolean>(
     Boolean(resumeToken),
   );
+  // Statut global du droit à l'image (majeure uniquement). Récupéré au
+  // lookup ou à la consommation du resume token. Si défini, on cache l'étape
+  // de consentement — le serveur snapshotte la valeur globale sur l'Enrollment.
+  const [globalDroitImage, setGlobalDroitImage] = useState<
+    "accepted" | "refused" | null
+  >(null);
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoIdx, setVideoIdx] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -210,6 +216,7 @@ export default function InscriptionForm({
     }));
     setRecognition(null);
     setResumeNotice(null);
+    setGlobalDroitImage(profile.droitsImageGlobalStatus);
     setFlow(isStale ? "returning_stale" : "returning_fresh");
     // returning_fresh skips steps 1 + 2; returning_stale skips only step 1
     setStep(isStale ? 2 : 3);
@@ -297,6 +304,10 @@ export default function InscriptionForm({
         maskedEmail: result.maskedEmail,
         lastEventName: result.lastEventName,
       });
+      // Capture the global droit-image state — used if the user later clicks
+      // the magic link (applyProfile overwrites with the same value) OR if
+      // they fall back to "continue as new" via Step 1 (we want the same skip).
+      setGlobalDroitImage(result.droitsImageGlobalStatus);
       const sent = await sendResumeLink(data.email, event.id);
       if (sent.ok) {
         setFlow("link_sent");
@@ -352,10 +363,14 @@ export default function InscriptionForm({
     (!fc.motivationEnabled || data.motivation.length > 0) &&
     (!fc.sourceEnabled || data.commentConnu.trim());
 
-  // Si le toggle "droit à l'image" est off, l'étape 3 ne requiert pas le
-  // consentement — sinon comportement historique (signature pour majeure,
-  // engagement pour mineure).
-  const step3Valid = !fc.droitsImageEnabled
+  // Skip droit-image quand : (a) le toggle event est off, OU (b) la personne
+  // est majeure avec un consentement global déjà exprimé (accepted/refused)
+  // — dans ce cas le serveur snapshotte la valeur globale sur l'Enrollment.
+  // Les mineures sont toujours interrogées (consentement parental par event).
+  const shouldAskDroitImage =
+    fc.droitsImageEnabled && !(globalDroitImage !== null && !isMinor);
+
+  const step3Valid = !shouldAskDroitImage
     ? true
     : isMinor
       ? data.droitsImageAccepted // = "je m'engage à apporter le doc"
@@ -422,11 +437,11 @@ export default function InscriptionForm({
         motivation: fc.motivationEnabled ? data.motivation : undefined,
         motivationDetail: data.motivationDetail || undefined,
         commentConnu: fc.sourceEnabled ? data.commentConnu : undefined,
-        droitsImageAccepted: fc.droitsImageEnabled
+        droitsImageAccepted: shouldAskDroitImage
           ? data.droitsImageAccepted
           : undefined,
         droitsImageSignature:
-          fc.droitsImageEnabled && !isMinor ? data.droitsImageSignature : undefined,
+          shouldAskDroitImage && !isMinor ? data.droitsImageSignature : undefined,
         regime: fc.regimeEnabled ? data.regime : undefined,
         accessibilite: fc.accessibiliteEnabled
           ? data.accessibilite || undefined
@@ -533,6 +548,7 @@ export default function InscriptionForm({
           setField={setField}
           toggleRegime={(v) => toggleArray("regime", v)}
           fc={fc}
+          shouldAskDroitImage={shouldAskDroitImage}
           onOpenVideo={(idx) => {
             setVideoIdx(idx);
             setVideoOpen(true);
@@ -1056,6 +1072,7 @@ function Step3Evenement({
   toggleRegime,
   fc,
   onOpenVideo,
+  shouldAskDroitImage,
 }: {
   data: FormData;
   flow: Flow;
@@ -1064,6 +1081,7 @@ function Step3Evenement({
   toggleRegime: (v: string) => void;
   fc: FormConfig;
   onOpenVideo: (idx: number) => void;
+  shouldAskDroitImage: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -1078,7 +1096,7 @@ function Step3Evenement({
       </div>
 
       {/* Droits image */}
-      {fc.droitsImageEnabled && (
+      {shouldAskDroitImage && (
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 space-y-4">
         <div>
           <h3 className="text-base font-bold text-zinc-900 mb-1">

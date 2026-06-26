@@ -151,6 +151,14 @@ model User {
   commentConnu         String?
   orientationUpdatedAt DateTime?
 
+  // Global droit-à-l'image consent (majeures only). Lifted from per-event so
+  // we don't ask returning participants twice. NULL = never expressed an
+  // opinion globally. Mineure consent stays on Enrollment because parental
+  // consent doesn't carry over between events (RGPD).
+  droitsImageStatus    DroitsImageStatus?
+  droitsImageSignedAt  DateTime?
+  droitsImageSignature String?
+
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
