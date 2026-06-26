@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer } from "lucide-react";
 import PageHeader from "../../../PageHeader";
 import { QrCode } from "@/components/ui/qr-code";
-import { sendManualReminder, sendJ2Reminder } from "./actions";
+import { EnrollmentStatus } from "@prisma/client";
+import {
+  sendManualReminder,
+  sendJ2Reminder,
+  markAttendance,
+  markDesistement,
+  updateEnrollmentStatus,
+  bulkUpdateStatus,
+} from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +46,9 @@ export type ParticipantRow = {
   source: string;
   enrolledAt: string;
   status: KanbanStatus;
+  /** Real EnrollmentStatus from the DB (the `status` field above is the
+   *  collapsed Kanban column). Used to drive the manual status control. */
+  realStatus?: string;
   j7EmailSent?: boolean;
   j2EmailSent?: boolean;
   droitsImageStatus?: DroitsImageStatus;
@@ -175,10 +186,25 @@ export default function KanbanBoard({
   const [toast, setToast] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("suivi");
-  const [emargState, setEmargState] = useState<Record<string, string>>({});
+  // Seed émargement from the real DB status so présentes already marked show up
+  // in the right section after a refresh (it used to be ephemeral local state).
+  const [emargState, setEmargState] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const p of initialParticipants) {
+      if (p.realStatus === "presente") initial[p.id] = "present";
+      else if (p.realStatus === "absente") initial[p.id] = "absent";
+    }
+    return initial;
+  });
 
+  // Émargement now persists: marking présente/absente writes through to the DB
+  // (optimistic local update first so the day-J UX stays instant).
   const markEmarg = useCallback((id: string, st: string) => {
     setEmargState((prev) => ({ ...prev, [id]: st }));
+    if (id.startsWith("demo-")) return;
+    if (st === "present") void markAttendance(id, true);
+    else if (st === "absent") void markAttendance(id, false);
+    else if (st === "pending") void updateEnrollmentStatus(id, EnrollmentStatus.confirmee_j2);
   }, []);
 
   const selected = participants.find((p) => p.id === selectedId) ?? null;
@@ -230,6 +256,65 @@ export default function KanbanBoard({
       });
     },
     [checkedIds, participants, showToast, clearChecked, router],
+  );
+
+  // ── Manual status control (admin-driven, persisted) ──
+  const [isUpdatingStatus, startStatusUpdate] = useTransition();
+
+  type StatusKind = "confirmee" | "presente" | "absente" | "desistement";
+  const STATUS_TOAST: Record<StatusKind, string> = {
+    confirmee: "Marquée attendue le Jour J",
+    presente: "Marquée présente ✓",
+    absente: "Marquée absente",
+    desistement: "Marquée désistée",
+  };
+
+  const changeStatus = useCallback(
+    (id: string, kind: StatusKind) => {
+      if (id.startsWith("demo-")) {
+        showToast("Action indisponible sur une carte démo");
+        return;
+      }
+      startStatusUpdate(async () => {
+        const res =
+          kind === "presente"
+            ? await markAttendance(id, true)
+            : kind === "absente"
+            ? await markAttendance(id, false)
+            : kind === "desistement"
+            ? await markDesistement(id)
+            : await updateEnrollmentStatus(id, EnrollmentStatus.confirmee_j2);
+        if (res.ok) {
+          showToast(STATUS_TOAST[kind]);
+          setSelectedId(null);
+          router.refresh();
+        } else {
+          showToast("Erreur lors du changement de statut");
+        }
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showToast, router],
+  );
+
+  const bulkStatus = useCallback(
+    (status: EnrollmentStatus, label: string) => {
+      const ids = checkedParticipants
+        .filter((p) => !p.id.startsWith("demo-"))
+        .map((p) => p.id);
+      if (ids.length === 0) return;
+      startStatusUpdate(async () => {
+        const res = await bulkUpdateStatus(ids, status);
+        showToast(
+          res.ok
+            ? `${res.count ?? ids.length} participante${(res.count ?? ids.length) > 1 ? "s" : ""} → ${label}`
+            : "Erreur lors de la mise à jour",
+        );
+        clearChecked();
+        router.refresh();
+      });
+    },
+    [checkedParticipants, showToast, clearChecked, router],
   );
 
   const update = useCallback((id: string, patch: Partial<ParticipantRow>, extraHistory?: Omit<HistoryItem, "ts" | "relTime">) => {
@@ -506,6 +591,28 @@ export default function KanbanBoard({
                 {isSending ? "Envoi…" : "✉️ Envoyer J-2"}
               </button>
             )}
+            {/* Bulk status — Jour J: marquer tout le monde présent sans attendre les confirmations */}
+            <button
+              disabled={isUpdatingStatus}
+              onClick={() => bulkStatus(EnrollmentStatus.presente, "présentes")}
+              className="px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-wait text-white text-xs font-semibold transition-colors"
+            >
+              {isUpdatingStatus ? "…" : "✓ Présentes"}
+            </button>
+            <button
+              disabled={isUpdatingStatus}
+              onClick={() => bulkStatus(EnrollmentStatus.confirmee_j2, "attendues Jour J")}
+              className="px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-wait text-white text-xs font-semibold transition-colors"
+            >
+              {isUpdatingStatus ? "…" : "Attendues"}
+            </button>
+            <button
+              disabled={isUpdatingStatus}
+              onClick={() => bulkStatus(EnrollmentStatus.absente, "absentes")}
+              className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-wait text-white text-xs font-semibold transition-colors"
+            >
+              {isUpdatingStatus ? "…" : "Absentes"}
+            </button>
           </div>
           <button onClick={clearChecked} className="text-zinc-400 hover:text-white text-lg leading-none shrink-0">✕</button>
         </div>
@@ -599,14 +706,31 @@ export default function KanbanBoard({
               </div>
             </div>
 
-            {/* Actions — read-only here. CRUD happens on the participant detail page,
-                with confirmation. Keeps the Kanban a safe consultation surface,
-                no destructive misclicks. */}
-            <div className="p-4 border-t border-zinc-100 shrink-0">
-              <p className="text-[11px] text-stone-400 mb-3">
-                Cette vue est en lecture. Pour relancer, modifier le statut ou voir tous
-                les détails, ouvre la fiche.
-              </p>
+            {/* Manual status control — the admin can move a participante to any
+                status without waiting for her to self-confirm (Jour J reality). */}
+            <div className="p-4 border-t border-zinc-100 shrink-0 space-y-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
+                  Changer le statut
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <StatusBtn onClick={() => changeStatus(selected.id, "confirmee")} disabled={isUpdatingStatus} tone="violet">
+                    Attendue Jour J
+                  </StatusBtn>
+                  <StatusBtn onClick={() => changeStatus(selected.id, "presente")} disabled={isUpdatingStatus} tone="green">
+                    Présente ✓
+                  </StatusBtn>
+                  <StatusBtn onClick={() => changeStatus(selected.id, "absente")} disabled={isUpdatingStatus} tone="red">
+                    Absente
+                  </StatusBtn>
+                  <StatusBtn onClick={() => changeStatus(selected.id, "desistement")} disabled={isUpdatingStatus} tone="zinc">
+                    Désistement
+                  </StatusBtn>
+                </div>
+                {selected.realStatus === "presente" && (
+                  <p className="text-[11px] text-green-600 mt-2">Actuellement : présente ✓</p>
+                )}
+              </div>
               <a
                 href={`/admin/events/${eventId}/inscrites/${selected.id}`}
                 className="block w-full text-center px-3 py-2 rounded-lg bg-white border border-stone-200 text-stone-700 text-xs font-semibold hover:bg-stone-50 transition-colors"
@@ -1321,6 +1445,34 @@ function ListingTab({ initialParticipants, archived, avatarColor, initials }: {
 }
 
 // ─── Small sub-component ──────────────────────────────────────────────────────
+
+function StatusBtn({
+  onClick,
+  disabled,
+  tone,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  tone: "violet" | "green" | "red" | "zinc";
+  children: React.ReactNode;
+}) {
+  const tones: Record<string, string> = {
+    violet: "bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100",
+    green: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100",
+    red: "bg-red-50 text-red-700 border-red-200 hover:bg-red-100",
+    zinc: "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100",
+  };
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 disabled:cursor-wait ${tones[tone]}`}
+    >
+      {children}
+    </button>
+  );
+}
 
 function SimBtn({
   onClick,
