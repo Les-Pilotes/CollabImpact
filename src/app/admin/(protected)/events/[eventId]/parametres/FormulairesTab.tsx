@@ -6,6 +6,12 @@ import { ChevronRight, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/Toggle";
 import { upsertFormConfig, upsertFeedbackConfig } from "./actions";
+import {
+  FEEDBACK_SECTIONS,
+  resolveFeedbackState,
+  type FeedbackQuestion,
+  type FeedbackSection,
+} from "@/lib/feedback/questions";
 
 type FormCfg = {
   // Couche Fondamentale
@@ -143,167 +149,6 @@ const INSCRIPTION_LAYERS: Layer[] = [
     ],
   },
 ];
-
-// =====================================================================
-// Feedback questionnaire — canonical question set (modèle Les Pilotes).
-// Les questions sont fixes ; seules les options « intervenante » et les
-// prénoms des animatrices changent d'un event à l'autre (résolus au
-// rendu du formulaire public). Chaque question est activable/désactivable
-// et l'état est persisté dans FeedbackConfig.customFields (JSON).
-// =====================================================================
-
-type PreviewType = "text" | "long" | "select" | "multi" | "scale" | "yesno";
-
-type FeedbackQuestion = {
-  key: string;
-  label: string;
-  description?: string;
-  type: PreviewType;
-  options?: string[];
-  /** Question structurelle, toujours collectée (non désactivable). */
-  locked?: boolean;
-  /** Options résolues dynamiquement depuis les intervenantes de l'event. */
-  dynamicOptions?: boolean;
-};
-
-type FeedbackSection = {
-  number: string;
-  title: string;
-  intro: string;
-  questions: FeedbackQuestion[];
-};
-
-const FEEDBACK_SECTIONS: FeedbackSection[] = [
-  {
-    number: "01",
-    title: "Identité",
-    intro: "Qui répond. Le prénom et le nom rattachent le feedback à la participante.",
-    questions: [
-      { key: "prenom", label: "Prénom", type: "text", locked: true },
-      { key: "nom", label: "Nom", type: "text", locked: true },
-      { key: "ville", label: "Ville de résidence", type: "text" },
-      {
-        key: "classe",
-        label: "T'es en quelle classe ?",
-        type: "select",
-        options: ["3ème", "Seconde", "Première", "Terminale", "Études supérieures", "Autres"],
-      },
-      {
-        key: "projetClair",
-        label: "Est-ce que tu sais ce que tu veux faire plus tard ?",
-        description: "Détaille ton projet professionnel ou le domaine qui t'intéresse.",
-        type: "long",
-      },
-    ],
-  },
-  {
-    number: "02",
-    title: "Déroulé",
-    intro: "Ressenti sur l'expérience vécue pendant l'événement.",
-    questions: [
-      {
-        key: "raisonsVenue",
-        label: "Quelles étaient tes raisons de venir à cet événement ?",
-        type: "multi",
-        options: [
-          "Networking professionnel",
-          "Rencontrer des amis",
-          "Apprendre de nouvelles choses",
-          "Être inspirée",
-          "Autres",
-        ],
-      },
-      { key: "motivationDetail", label: "Détaille ta motivation", type: "long" },
-      {
-        key: "momentPrefere",
-        label: "C'était quoi ton moment préféré ?",
-        type: "select",
-        options: [
-          "Jeu de cohésion",
-          "Jeu des intervenantes mystères",
-          "Travail en groupe avec mon intervenante",
-          "Présentations & Questions",
-          "Réseautage de fin",
-        ],
-      },
-      { key: "momentPreferePourquoi", label: "Pourquoi c'était ton moment préféré ?", type: "long" },
-      {
-        key: "intervenantePreferee",
-        label: "Quelle était ton intervenante préférée ?",
-        description: "Options générées depuis les intervenantes de l'event.",
-        type: "select",
-        dynamicOptions: true,
-      },
-      {
-        key: "intervenantePrefereePourquoi",
-        label: "Pourquoi c'était ton intervenante préférée ?",
-        type: "long",
-      },
-      {
-        key: "parleToutesIntervenantes",
-        label: "Est-ce que t'as parlé avec toutes les intervenantes ?",
-        type: "long",
-      },
-      {
-        key: "rencontresAide",
-        label:
-          "Est-ce que ces rencontres t'ont aidée par rapport à ton orientation et ton projet professionnel ?",
-        type: "yesno",
-      },
-      { key: "rencontresAideDetail", label: "En quoi est-ce que ces rencontres t'ont aidée ?", type: "long" },
-      { key: "plusMarque", label: "Qu'est-ce qui t'a le plus marqué ?", type: "long" },
-      { key: "domaineProchaineFois", label: "Quel domaine aimerais-tu voir la prochaine fois ?", type: "long" },
-    ],
-  },
-  {
-    number: "03",
-    title: "Organisation",
-    intro: "Qualité de l'animation et de la logistique de la demi-journée.",
-    questions: [
-      {
-        key: "noteAnimation",
-        label: "Qualité de l'animation de l'atelier",
-        description: "Note de 1 à 5. Le nom des animatrices est inséré automatiquement.",
-        type: "scale",
-      },
-      { key: "commentaireAnimation", label: "Laisse un commentaire sur l'animation de la demi-journée", type: "long" },
-      { key: "avisOrganisation", label: "T'as pensé quoi de l'organisation de la demi-journée ?", type: "long" },
-      { key: "ameliorations", label: "Qu'est-ce qu'on aurait pu améliorer dans l'ensemble ?", type: "long" },
-    ],
-  },
-  {
-    number: "04",
-    title: "La suite",
-    intro: "Intention de revenir et mot de la fin.",
-    questions: [
-      {
-        key: "interesseAutresEvents",
-        label: "Es-tu intéressée par d'autres événements avec Les Pilotes ?",
-        type: "select",
-        options: [
-          "Oui, par d'autres événements 100% Féminin",
-          "Oui, 100% Féminin et plus avec Les Pilotes",
-          "Non, je ne suis pas intéressée",
-          "Je ne sais pas encore",
-        ],
-      },
-      { key: "motDeLaFin", label: "Mot de la fin", type: "long" },
-    ],
-  },
-];
-
-const ALL_FEEDBACK_KEYS = FEEDBACK_SECTIONS.flatMap((s) => s.questions.map((q) => q.key));
-
-/** Default enabled-state: every question on, unless the saved config says otherwise. */
-function resolveFeedbackState(
-  initial: Record<string, boolean> | null,
-): Record<string, boolean> {
-  const state: Record<string, boolean> = {};
-  for (const key of ALL_FEEDBACK_KEYS) {
-    state[key] = initial?.[key] ?? true;
-  }
-  return state;
-}
 
 export default function FormulairesTab({
   eventId,
@@ -727,7 +572,7 @@ function FeedbackQuestionRow({
   checked: boolean;
   onToggle: () => void;
 }) {
-  if (question.locked) {
+  if (question.locked || question.fromProfile) {
     return (
       <li className="flex items-start gap-3 py-3 pl-4 -ml-px border-l border-transparent">
         <Lock className="w-3.5 h-3.5 mt-0.5 text-stone-300 shrink-0" />
@@ -738,7 +583,7 @@ function FeedbackQuestionRow({
           )}
         </div>
         <span className="text-[10px] uppercase tracking-wider text-stone-400 mt-0.5">
-          Obligatoire
+          {question.fromProfile ? "Repris du profil" : "Obligatoire"}
         </span>
       </li>
     );
@@ -773,7 +618,10 @@ function FeedbackPreview({ state }: { state: Record<string, boolean> }) {
 
       <div className="p-5 space-y-5 max-h-[680px] overflow-y-auto">
         {FEEDBACK_SECTIONS.map((section) => {
-          const visible = section.questions.filter((q) => q.locked || state[q.key]);
+          // Profile-known questions aren't asked on the public form → not previewed.
+          const visible = section.questions.filter(
+            (q) => !q.fromProfile && (q.locked || state[q.key]),
+          );
           if (visible.length === 0) return null;
           return (
             <PreviewGroup key={section.number} label={section.title}>

@@ -30,7 +30,7 @@ export function FeedbackCard({ feedback }: { feedback: Feedback }) {
               Note globale
             </p>
             <p className="mt-1 text-2xl font-bold text-stone-900 tabular-nums">
-              {feedback.overallRating}
+              {feedback.overallRating ?? "—"}
               <span className="text-base text-stone-400">/5</span>
             </p>
           </div>
@@ -39,7 +39,7 @@ export function FeedbackCard({ feedback }: { feedback: Feedback }) {
               Organisation
             </p>
             <p className="mt-1 text-2xl font-bold text-stone-900 tabular-nums">
-              {feedback.orgRating}
+              {feedback.orgRating ?? "—"}
               <span className="text-base text-stone-400">/5</span>
             </p>
           </div>
@@ -48,7 +48,7 @@ export function FeedbackCard({ feedback }: { feedback: Feedback }) {
               Vision changée
             </p>
             <p className="mt-1 text-lg font-semibold text-stone-900">
-              {feedback.changedVision ? "Oui" : "Non"}
+              {feedback.changedVision == null ? "—" : feedback.changedVision ? "Oui" : "Non"}
             </p>
           </div>
         </div>

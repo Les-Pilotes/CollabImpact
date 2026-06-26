@@ -1,6 +1,11 @@
 import { verifyFeedbackToken } from "@/lib/tokens";
 import { prisma } from "@/lib/db";
 import FeedbackForm from "./FeedbackForm";
+import {
+  resolveFeedbackState,
+  visibleFeedbackQuestions,
+  type FeedbackQuestion,
+} from "@/lib/feedback/questions";
 
 export const metadata = { title: "Ton avis — Les Pilotes" };
 
@@ -28,7 +33,16 @@ export default async function FeedbackPage({
     where: { id: verification.enrollmentId },
     include: {
       user: true,
-      event: true,
+      event: {
+        include: {
+          feedbackConfig: true,
+          speakers: {
+            where: { deletedAt: null },
+            select: { firstName: true, domain: true },
+            orderBy: { firstName: "asc" },
+          },
+        },
+      },
       feedback: true,
     },
   });
@@ -55,6 +69,19 @@ export default async function FeedbackPage({
     );
   }
 
+  // Resolve which questions to show from the saved config, then inject the
+  // event's speakers as options for the dynamic "intervenante préférée" question.
+  const enabled = resolveFeedbackState(
+    (enrollment.event.feedbackConfig?.customFields as { fields?: Record<string, boolean> } | null)
+      ?.fields ?? null,
+  );
+  const speakerOptions = enrollment.event.speakers.map((s) =>
+    s.domain ? `${s.firstName} (${s.domain})` : s.firstName,
+  );
+  const questions: FeedbackQuestion[] = visibleFeedbackQuestions(enabled).map((q) =>
+    q.dynamicOptions ? { ...q, options: speakerOptions } : q,
+  );
+
   return (
     <main style={containerStyle}>
       <div style={cardStyle}>
@@ -65,6 +92,7 @@ export default async function FeedbackPage({
           token={token}
           firstName={enrollment.user.firstName}
           immersionName={enrollment.event.name}
+          questions={questions}
         />
       </div>
     </main>

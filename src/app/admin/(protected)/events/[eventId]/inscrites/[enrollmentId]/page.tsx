@@ -192,7 +192,10 @@ export default async function ParticipantDetailPage({
     timeline.push({
       id: "fb_recu",
       kind: "success",
-      label: `Feedback reçu — note ${feedback.overallRating}/5`,
+      label:
+        feedback.overallRating != null
+          ? `Feedback reçu — note ${feedback.overallRating}/5`
+          : "Feedback reçu",
       ts: feedback.submittedAt.getTime(),
     });
   }
