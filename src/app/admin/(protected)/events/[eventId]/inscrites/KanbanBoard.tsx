@@ -813,6 +813,10 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
   initials: (p: ParticipantRow) => string;
 }) {
   const [mode, setMode] = useState<"groupes" | "emargement">("groupes");
+  // Group cards are compact by default (just the name) so the répartition stays
+  // readable; this toggle expands the orientation details on every card at once,
+  // and each card can also be expanded individually via its chevron.
+  const [groupDetails, setGroupDetails] = useState(false);
   const [picking, setPicking] = useState<string | null>(null);   // tap-to-assign (mobile)
   const [draggingId, setDraggingId] = useState<string | null>(null); // drag (desktop)
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
@@ -884,6 +888,20 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
         >
           Émargement
         </button>
+
+        {/* Détails toggle — only relevant for the Groupes view */}
+        {mode === "groupes" && (
+          <button
+            onClick={() => setGroupDetails((v) => !v)}
+            className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              groupDetails ? "bg-orange-100 text-orange-700" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+            }`}
+            title="Afficher / masquer les infos d'orientation sur toutes les cartes"
+          >
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${groupDetails ? "rotate-180" : ""}`} />
+            {groupDetails ? "Masquer les détails" : "Afficher les détails"}
+          </button>
+        )}
       </div>
 
       {/* Pick banner */}
@@ -961,6 +979,7 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
                         p={p}
                         avatarColor={avatarColor}
                         initials={initials}
+                        globalDetails={groupDetails}
                         draggingId={draggingId}
                         picking={picking}
                         onDragStart={() => { setDraggingId(p.id); setPicking(null); }}
@@ -1060,6 +1079,7 @@ function ParticipantOrientationRow({
   p,
   avatarColor,
   initials,
+  globalDetails,
   draggingId,
   picking,
   onDragStart,
@@ -1070,6 +1090,7 @@ function ParticipantOrientationRow({
   p: ParticipantRow;
   avatarColor: (id: string) => string;
   initials: (p: ParticipantRow) => string;
+  globalDetails: boolean;
   draggingId: string | null;
   picking: string | null;
   onDragStart: () => void;
@@ -1077,12 +1098,17 @@ function ParticipantOrientationRow({
   onTap: () => void;
   onOpenQr: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   const niveau =
     p.niveauScolaire === "Autres" && p.niveauScolaireAutre
       ? p.niveauScolaireAutre
       : p.niveauScolaire;
   const motivations = p.motivation ?? [];
   const hasQr = p.status === "confirmee" && !!p.checkinToken;
+  const hasDetails = !!(niveau || p.projetPro || p.region || motivations.length > 0);
+  // Compact by default — orientation pills appear only when this card is
+  // expanded (per-card chevron) or when the global "Détails" toggle is on.
+  const showDetails = globalDetails || open;
 
   return (
     <div
@@ -1124,10 +1150,23 @@ function ParticipantOrientationRow({
             <QrCodeIcon className="w-3.5 h-3.5" />
           </button>
         )}
+        {hasDetails && !globalDetails && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen((v) => !v);
+            }}
+            title={open ? "Masquer les détails" : "Voir l'orientation"}
+            className="text-zinc-300 hover:text-zinc-600 transition-colors"
+          >
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+        )}
         <span className="text-[10px] text-zinc-300 hidden md:inline">⠿</span>
       </div>
 
-      {(niveau || p.projetPro || p.region || motivations.length > 0) && (
+      {hasDetails && showDetails && (
         <div className="flex flex-wrap gap-1 mt-1.5 pl-10">
           {niveau && (
             <span
