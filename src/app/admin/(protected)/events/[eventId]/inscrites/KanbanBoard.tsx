@@ -13,11 +13,13 @@ import {
   markDesistement,
   updateEnrollmentStatus,
   bulkUpdateStatus,
+  sendFeedbackInvite,
+  generateFeedbackLink,
 } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type KanbanStatus = "attente_j7" | "attente_j2" | "confirmee";
+export type KanbanStatus = "attente_j7" | "attente_j2" | "confirmee" | "absente";
 
 export type HistoryItem = {
   id: string;
@@ -61,6 +63,9 @@ export type ParticipantRow = {
   region?: string | null;
   /** Signed checkin token (QR Jour-J). Only present on `confirmee` rows. */
   checkinToken?: string | null;
+  /** Feedback invite token — present once `sendFeedbackInvite` has been called. */
+  feedbackToken?: string | null;
+  feedbackSentAt?: string | null;
   history: HistoryItem[];
   isDemo?: boolean;
   archivedAs?: "desistee" | "presente" | "absente";
@@ -72,6 +77,7 @@ const COLUMNS: { id: KanbanStatus; label: string; color: string }[] = [
   { id: "attente_j7", label: "Confirmation J-7", color: "bg-zinc-100 text-zinc-600" },
   { id: "attente_j2", label: "Confirmation J-2", color: "bg-blue-50 text-blue-700" },
   { id: "confirmee", label: "Attendues le Jour J", color: "bg-violet-50 text-violet-700" },
+  { id: "absente", label: "Absentes Jour J", color: "bg-red-50 text-red-700" },
 ];
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -477,15 +483,11 @@ export default function KanbanBoard({
 
         {/* ── Post-Event tab ── */}
         {activeTab === "postevent" && (
-          <div className="flex-1 flex items-center justify-center p-6">
-            <div className="text-center">
-              <p className="text-3xl mb-3">📋</p>
-              <p className="text-sm font-semibold text-zinc-700">Post-Event · Feedbacks</p>
-              <p className="text-xs text-zinc-400 mt-1">
-                Disponible après le Jour J — les feedbacks apparaîtront ici une fois l&apos;émargement terminé.
-              </p>
-            </div>
-          </div>
+          <PostEventTab
+            participants={participants}
+            eventId={eventId}
+            onToast={showToast}
+          />
         )}
 
         {/* ── Suivi tab (Kanban) ── */}
@@ -749,6 +751,9 @@ export default function KanbanBoard({
                 {selected.realStatus === "presente" && (
                   <p className="text-[11px] text-green-600 mt-2">Actuellement : présente ✓</p>
                 )}
+                {selected.realStatus === "absente" && (
+                  <p className="text-[11px] text-red-600 mt-2">Actuellement : absente — modifiable ci-dessus</p>
+                )}
               </div>
               <a
                 href={`/admin/events/${eventId}/inscrites/${selected.id}`}
@@ -841,15 +846,10 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   const [qrParticipant, setQrParticipant] = useState<ParticipantRow | null>(null);
 
-  // Filter out participantes who dropped out (`desistement`) or were marked
-  // `absente` — they're already excluded at the parent fetch (`status notIn`),
-  // but we keep this guard explicit so the Workshop tab stays correct if the
-  // upstream filter ever loosens. Inscrit / contactée flow through as
-  // `attente_j7` (cf. mapStatus in page.tsx) and are included — useful to
-  // start drafting groups before everyone is confirmed.
-  const eligible = participants.filter((p) =>
-    ["confirmee", "attente_j2", "attente_j7"].includes(p.status)
-  );
+  // Exclude absentes from group composition — they're not expected on the day.
+  // All other statuses (attente_j7, attente_j2, confirmee) flow through so the
+  // admin can start drafting groups before everyone is confirmed.
+  const eligible = participants.filter((p) => p.status !== "absente");
 
   const [groups, setGroups] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -1380,6 +1380,137 @@ function WalkinQrModal({ eventId, onClose }: { eventId: string; onClose: () => v
   );
 }
 
+// ─── Post-Event tab component ─────────────────────────────────────────────────
+
+function PostEventTab({
+  participants,
+  eventId,
+  onToast,
+}: {
+  participants: ParticipantRow[];
+  eventId: string;
+  onToast: (msg: string) => void;
+}) {
+  const [rows, setRows] = useState<ParticipantRow[]>(participants);
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const router = useRouter();
+
+  const appOrigin = typeof window !== "undefined" ? window.location.origin : "";
+
+  const eligible = rows.filter((p) =>
+    p.realStatus === "presente" || p.realStatus === "absente" ||
+    p.realStatus === "confirmee_j2" || p.realStatus === "feedback_recu"
+  );
+
+  const copyLink = async (p: ParticipantRow) => {
+    if (p.feedbackToken) {
+      await navigator.clipboard.writeText(`${appOrigin}/feedback/${p.feedbackToken}`);
+      onToast("Lien copié !");
+      return;
+    }
+    // Generate token first
+    setPending((prev) => new Set(prev).add(p.id));
+    const res = await generateFeedbackLink(p.id);
+    setPending((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
+    if (res.ok && res.url) {
+      setRows((prev) => prev.map((r) => r.id === p.id ? { ...r, feedbackToken: res.url!.split("/feedback/")[1] } : r));
+      await navigator.clipboard.writeText(res.url);
+      onToast("Lien généré et copié !");
+    } else {
+      onToast(res.error ?? "Erreur lors de la génération");
+    }
+  };
+
+  const sendEmail = async (enrollmentId: string) => {
+    setPending((prev) => new Set(prev).add(enrollmentId));
+    const res = await sendFeedbackInvite(enrollmentId);
+    setPending((prev) => { const n = new Set(prev); n.delete(enrollmentId); return n; });
+    if (res.ok) {
+      onToast("Email de feedback envoyé ✓");
+      router.refresh();
+    } else {
+      onToast(res.error ?? "Erreur lors de l'envoi");
+    }
+  };
+
+  if (eligible.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-3xl mb-3">📋</p>
+          <p className="text-sm font-semibold text-zinc-700">Post-Event · Feedbacks</p>
+          <p className="text-xs text-zinc-400 mt-1">
+            Les participantes présentes apparaîtront ici une fois l&apos;émargement terminé.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+            Liens feedback · {eligible.length} participante{eligible.length > 1 ? "s" : ""}
+          </span>
+          <span className="text-[11px] text-zinc-400">
+            Copiez le lien ou envoyez par email
+          </span>
+        </div>
+        <div className="divide-y divide-zinc-50">
+          {eligible.map((p) => {
+            const hasFeedback = !!p.feedbackToken;
+            const isBusy = pending.has(p.id);
+            const feedbackUrl = hasFeedback ? `${appOrigin}/feedback/${p.feedbackToken}` : null;
+            return (
+              <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(p.id)}`}>
+                  {`${p.firstName[0]}${p.lastName[0]}`.toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-zinc-900 truncate">
+                    {p.firstName} {p.lastName}
+                  </p>
+                  {feedbackUrl ? (
+                    <p className="text-[11px] text-zinc-400 truncate">{feedbackUrl}</p>
+                  ) : (
+                    <p className="text-[11px] text-zinc-300 italic">Lien non encore généré</p>
+                  )}
+                </div>
+                {p.feedbackSentAt && (
+                  <span className="text-[10px] text-zinc-400 shrink-0">
+                    Email envoyé le{" "}
+                    {new Date(p.feedbackSentAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                  </span>
+                )}
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => copyLink(p)}
+                    disabled={isBusy}
+                    title={hasFeedback ? "Copier le lien" : "Générer et copier le lien"}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {isBusy ? "…" : hasFeedback ? "Copier le lien" : "Générer le lien"}
+                  </button>
+                  <button
+                    onClick={() => sendEmail(p.id)}
+                    disabled={isBusy}
+                    title="Envoyer le formulaire de feedback par email"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {isBusy ? "…" : "Envoyer par email"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Listing tab component ────────────────────────────────────────────────────
 
 function archivedStage(p: ParticipantRow): string {
@@ -1396,11 +1527,13 @@ const STATUS_COLORS: Record<KanbanStatus, string> = {
   attente_j7: "bg-zinc-100 text-zinc-600",
   attente_j2: "bg-blue-50 text-blue-700",
   confirmee: "bg-violet-50 text-violet-700",
+  absente: "bg-red-50 text-red-700",
 };
 const STATUS_LABELS_LISTING: Record<KanbanStatus, string> = {
   attente_j7: "Confirmation J-7",
   attente_j2: "Confirmation J-2",
   confirmee: "Attendue Jour J",
+  absente: "Absente Jour J",
 };
 
 function ListingRow({ p, i, avatarColor, initials }: { p: ParticipantRow; i: number; avatarColor: (id: string) => string; initials: (p: ParticipantRow) => string }) {

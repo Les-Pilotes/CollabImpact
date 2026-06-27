@@ -365,6 +365,29 @@ export async function sendFeedbackInvite(
   }
 }
 
+/**
+ * Generate (or reuse) a feedback token for a participante without sending an
+ * email. Returns the shareable URL so the admin can copy/paste it manually.
+ */
+export async function generateFeedbackLink(
+  enrollmentId: string
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  await requireAdmin();
+
+  try {
+    const token = createFeedbackToken(enrollmentId);
+    await prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: { feedbackToken: token },
+    });
+    const appUrl = getAppUrl();
+    return { ok: true, url: `${appUrl}/feedback/${token}` };
+  } catch (err) {
+    console.error('[generateFeedbackLink]', err);
+    return { ok: false, error: 'Erreur lors de la génération du lien.' };
+  }
+}
+
 // ─── Undo / reversal actions ────────────────────────────────────────────────
 // All "destructive" admin actions surface an Annuler toast. These mutations
 // reverse the original action so the previous state can be restored.
