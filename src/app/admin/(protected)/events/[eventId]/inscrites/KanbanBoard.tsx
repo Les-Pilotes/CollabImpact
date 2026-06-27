@@ -186,6 +186,7 @@ export default function KanbanBoard({
   const [toast, setToast] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("suivi");
+  const [walkinQrOpen, setWalkinQrOpen] = useState(false);
   // Seed émargement from the real DB status so présentes already marked show up
   // in the right section after a refresh (it used to be ephemeral local state).
   const [emargState, setEmargState] = useState<Record<string, string>>(() => {
@@ -429,15 +430,25 @@ export default function KanbanBoard({
           activeTab={activeTab}
           onTabChange={(id) => { setActiveTab(id); setSelectedId(null); }}
           actions={
-            <a
-              href={`/api/events/${eventId}/export`}
-              download
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
-              title="Télécharger toutes les inscriptions au format CSV"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Exporter CSV
-            </a>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setWalkinQrOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
+                title="Afficher le QR d'inscription sur place (Jour J)"
+              >
+                <QrCodeIcon className="w-3.5 h-3.5" />
+                QR walk-in
+              </button>
+              <a
+                href={`/api/events/${eventId}/export`}
+                download
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
+                title="Télécharger toutes les inscriptions au format CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exporter CSV
+              </a>
+            </div>
           }
         />
 
@@ -538,6 +549,11 @@ export default function KanbanBoard({
                               <div className="flex items-center justify-between gap-1">
                                 <p className="text-sm font-semibold text-zinc-900 truncate">
                                   {p.firstName} {p.lastName}
+                                  {p.source === "walk_in" && (
+                                    <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+                                      walk-in
+                                    </span>
+                                  )}
                                   {p.isDemo && <span className="ml-1.5 text-[10px] font-normal text-orange-400">démo</span>}
                                 </p>
                                 <span className="text-[10px] text-zinc-300 shrink-0">{lastDate}</span>
@@ -617,6 +633,9 @@ export default function KanbanBoard({
           <button onClick={clearChecked} className="text-zinc-400 hover:text-white text-lg leading-none shrink-0">✕</button>
         </div>
       )}
+
+      {/* ── QR walk-in (inscription sur place Jour J) ── */}
+      {walkinQrOpen && <WalkinQrModal eventId={eventId} onClose={() => setWalkinQrOpen(false)} />}
 
       {/* ── Side panel — desktop: pushes kanban, mobile: overlay ── */}
       {selected && (
@@ -1311,6 +1330,51 @@ function CheckinQrModal({
             Envoyer par email
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── QR walk-in (générique par event, inscription sur place) ──────────────────
+
+function WalkinQrModal({ eventId, onClose }: { eventId: string; onClose: () => void }) {
+  const url =
+    typeof window !== "undefined" ? `${window.location.origin}/walk-in/${eventId}` : "";
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 print:shadow-none print:max-w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-500">
+              QR walk-in · Jour J
+            </p>
+            <p className="text-base font-extrabold text-zinc-900 mt-0.5">Inscription sur place</p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              À afficher à l&apos;accueil — une participante scanne et s&apos;inscrit (marquée présente).
+            </p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 print:hidden" aria-label="Fermer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex justify-center">
+          <QrCode value={url} size={200} />
+        </div>
+
+        <p className="text-[10px] text-zinc-400 text-center break-all px-2">{url}</p>
+
+        <button
+          onClick={() => typeof window !== "undefined" && window.print()}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-colors print:hidden"
+        >
+          <Printer className="w-3.5 h-3.5" />
+          Imprimer
+        </button>
       </div>
     </div>
   );
