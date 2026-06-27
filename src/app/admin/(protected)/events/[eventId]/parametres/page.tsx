@@ -82,11 +82,14 @@ export default async function EventParametresPage({
   };
 
   // Feedback question toggles live in FeedbackConfig.customFields (JSON) —
-  // shape: { fields: { [questionKey]: boolean } }. Null when never configured,
-  // the client defaults every question to enabled.
-  const feedbackFields =
-    (event.feedbackConfig?.customFields as { fields?: Record<string, boolean> } | null)?.fields ??
-    null;
+  // shape: { fields: { [questionKey]: boolean }, animatriceName?: string }.
+  // Null when never configured; the client defaults every question to enabled.
+  const feedbackCustom = event.feedbackConfig?.customFields as {
+    fields?: Record<string, boolean>;
+    animatriceName?: string;
+  } | null;
+  const feedbackFields = feedbackCustom?.fields ?? null;
+  const feedbackAnimatriceName = feedbackCustom?.animatriceName ?? "";
 
   const emailCfg = event.emailConfig;
 
@@ -141,6 +144,7 @@ export default async function EventParametresPage({
                 commentaireEnabled: formCfg.commentaireEnabled,
               }}
               feedbackFields={feedbackFields}
+              feedbackAnimatriceName={feedbackAnimatriceName}
             />
           ),
           communications: (

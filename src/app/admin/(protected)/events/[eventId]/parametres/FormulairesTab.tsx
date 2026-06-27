@@ -154,10 +154,12 @@ export default function FormulairesTab({
   eventId,
   formCfg,
   feedbackFields,
+  feedbackAnimatriceName,
 }: {
   eventId: string;
   formCfg: FormCfg;
   feedbackFields: Record<string, boolean> | null;
+  feedbackAnimatriceName?: string;
 }) {
   return (
     <div className="space-y-4">
@@ -174,7 +176,7 @@ export default function FormulairesTab({
         hint="Le formulaire envoyé après l'événement pour mesurer l'impact."
         defaultOpen
       >
-        <FeedbackBody eventId={eventId} initial={feedbackFields} />
+        <FeedbackBody eventId={eventId} initial={feedbackFields} initialAnimatriceName={feedbackAnimatriceName ?? ""} />
       </CollapsibleSection>
     </div>
   );
@@ -468,11 +470,14 @@ function FieldRow({
 function FeedbackBody({
   eventId,
   initial,
+  initialAnimatriceName,
 }: {
   eventId: string;
   initial: Record<string, boolean> | null;
+  initialAnimatriceName: string;
 }) {
   const [state, setState] = useState(() => resolveFeedbackState(initial));
+  const [animatriceName, setAnimatriceName] = useState(initialAnimatriceName);
   const [isDirty, setIsDirty] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -483,7 +488,7 @@ function FeedbackBody({
 
   function handleSave() {
     startTransition(async () => {
-      const result = await upsertFeedbackConfig(eventId, state);
+      const result = await upsertFeedbackConfig(eventId, state, animatriceName);
       if (result.ok) {
         toast.success("Formulaire de feedback mis à jour");
         setIsDirty(false);
@@ -497,6 +502,28 @@ function FeedbackBody({
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
       {/* Left: question toggles, grouped by section */}
       <div className="space-y-10 min-w-0">
+        {/* Animatrice name — injected into the `noteAnimation` question label */}
+        <div>
+          <div className="flex items-baseline gap-3 mb-1">
+            <span className="text-xs font-mono text-stone-400 tabular-nums">00</span>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-700">
+              Animatrice / Facilitatrice
+            </h3>
+          </div>
+          <p className="text-xs text-stone-500 max-w-prose mb-4 pl-9">
+            Nom affiché dans la question de notation de l&apos;animation. Exemple : <em>Amadou Ba</em>.
+          </p>
+          <div className="pl-9">
+            <input
+              type="text"
+              value={animatriceName}
+              onChange={(e) => { setAnimatriceName(e.target.value); setIsDirty(true); }}
+              placeholder="Prénom Nom de l'animatrice"
+              className="w-full max-w-sm px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
+            />
+          </div>
+        </div>
+
         {FEEDBACK_SECTIONS.map((section) => (
           <FeedbackSectionCard
             key={section.number}
@@ -524,7 +551,7 @@ function FeedbackBody({
         <p className="text-[11px] uppercase tracking-[0.16em] text-stone-400 mb-3">
           Aperçu en temps réel
         </p>
-        <FeedbackPreview state={state} />
+        <FeedbackPreview state={state} animatriceName={animatriceName} />
       </div>
     </div>
   );
@@ -608,7 +635,7 @@ function FeedbackQuestionRow({
  * The "intervenante préférée" options are resolved from the event's speakers at
  * send time — here we show a placeholder.
  */
-function FeedbackPreview({ state }: { state: Record<string, boolean> }) {
+function FeedbackPreview({ state, animatriceName }: { state: Record<string, boolean>; animatriceName?: string }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
       <div className="bg-gradient-to-r from-pink-500 to-orange-400 px-5 py-4">
@@ -626,7 +653,7 @@ function FeedbackPreview({ state }: { state: Record<string, boolean> }) {
           return (
             <PreviewGroup key={section.number} label={section.title}>
               {visible.map((q) => (
-                <FeedbackPreviewField key={q.key} question={q} />
+                <FeedbackPreviewField key={q.key} question={q} animatriceName={animatriceName} />
               ))}
             </PreviewGroup>
           );
@@ -636,15 +663,19 @@ function FeedbackPreview({ state }: { state: Record<string, boolean> }) {
   );
 }
 
-function FeedbackPreviewField({ question }: { question: FeedbackQuestion }) {
+function FeedbackPreviewField({ question, animatriceName }: { question: FeedbackQuestion; animatriceName?: string }) {
   const options = question.dynamicOptions
     ? ["Intervenante A", "Intervenante B", "Intervenante C"]
     : question.options;
 
+  const label = question.dynamicLabel
+    ? question.label.replace("{animatriceName}", animatriceName?.trim() || "[nom de l'animatrice]")
+    : question.label;
+
   return (
     <div className="space-y-1">
       <p className="text-xs text-stone-600">
-        {question.label}
+        {label}
         {!question.dynamicOptions && <span className="text-orange-500"> *</span>}
       </p>
 

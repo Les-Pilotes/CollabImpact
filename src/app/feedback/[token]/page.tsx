@@ -69,18 +69,22 @@ export default async function FeedbackPage({
     );
   }
 
-  // Resolve which questions to show from the saved config, then inject the
-  // event's speakers as options for the dynamic "intervenante préférée" question.
-  const enabled = resolveFeedbackState(
-    (enrollment.event.feedbackConfig?.customFields as { fields?: Record<string, boolean> } | null)
-      ?.fields ?? null,
-  );
+  // Resolve which questions to show from the saved config, then inject
+  // per-event dynamic values: speaker names and the animatrice name.
+  const feedbackCustom = enrollment.event.feedbackConfig?.customFields as {
+    fields?: Record<string, boolean>;
+    animatriceName?: string;
+  } | null;
+  const enabled = resolveFeedbackState(feedbackCustom?.fields ?? null);
+  const animatriceName = feedbackCustom?.animatriceName?.trim() || "l'animatrice";
   const speakerOptions = enrollment.event.speakers.map((s) =>
     s.domain ? `${s.firstName} (${s.domain})` : s.firstName,
   );
-  const questions: FeedbackQuestion[] = visibleFeedbackQuestions(enabled).map((q) =>
-    q.dynamicOptions ? { ...q, options: speakerOptions } : q,
-  );
+  const questions: FeedbackQuestion[] = visibleFeedbackQuestions(enabled).map((q) => {
+    if (q.dynamicOptions) return { ...q, options: speakerOptions };
+    if (q.dynamicLabel) return { ...q, label: q.label.replace("{animatriceName}", animatriceName) };
+    return q;
+  });
 
   return (
     <main style={containerStyle}>
