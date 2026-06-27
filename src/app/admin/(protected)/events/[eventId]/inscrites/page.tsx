@@ -7,6 +7,7 @@ import { createCheckinToken } from "@/lib/tokens";
 function mapStatus(s: string): ParticipantRow["status"] {
   if (s === "confirmee_j7") return "attente_j2";
   if (s === "confirmee_j2" || s === "presente") return "confirmee";
+  if (s === "absente") return "absente";
   return "attente_j7"; // inscrit, contactee
 }
 
@@ -32,10 +33,10 @@ export default async function ParticipantesPage({
       where: {
         eventId,
         deletedAt: null,
-        // `presente` stays on the board (mapped to the "Attendues le Jour J"
-        // column) so marking a participante présente — manually or via
-        // émargement — doesn't hide her from Suivi / Workshop on the day.
-        status: { notIn: ["desistement", "absente", "feedback_recu"] },
+        // `presente` and `absente` stay on the board so admins can always see
+        // and re-modify them (e.g. a participante marked absente who showed up).
+        // Only `desistement` and `feedback_recu` are hidden (terminal states).
+        status: { notIn: ["desistement", "feedback_recu"] },
       },
       include: { user: true },
       orderBy: { enrolledAt: "asc" },
@@ -123,6 +124,8 @@ export default async function ParticipantesPage({
       motivation: e.user.motivation ?? [],
       region: e.user.region ?? null,
       checkinToken,
+      feedbackToken: e.feedbackToken ?? null,
+      feedbackSentAt: e.feedbackSentAt?.toISOString() ?? null,
       history,
     };
   });

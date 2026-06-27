@@ -53,13 +53,17 @@ export async function upsertFormConfig(
 export async function upsertFeedbackConfig(
   eventId: string,
   enabledFields: Record<string, boolean>,
+  animatriceName?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     await requireAdmin();
+    const customFields = animatriceName !== undefined
+      ? { fields: enabledFields, animatriceName: animatriceName.trim() }
+      : { fields: enabledFields };
     await prisma.feedbackConfig.upsert({
       where: { eventId },
-      create: { eventId, customFields: { fields: enabledFields } },
-      update: { customFields: { fields: enabledFields } },
+      create: { eventId, customFields },
+      update: { customFields },
     });
     revalidatePath(`/admin/events/${eventId}/parametres`);
     return { ok: true };

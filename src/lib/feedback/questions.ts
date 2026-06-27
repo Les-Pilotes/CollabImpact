@@ -29,6 +29,11 @@ export type FeedbackQuestion = {
   fromProfile?: boolean;
   /** Options résolues dynamiquement depuis les intervenantes de l'event. */
   dynamicOptions?: boolean;
+  /**
+   * Le libellé contient `{animatriceName}` — remplacé par le nom de l'animatrice
+   * de l'event au moment du rendu (résolu depuis FeedbackConfig.customFields).
+   */
+  dynamicLabel?: boolean;
   /** Affichée conditionnellement quand la réponse à `key` vaut `equals`. */
   showIf?: { key: string; equals: string };
 };
@@ -137,9 +142,10 @@ export const FEEDBACK_SECTIONS: FeedbackSection[] = [
     questions: [
       {
         key: "noteAnimation",
-        label: "Qualité de l'animation de l'atelier",
-        description: "Note de 1 à 5. Le nom des animatrices est inséré automatiquement.",
+        label: "Sur une échelle de 1 à 5, comment évalues-tu la qualité de l'animation de l'atelier par {animatriceName} ?",
+        description: "Le nom de l'animatrice est configuré dans Paramètres → Formulaires.",
         type: "scale",
+        dynamicLabel: true,
       },
       { key: "commentaireAnimation", label: "Laisse un commentaire sur l'animation de la demi-journée", type: "long" },
       { key: "avisOrganisation", label: "T'as pensé quoi de l'organisation de la demi-journée ?", type: "long" },
