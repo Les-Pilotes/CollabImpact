@@ -1,13 +1,32 @@
+import type React from "react";
 import { verifyFeedbackToken } from "@/lib/tokens";
 import { prisma } from "@/lib/db";
 import FeedbackForm from "./FeedbackForm";
 import {
+  FEEDBACK_SECTIONS,
   resolveFeedbackState,
-  visibleFeedbackQuestions,
   type FeedbackQuestion,
 } from "@/lib/feedback/questions";
 
 export const metadata = { title: "Ton avis — Les Pilotes" };
+
+const containerStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "2rem",
+  background: "linear-gradient(to bottom, #fafaf9, #fff)",
+};
+
+const cardStyle: React.CSSProperties = {
+  background: "#fff",
+  border: "1px solid #e4e4e7",
+  borderRadius: 16,
+  padding: "2rem",
+  maxWidth: 420,
+  width: "100%",
+};
 
 export default async function FeedbackPage({
   params,
@@ -80,45 +99,29 @@ export default async function FeedbackPage({
   const speakerOptions = enrollment.event.speakers.map((s) =>
     s.domain ? `${s.firstName} (${s.domain})` : s.firstName,
   );
-  const questions: FeedbackQuestion[] = visibleFeedbackQuestions(enabled).map((q) => {
+
+  function resolveQuestion(q: FeedbackQuestion): FeedbackQuestion {
     if (q.dynamicOptions) return { ...q, options: speakerOptions };
     if (q.dynamicLabel) return { ...q, label: q.label.replace("{animatriceName}", animatriceName) };
     return q;
-  });
+  }
+
+  // Build sections: exclude Identité (fromProfile), filter by enabled config.
+  const sections = FEEDBACK_SECTIONS.map((s) => ({
+    number: s.number,
+    title: s.title,
+    questions: s.questions
+      .filter((q) => !q.fromProfile && (q.locked || enabled[q.key]))
+      .map(resolveQuestion),
+  })).filter((s) => s.questions.length > 0);
 
   return (
-    <main style={containerStyle}>
-      <div style={cardStyle}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
-          Ton avis, {enrollment.user.firstName} !
-        </h1>
-        <FeedbackForm
-          token={token}
-          firstName={enrollment.user.firstName}
-          immersionName={enrollment.event.name}
-          questions={questions}
-        />
-      </div>
-    </main>
+    <FeedbackForm
+      token={token}
+      firstName={enrollment.user.firstName}
+      immersionName={enrollment.event.name}
+      sections={sections}
+    />
   );
 }
 
-const containerStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  backgroundColor: "#f4f4f5",
-  display: "flex",
-  alignItems: "flex-start",
-  justifyContent: "center",
-  padding: "32px 16px",
-};
-
-const cardStyle: React.CSSProperties = {
-  backgroundColor: "#ffffff",
-  borderRadius: 8,
-  padding: "32px 24px",
-  width: "100%",
-  maxWidth: 560,
-  display: "flex",
-  flexDirection: "column",
-  gap: 16,
-};
