@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useState } from "react";
 import Image from "next/image";
 import type { FeedbackQuestion } from "@/lib/feedback/questions";
@@ -16,25 +17,46 @@ type Props = {
   token: string;
   firstName: string;
   immersionName: string;
+  eventDate: string; // ISO string
   sections: Section[];
 };
 
-export default function FeedbackForm({ token, firstName, immersionName, sections }: Props) {
+export default function FeedbackForm({
+  token,
+  firstName,
+  immersionName,
+  eventDate,
+  sections,
+}: Props) {
+  // step 0 = intro, step 1..N = sections[step-1]
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const totalSteps = sections.length;
-  const progress = Math.round(((step + 1) / totalSteps) * 100);
-  const currentSection = sections[step];
+  const isIntro = step === 0;
+  const currentSection = isIntro ? null : sections[step - 1];
+  const progress = isIntro ? 0 : Math.round((step / totalSteps) * 100);
+
+  const eventDateLabel = new Intl.DateTimeFormat("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(eventDate));
+
+  // ─── Answer helpers ───────────────────────────────────────────────────────
 
   function setAnswer(key: string, value: AnswerValue) {
+    setValidationError(null);
     setAnswers((prev) => ({ ...prev, [key]: value }));
   }
 
   function toggleMulti(key: string, option: string) {
+    setValidationError(null);
     setAnswers((prev) => {
       const current = Array.isArray(prev[key]) ? (prev[key] as string[]) : [];
       const next = current.includes(option)
@@ -54,20 +76,59 @@ export default function FeedbackForm({ token, firstName, immersionName, sections
     return Array.isArray(value) ? value.length > 0 : value.trim().length > 0;
   }
 
-  async function handleSubmit() {
-    const allVisibleQuestions = sections.flatMap((s) => s.questions.filter(isVisible));
-    const cleaned: Record<string, AnswerValue> = {};
-    for (const q of allVisibleQuestions) {
-      const value = answers[q.key];
-      if (isAnswered(value)) cleaned[q.key] = value as AnswerValue;
+  // A question is "required" unless it's a select/multi with no options to choose from.
+  function isRequiredQuestion(q: FeedbackQuestion): boolean {
+    if (q.type === "select" || q.type === "multi") {
+      return (q.options ?? []).length > 0;
     }
-    if (Object.keys(cleaned).length === 0) {
-      setError("Réponds à au moins une question avant d'envoyer.");
+    return true;
+  }
+
+  function validateSection(sectionIndex: number): boolean {
+    const section = sections[sectionIndex];
+    return section.questions
+      .filter(isVisible)
+      .filter(isRequiredQuestion)
+      .every((q) => isAnswered(answers[q.key]));
+  }
+
+  // ─── Navigation ───────────────────────────────────────────────────────────
+
+  function handleContinue() {
+    if (isIntro) {
+      setStep(1);
+      return;
+    }
+    if (!validateSection(step - 1)) {
+      setValidationError("Réponds à toutes les questions pour continuer.");
+      return;
+    }
+    setValidationError(null);
+    setStep((s) => s + 1);
+  }
+
+  function handleBack() {
+    setValidationError(null);
+    setStep((s) => s - 1);
+  }
+
+  async function handleSubmit() {
+    // Validate last section
+    if (!validateSection(step - 1)) {
+      setValidationError("Réponds à toutes les questions pour envoyer.");
       return;
     }
 
+    // Collect all visible answers across all sections
+    const allVisible = sections.flatMap((s) => s.questions.filter(isVisible));
+    const cleaned: Record<string, AnswerValue> = {};
+    for (const q of allVisible) {
+      const value = answers[q.key];
+      if (isAnswered(value)) cleaned[q.key] = value as AnswerValue;
+    }
+
     setSubmitting(true);
-    setError(null);
+    setSubmitError(null);
     try {
       const res = await fetch(`/api/feedback/${token}`, {
         method: "POST",
@@ -76,20 +137,22 @@ export default function FeedbackForm({ token, firstName, immersionName, sections
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Une erreur est survenue.");
+        setSubmitError(data.error ?? "Une erreur est survenue.");
       } else {
         setSuccess(true);
       }
     } catch {
-      setError("Une erreur réseau est survenue.");
+      setSubmitError("Une erreur réseau est survenue.");
     } finally {
       setSubmitting(false);
     }
   }
 
+  // ─── Success ──────────────────────────────────────────────────────────────
+
   if (success) {
     return (
-      <FeedbackLayout immersionName={immersionName}>
+      <FeedbackLayout immersionName={immersionName} eventDateLabel={eventDateLabel}>
         <div className="text-center py-16 space-y-4">
           <p className="text-5xl">🙏</p>
           <h2 className="text-xl font-extrabold text-zinc-900">Merci, {firstName} !</h2>
@@ -101,24 +164,52 @@ export default function FeedbackForm({ token, firstName, immersionName, sections
     );
   }
 
-  const visibleQuestions = currentSection.questions.filter(isVisible);
+  // ─── Intro step ───────────────────────────────────────────────────────────
+
+  if (isIntro) {
+    return (
+      <FeedbackLayout immersionName={immersionName} eventDateLabel={eventDateLabel}>
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <h2 className="text-2xl font-extrabold text-zinc-900">
+              Bonjour {firstName} ! 👋
+            </h2>
+            <p className="text-sm text-zinc-600 leading-relaxed">
+              Tu as participé à <strong>{immersionName}</strong> le {eventDateLabel}.
+            </p>
+            <p className="text-sm text-zinc-600 leading-relaxed">
+              Ton avis compte vraiment — il nous aide directement à améliorer les prochains
+              événements pour toi et toutes les futures Pilotes. Ça prend 3 minutes !
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleContinue}
+            className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors"
+          >
+            Commencer →
+          </button>
+        </div>
+      </FeedbackLayout>
+    );
+  }
+
+  // ─── Section steps ────────────────────────────────────────────────────────
+
+  const visibleQuestions = currentSection!.questions.filter(isVisible);
 
   return (
     <FeedbackLayout
       immersionName={immersionName}
-      stepLabel={`Étape ${step + 1}/${totalSteps}`}
+      eventDateLabel={eventDateLabel}
+      stepLabel={`Étape ${step}/${totalSteps}`}
       progress={progress}
     >
       <div className="space-y-6">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-orange-500 mb-1">
-            {currentSection.number} · {currentSection.title}
+            {currentSection!.title}
           </p>
-          {step === 0 && (
-            <p className="text-sm text-zinc-500">
-              Partage ton expérience sur <strong>{immersionName}</strong>. Ça prend 3 minutes !
-            </p>
-          )}
         </div>
 
         {visibleQuestions.map((q) => (
@@ -131,23 +222,26 @@ export default function FeedbackForm({ token, firstName, immersionName, sections
           />
         ))}
 
-        {error && <p className="text-rose-600 text-sm">{error}</p>}
+        {validationError && (
+          <p className="text-rose-600 text-sm font-medium">{validationError}</p>
+        )}
+        {submitError && (
+          <p className="text-rose-600 text-sm font-medium">{submitError}</p>
+        )}
 
         <div className="flex gap-3 pt-2">
-          {step > 0 && (
+          <button
+            type="button"
+            onClick={handleBack}
+            disabled={submitting}
+            className="px-5 py-3 rounded-xl border border-zinc-200 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-50"
+          >
+            ← Retour
+          </button>
+          {step < totalSteps ? (
             <button
               type="button"
-              onClick={() => setStep((s) => s - 1)}
-              disabled={submitting}
-              className="px-5 py-3 rounded-xl border border-zinc-200 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-50"
-            >
-              ← Retour
-            </button>
-          )}
-          {step < totalSteps - 1 ? (
-            <button
-              type="button"
-              onClick={() => setStep((s) => s + 1)}
+              onClick={handleContinue}
               disabled={submitting}
               className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-xl transition-colors"
             >
@@ -173,11 +267,13 @@ export default function FeedbackForm({ token, firstName, immersionName, sections
 
 function FeedbackLayout({
   immersionName,
+  eventDateLabel,
   stepLabel,
   progress,
   children,
 }: {
   immersionName: string;
+  eventDateLabel: string;
   stepLabel?: string;
   progress?: number;
   children: React.ReactNode;
@@ -191,10 +287,10 @@ function FeedbackLayout({
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-zinc-900 truncate">{immersionName}</p>
-            <p className="text-[11px] text-zinc-500">Questionnaire de satisfaction</p>
+            <p className="text-[11px] text-zinc-500 truncate">{eventDateLabel}</p>
           </div>
         </div>
-        {progress !== undefined && (
+        {progress !== undefined && progress > 0 && (
           <div className="max-w-lg mx-auto px-4 pb-3">
             <div className="flex justify-between text-[11px] text-zinc-500 mb-1">
               <span>{stepLabel}</span>
@@ -228,13 +324,8 @@ function QuestionField({
   onToggleMulti: (option: string) => void;
 }) {
   const labelEl = (
-    <legend className="font-semibold mb-2 block">
+    <legend className="font-semibold mb-3 block leading-snug">
       {question.label}
-      {question.description && (
-        <span className="block font-normal text-sm text-zinc-500 mt-0.5">
-          {question.description}
-        </span>
-      )}
     </legend>
   );
 
@@ -244,11 +335,8 @@ function QuestionField({
   switch (question.type) {
     case "text":
       return (
-        <label className="flex flex-col gap-1">
-          <span className="font-semibold">{question.label}</span>
-          {question.description && (
-            <span className="text-sm text-zinc-500 -mt-0.5">{question.description}</span>
-          )}
+        <label className="flex flex-col gap-1.5">
+          <span className="font-semibold leading-snug">{question.label}</span>
           <input
             type="text"
             value={stringValue}
@@ -260,11 +348,8 @@ function QuestionField({
 
     case "long":
       return (
-        <label className="flex flex-col gap-1">
-          <span className="font-semibold">{question.label}</span>
-          {question.description && (
-            <span className="text-sm text-zinc-500 -mt-0.5">{question.description}</span>
-          )}
+        <label className="flex flex-col gap-1.5">
+          <span className="font-semibold leading-snug">{question.label}</span>
           <textarea
             value={stringValue}
             onChange={(e) => onChange(e.target.value)}
@@ -305,19 +390,25 @@ function QuestionField({
       return (
         <fieldset className="border-0 p-0 m-0">
           {labelEl}
-          <div className="flex gap-4">
-            {["Oui", "Non"].map((opt) => (
-              <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name={question.key}
-                  checked={stringValue === opt}
-                  onChange={() => onChange(opt)}
-                  className="accent-orange-500 w-4 h-4"
-                />
-                {opt}
-              </label>
-            ))}
+          <div className="flex gap-3">
+            {["Oui", "Non"].map((opt) => {
+              const selected = stringValue === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => onChange(opt)}
+                  className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-colors ${
+                    selected
+                      ? "bg-orange-500 text-white border-orange-500"
+                      : "bg-white text-zinc-600 border-zinc-200 hover:border-orange-300"
+                  }`}
+                  aria-pressed={selected}
+                >
+                  {opt}
+                </button>
+              );
+            })}
           </div>
         </fieldset>
       );
@@ -328,12 +419,15 @@ function QuestionField({
           {labelEl}
           <div className="flex flex-col gap-2">
             {(question.options ?? []).map((opt) => (
-              <label key={opt} className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-zinc-200 hover:bg-zinc-50">
+              <label
+                key={opt}
+                className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition-colors"
+              >
                 <input
                   type="checkbox"
                   checked={arrayValue.includes(opt)}
                   onChange={() => onToggleMulti(opt)}
-                  className="accent-orange-500 w-4 h-4"
+                  className="accent-orange-500 w-4 h-4 shrink-0"
                 />
                 <span className="text-sm text-zinc-700">{opt}</span>
               </label>
@@ -347,22 +441,29 @@ function QuestionField({
         <fieldset className="border-0 p-0 m-0">
           {labelEl}
           <div className="flex flex-col gap-2">
-            {(question.options ?? []).map((opt) => (
-              <label key={opt} className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-zinc-200 hover:bg-zinc-50">
-                <input
-                  type="radio"
-                  name={question.key}
-                  checked={stringValue === opt}
-                  onChange={() => onChange(opt)}
-                  className="accent-orange-500 w-4 h-4"
-                />
-                <span className="text-sm text-zinc-700">{opt}</span>
-              </label>
-            ))}
-            {(question.options ?? []).length === 0 && (
+            {(question.options ?? []).length === 0 ? (
               <p className="text-sm text-zinc-400 italic">
                 Aucune intervenante renseignée pour cet événement.
               </p>
+            ) : (
+              (question.options ?? []).map((opt) => {
+                const selected = stringValue === opt;
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => onChange(opt)}
+                    className={`text-left px-4 py-3 rounded-xl border text-sm transition-colors ${
+                      selected
+                        ? "bg-orange-50 border-orange-400 font-semibold text-orange-900"
+                        : "bg-white border-zinc-200 text-zinc-700 hover:border-orange-300"
+                    }`}
+                    aria-pressed={selected}
+                  >
+                    {opt}
+                  </button>
+                );
+              })
             )}
           </div>
         </fieldset>
