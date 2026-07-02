@@ -1,8 +1,9 @@
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import PageHeader from "../../../PageHeader";
-import { Star, Heart, Sparkles, MessageSquareQuote, Lightbulb, BarChart2 } from "lucide-react";
+import { Star, Heart, Sparkles, MessageSquareQuote, Lightbulb, BarChart2, Users } from "lucide-react";
 import { capitalizeName } from "@/lib/normalize";
+import { FEEDBACK_SECTIONS } from "@/lib/feedback/questions";
 
 export const metadata = { title: "Impact — Admin" };
 
@@ -46,6 +47,7 @@ export default async function ImpactPage({
             improvements: true,
             verbatim: true,
             submittedAt: true,
+            answers: true,
           },
         },
       },
@@ -187,6 +189,86 @@ export default async function ImpactPage({
                 </ul>
               </Section>
             )}
+
+            {/* Individual responses */}
+            <Section
+              icon={Users}
+              title="Réponses individuelles"
+              subtitle={`${total} participante${total !== 1 ? "s" : ""} · cliquer pour développer`}
+            >
+              <div className="space-y-2">
+                {feedbacks.map((f, i) => {
+                  const name = `${capitalizeName(f.user.firstName)} ${capitalizeName(f.user.lastName)}`;
+                  const answers = (f.feedback!.answers ?? {}) as Record<string, unknown>;
+                  const hasV2 = Object.keys(answers).length > 0;
+                  return (
+                    <details key={i} className="group rounded-xl border border-stone-200 bg-white">
+                      <summary className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer list-none select-none">
+                        <div className="flex items-center gap-2">
+                          <span className="w-7 h-7 rounded-full bg-stone-100 flex items-center justify-center text-[11px] font-bold text-stone-600">
+                            {f.user.firstName[0]}{f.user.lastName[0]}
+                          </span>
+                          <span className="text-sm font-semibold text-stone-900">{name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] text-stone-400">
+                            {new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(f.feedback!.submittedAt)}
+                          </span>
+                          <span className="text-stone-400 group-open:rotate-90 transition-transform text-xs">{">"}</span>
+                        </div>
+                      </summary>
+                      <div className="px-4 pb-4 border-t border-stone-100 pt-3 space-y-4 text-sm">
+                        {hasV2 ? (
+                          FEEDBACK_SECTIONS
+                            .filter((s) => s.questions.some((q) => !q.fromProfile && answers[q.key] != null && answers[q.key] !== ""))
+                            .map((section) => {
+                              const answered = section.questions.filter(
+                                (q) => !q.fromProfile && answers[q.key] != null && answers[q.key] !== "" &&
+                                  !(Array.isArray(answers[q.key]) && (answers[q.key] as unknown[]).length === 0)
+                              );
+                              return (
+                                <div key={section.number}>
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-2">
+                                    {section.number} · {section.title}
+                                  </p>
+                                  <dl className="space-y-2">
+                                    {answered.map((q) => {
+                                      const label = q.dynamicLabel
+                                        ? q.label.replace("{animatriceName}", "l'animatrice")
+                                        : q.label;
+                                      const val = answers[q.key];
+                                      return (
+                                        <div key={q.key}>
+                                          <dt className="text-[11px] text-stone-500 font-medium">{label}</dt>
+                                          <dd className="text-stone-800 mt-0.5">
+                                            {q.type === "scale"
+                                              ? `${val} / 5`
+                                              : Array.isArray(val)
+                                              ? (val as string[]).join(", ")
+                                              : String(val)}
+                                          </dd>
+                                        </div>
+                                      );
+                                    })}
+                                  </dl>
+                                </div>
+                              );
+                            })
+                        ) : (
+                          <div className="space-y-2 text-stone-700">
+                            {f.feedback!.overallRating != null && <p><span className="text-stone-500">Note globale :</span> {f.feedback!.overallRating}/5</p>}
+                            {f.feedback!.orgRating != null && <p><span className="text-stone-500">Organisation :</span> {f.feedback!.orgRating}/5</p>}
+                            {f.feedback!.changedVision != null && <p><span className="text-stone-500">Vision changée :</span> {f.feedback!.changedVision ? "Oui" : "Non"}</p>}
+                            {f.feedback!.favoriteMoment && <p><span className="text-stone-500">Moment préféré :</span> {f.feedback!.favoriteMoment}</p>}
+                            {f.feedback!.verbatim && <p className="italic text-stone-600">&ldquo;{f.feedback!.verbatim}&rdquo;</p>}
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
+            </Section>
           </div>
         )}
       </div>
