@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
+import { useState, useCallback, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer } from "lucide-react";
 import PageHeader from "../../../PageHeader";
@@ -203,6 +203,21 @@ export default function KanbanBoard({
     }
     return initial;
   });
+
+  // When router.refresh() causes the server to push fresh initialParticipants
+  // (e.g. after a status change), sync local state so the UI reflects the DB
+  // truth without requiring a full page reload.
+  useEffect(() => {
+    setParticipants(initialParticipants);
+    setEmargState(() => {
+      const s: Record<string, string> = {};
+      for (const p of initialParticipants) {
+        if (p.realStatus === "presente") s[p.id] = "present";
+        else if (p.realStatus === "absente") s[p.id] = "absent";
+      }
+      return s;
+    });
+  }, [initialParticipants]);
 
   // Émargement now persists: marking présente/absente writes through to the DB
   // (optimistic local update first so the day-J UX stays instant).
@@ -1393,7 +1408,11 @@ function PostEventTab({
 }) {
   const [rows, setRows] = useState<ParticipantRow[]>(participants);
   const [pending, setPending] = useState<Set<string>>(new Set());
+  const [qrParticipant, setQrParticipant] = useState<{ name: string; url: string } | null>(null);
   const router = useRouter();
+
+  // Stay in sync when server data refreshes
+  useEffect(() => { setRows(participants); }, [participants]);
 
   const appOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -1402,23 +1421,30 @@ function PostEventTab({
     p.realStatus === "confirmee_j2" || p.realStatus === "feedback_recu"
   );
 
-  const copyLink = async (p: ParticipantRow) => {
-    if (p.feedbackToken) {
-      await navigator.clipboard.writeText(`${appOrigin}/feedback/${p.feedbackToken}`);
-      onToast("Lien copié !");
-      return;
-    }
-    // Generate token first
+  const ensureToken = async (p: ParticipantRow): Promise<string | null> => {
+    if (p.feedbackToken) return `${appOrigin}/feedback/${p.feedbackToken}`;
     setPending((prev) => new Set(prev).add(p.id));
     const res = await generateFeedbackLink(p.id);
     setPending((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
     if (res.ok && res.url) {
       setRows((prev) => prev.map((r) => r.id === p.id ? { ...r, feedbackToken: res.url!.split("/feedback/")[1] } : r));
-      await navigator.clipboard.writeText(res.url);
-      onToast("Lien généré et copié !");
-    } else {
-      onToast(res.error ?? "Erreur lors de la génération");
+      return res.url;
     }
+    onToast(res.error ?? "Erreur lors de la génération");
+    return null;
+  };
+
+  const copyLink = async (p: ParticipantRow) => {
+    const url = await ensureToken(p);
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    onToast(p.feedbackToken ? "Lien copié !" : "Lien généré et copié !");
+  };
+
+  const openQr = async (p: ParticipantRow) => {
+    const url = await ensureToken(p);
+    if (!url) return;
+    setQrParticipant({ name: `${p.firstName} ${p.lastName}`, url });
   };
 
   const sendEmail = async (enrollmentId: string) => {
@@ -1455,7 +1481,7 @@ function PostEventTab({
             Liens feedback · {eligible.length} participante{eligible.length > 1 ? "s" : ""}
           </span>
           <span className="text-[11px] text-zinc-400">
-            Copiez le lien ou envoyez par email
+            QR à partager sur place · ou envoyer par email
           </span>
         </div>
         <div className="divide-y divide-zinc-50">
@@ -1479,19 +1505,27 @@ function PostEventTab({
                   )}
                 </div>
                 {p.feedbackSentAt && (
-                  <span className="text-[10px] text-zinc-400 shrink-0">
-                    Email envoyé le{" "}
+                  <span className="text-[10px] text-zinc-400 shrink-0 hidden md:inline">
+                    Email le{" "}
                     {new Date(p.feedbackSentAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
                   </span>
                 )}
                 <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => openQr(p)}
+                    disabled={isBusy}
+                    title="Afficher le QR code du formulaire de feedback"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {isBusy ? "…" : <><QrCodeIcon className="w-3.5 h-3.5" /><span className="hidden sm:inline ml-1">QR</span></>}
+                  </button>
                   <button
                     onClick={() => copyLink(p)}
                     disabled={isBusy}
                     title={hasFeedback ? "Copier le lien" : "Générer et copier le lien"}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold transition-colors disabled:opacity-50"
                   >
-                    {isBusy ? "…" : hasFeedback ? "Copier le lien" : "Générer le lien"}
+                    {isBusy ? "…" : hasFeedback ? "Copier" : "Générer"}
                   </button>
                   <button
                     onClick={() => sendEmail(p.id)}
@@ -1499,7 +1533,7 @@ function PostEventTab({
                     title="Envoyer le formulaire de feedback par email"
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-colors disabled:opacity-50"
                   >
-                    {isBusy ? "…" : "Envoyer par email"}
+                    {isBusy ? "…" : "Email"}
                   </button>
                 </div>
               </div>
@@ -1507,6 +1541,42 @@ function PostEventTab({
           })}
         </div>
       </div>
+
+      {/* QR modal */}
+      {qrParticipant && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setQrParticipant(null)}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 print:shadow-none print:max-w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-orange-500">Feedback · QR personnel</p>
+                <p className="text-base font-extrabold text-zinc-900 mt-0.5">{qrParticipant.name}</p>
+                <p className="text-[11px] text-zinc-500 mt-0.5">Scan = accès direct au formulaire de feedback</p>
+              </div>
+              <button onClick={() => setQrParticipant(null)} className="text-zinc-400 hover:text-zinc-700 print:hidden">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex justify-center">
+              <QrCode value={qrParticipant.url} size={200} />
+            </div>
+            <p className="text-[10px] text-zinc-400 text-center break-all px-2">{qrParticipant.url}</p>
+            <div className="flex gap-2 print:hidden">
+              <button
+                onClick={() => typeof window !== "undefined" && window.print()}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-colors"
+              >
+                <Printer className="w-3.5 h-3.5" /> Imprimer
+              </button>
+              <button
+                onClick={async () => { await navigator.clipboard.writeText(qrParticipant.url); onToast("Lien copié !"); }}
+                className="flex-1 px-3 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold"
+              >
+                Copier le lien
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
