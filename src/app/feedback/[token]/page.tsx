@@ -120,6 +120,7 @@ export default async function FeedbackPage({
       token={token}
       firstName={enrollment.user.firstName}
       immersionName={enrollment.event.name}
+      eventDate={enrollment.event.date.toISOString()}
       sections={sections}
     />
   );

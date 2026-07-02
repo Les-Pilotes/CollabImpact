@@ -105,7 +105,6 @@ export const FEEDBACK_SECTIONS: FeedbackSection[] = [
       {
         key: "intervenantePreferee",
         label: "Quelle était ton intervenante préférée ?",
-        description: "Options générées depuis les intervenantes de l'event.",
         type: "select",
         dynamicOptions: true,
       },
@@ -143,7 +142,6 @@ export const FEEDBACK_SECTIONS: FeedbackSection[] = [
       {
         key: "noteAnimation",
         label: "Sur une échelle de 1 à 5, comment évalues-tu la qualité de l'animation de l'atelier par {animatriceName} ?",
-        description: "Le nom de l'animatrice est configuré dans Paramètres → Formulaires.",
         type: "scale",
         dynamicLabel: true,
       },
