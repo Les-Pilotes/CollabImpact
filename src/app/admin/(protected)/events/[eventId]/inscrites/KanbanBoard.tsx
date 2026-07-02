@@ -1416,10 +1416,11 @@ function PostEventTab({
 
   const appOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
+  // Only participantes who actually showed up on the day.
   const eligible = rows.filter((p) =>
-    p.realStatus === "presente" || p.realStatus === "absente" ||
-    p.realStatus === "confirmee_j2" || p.realStatus === "feedback_recu"
+    p.realStatus === "presente" || p.realStatus === "feedback_recu"
   );
+  const feedbackCount = eligible.filter((p) => p.realStatus === "feedback_recu").length;
 
   const ensureToken = async (p: ParticipantRow): Promise<string | null> => {
     if (p.feedbackToken) return `${appOrigin}/feedback/${p.feedbackToken}`;
@@ -1478,7 +1479,10 @@ function PostEventTab({
       <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-            Liens feedback · {eligible.length} participante{eligible.length > 1 ? "s" : ""}
+            Présentes · {eligible.length}
+            {feedbackCount > 0 && (
+              <span className="ml-2 text-emerald-600">· {feedbackCount} feedback reçu{feedbackCount > 1 ? "s" : ""}</span>
+            )}
           </span>
           <span className="text-[11px] text-zinc-400">
             QR à partager sur place · ou envoyer par email
@@ -1487,6 +1491,7 @@ function PostEventTab({
         <div className="divide-y divide-zinc-50">
           {eligible.map((p) => {
             const hasFeedback = !!p.feedbackToken;
+            const feedbackDone = p.realStatus === "feedback_recu";
             const isBusy = pending.has(p.id);
             const feedbackUrl = hasFeedback ? `${appOrigin}/feedback/${p.feedbackToken}` : null;
             return (
@@ -1504,12 +1509,20 @@ function PostEventTab({
                     <p className="text-[11px] text-zinc-300 italic">Lien non encore généré</p>
                   )}
                 </div>
-                {p.feedbackSentAt && (
-                  <span className="text-[10px] text-zinc-400 shrink-0 hidden md:inline">
-                    Email le{" "}
-                    {new Date(p.feedbackSentAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                  </span>
-                )}
+                <div className="shrink-0 hidden sm:flex flex-col items-end gap-0.5">
+                  {p.realStatus === "feedback_recu" ? (
+                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      ✓ Feedback reçu
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-zinc-400">En attente</span>
+                  )}
+                  {p.feedbackSentAt && (
+                    <span className="text-[10px] text-zinc-400">
+                      Email {new Date(p.feedbackSentAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => openQr(p)}
@@ -1527,14 +1540,16 @@ function PostEventTab({
                   >
                     {isBusy ? "…" : hasFeedback ? "Copier" : "Générer"}
                   </button>
-                  <button
-                    onClick={() => sendEmail(p.id)}
-                    disabled={isBusy}
-                    title="Envoyer le formulaire de feedback par email"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-colors disabled:opacity-50"
-                  >
-                    {isBusy ? "…" : "Email"}
-                  </button>
+                  {!feedbackDone && (
+                    <button
+                      onClick={() => sendEmail(p.id)}
+                      disabled={isBusy}
+                      title="Envoyer le formulaire de feedback par email"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                    >
+                      {isBusy ? "…" : "Email"}
+                    </button>
+                  )}
                 </div>
               </div>
             );
