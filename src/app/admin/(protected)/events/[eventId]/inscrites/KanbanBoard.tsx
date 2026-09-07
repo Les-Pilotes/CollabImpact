@@ -15,7 +15,6 @@ import {
   bulkUpdateStatus,
   sendFeedbackInvite,
   generateFeedbackLink,
-  toggleFlag,
 } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -69,8 +68,8 @@ export type ParticipantRow = {
   feedbackSentAt?: string | null;
   /** Age in full years at the event date (null if birthDate missing). */
   age?: number | null;
-  /** Admin flag — hors-cible âge ou autre motif de suivi manuel. */
-  flagged?: boolean;
+  /** True when the enrollment has a non-empty internalNote. */
+  hasNote?: boolean;
   history: HistoryItem[];
   isDemo?: boolean;
   archivedAs?: "desistee" | "presente" | "absente";
@@ -602,12 +601,12 @@ export default function KanbanBoard({
                                   {p.age} ans{p.age >= 25 ? " ⚠" : ""}
                                 </span>
                               )}
-                              {p.flagged && (
+                              {p.hasNote && (
                                 <span
-                                  className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700"
-                                  title="Signalée par l'admin"
+                                  className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700"
+                                  title="Note admin"
                                 >
-                                  <Flag className="w-2.5 h-2.5" /> Signalée
+                                  <Flag className="w-2.5 h-2.5" /> Note
                                 </span>
                               )}
                             </div>
@@ -748,28 +747,13 @@ export default function KanbanBoard({
                   </span>
                 </div>
               </div>
-              {/* Flag toggle */}
-              <div className="mt-3 pt-3 border-t border-zinc-100">
-                <button
-                  onClick={() => {
-                    const next = !selected.flagged;
-                    setParticipants((prev) =>
-                      prev.map((p) => p.id === selected.id ? { ...p, flagged: next } : p)
-                    );
-                    if (!selected.id.startsWith("demo-")) {
-                      void toggleFlag(selected.id, next);
-                    }
-                  }}
-                  className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${
-                    selected.flagged
-                      ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-                      : "bg-white border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-                  }`}
-                >
-                  <Flag className="w-3.5 h-3.5" />
-                  {selected.flagged ? "Signalée — cliquer pour retirer" : "Signaler (hors-cible, suivi…)"}
-                </button>
-              </div>
+              {selected.hasNote && (
+                <div className="mt-3 pt-3 border-t border-zinc-100">
+                  <p className="flex items-center gap-1.5 text-[11px] text-violet-700 font-semibold">
+                    <Flag className="w-3 h-3" /> Note admin enregistrée
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Timeline */}

@@ -127,7 +127,7 @@ export default async function ParticipantesPage({
       j2EmailSent: !!e.j2SentAt,
       droitsImageStatus: e.droitsImageStatus,
       age,
-      flagged: e.flagged,
+      hasNote: !!e.internalNote,
       // Orientation fields (PR #3) — surfaced in the Workshop tab so the admin
       // can compose groups based on niveau/projet/centres d'intérêt/région.
       niveauScolaire: e.user.niveauScolaire ?? null,

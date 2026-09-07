@@ -447,23 +447,4 @@ export async function revertStatus(
   }
 }
 
-/**
- * Toggle the admin flag on an enrollment (hors-cible âge, suivi manuel, etc.).
- */
-export async function toggleFlag(
-  enrollmentId: string,
-  flagged: boolean,
-): Promise<{ ok: boolean }> {
-  await requireAdmin();
-  try {
-    await prisma.enrollment.update({
-      where: { id: enrollmentId },
-      data: { flagged },
-    });
-    return { ok: true };
-  } catch (err) {
-    console.error('[toggleFlag]', err);
-    return { ok: false };
-  }
-}
 

@@ -249,9 +249,6 @@ model Enrollment {
   // Admin-only internal note (not visible to participante)
   internalNote String?
 
-  // Admin flag — hors-cible âge ou autre motif de suivi manuel
-  flagged Boolean @default(false)
-
   deletedAt  DateTime?
   enrolledAt DateTime  @default(now())
   updatedAt  DateTime  @updatedAt

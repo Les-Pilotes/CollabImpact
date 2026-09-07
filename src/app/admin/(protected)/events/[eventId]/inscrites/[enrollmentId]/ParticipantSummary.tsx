@@ -91,6 +91,23 @@ export function ParticipantSummary({
             Mineure {ageOnEventDay !== null ? `· ${ageOnEventDay} ans` : ""}
           </Badge>
         )}
+        {!isMinor && ageOnEventDay !== null && ageOnEventDay >= 25 && (
+          <Badge
+            variant="warning"
+            className="bg-amber-100 text-amber-800"
+            title="Hors cible — plus de 25 ans le jour de l'événement"
+          >
+            {ageOnEventDay} ans ⚠ hors cible
+          </Badge>
+        )}
+        {!isMinor && ageOnEventDay !== null && ageOnEventDay < 25 && (
+          <Badge
+            variant="muted"
+            title={`${ageOnEventDay} ans le jour de l'événement`}
+          >
+            {ageOnEventDay} ans
+          </Badge>
+        )}
         <Badge variant={DROITS_VARIANT[droitsImageStatus]}>
           Droits image · {DROITS_LABEL[droitsImageStatus]}
         </Badge>
