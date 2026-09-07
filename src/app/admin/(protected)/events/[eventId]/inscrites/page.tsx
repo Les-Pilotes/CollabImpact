@@ -28,7 +28,8 @@ export default async function ParticipantesPage({
   const { admin } = await requireAdmin();
   const { eventId } = await params;
 
-  const [enrollments, speakersRaw] = await Promise.all([
+  const [eventRow, enrollments, speakersRaw] = await Promise.all([
+    prisma.event.findUnique({ where: { id: eventId }, select: { date: true } }),
     prisma.enrollment.findMany({
       where: {
         eventId,
@@ -102,6 +103,15 @@ export default async function ParticipantesPage({
     const checkinToken =
       e.status === "confirmee_j2" ? createCheckinToken(e.id) : null;
 
+    // Age au moment de l'event (en années révolues). Amber si ≥ 25.
+    const age: number | null =
+      e.user.birthDate && eventRow?.date
+        ? Math.floor(
+            (eventRow.date.getTime() - e.user.birthDate.getTime()) /
+              (365.25 * 24 * 3600 * 1000),
+          )
+        : null;
+
     return {
       id: e.id,
       firstName: capitalizeName(e.user.firstName),
@@ -116,6 +126,8 @@ export default async function ParticipantesPage({
       j7EmailSent: !!e.j7SentAt,
       j2EmailSent: !!e.j2SentAt,
       droitsImageStatus: e.droitsImageStatus,
+      age,
+      flagged: e.flagged,
       // Orientation fields (PR #3) — surfaced in the Workshop tab so the admin
       // can compose groups based on niveau/projet/centres d'intérêt/région.
       niveauScolaire: e.user.niveauScolaire ?? null,
