@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer } from "lucide-react";
+import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer, Flag } from "lucide-react";
 import PageHeader from "../../../PageHeader";
 import { QrCode } from "@/components/ui/qr-code";
 import { EnrollmentStatus } from "@prisma/client";
@@ -66,6 +66,10 @@ export type ParticipantRow = {
   /** Feedback invite token — present once `sendFeedbackInvite` has been called. */
   feedbackToken?: string | null;
   feedbackSentAt?: string | null;
+  /** Age in full years at the event date (null if birthDate missing). */
+  age?: number | null;
+  /** True when the enrollment has a non-empty internalNote. */
+  hasNote?: boolean;
   history: HistoryItem[];
   isDemo?: boolean;
   archivedAs?: "desistee" | "presente" | "absente";
@@ -585,6 +589,26 @@ export default function KanbanBoard({
                                   📄 Mineure
                                 </span>
                               )}
+                              {p.age != null && (
+                                <span
+                                  className={`inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                    p.age >= 25
+                                      ? "bg-amber-100 text-amber-800"
+                                      : "bg-zinc-100 text-zinc-500"
+                                  }`}
+                                  title={p.age >= 25 ? "Hors cible — plus de 25 ans" : "Âge au jour de l'event"}
+                                >
+                                  {p.age} ans{p.age >= 25 ? " ⚠" : ""}
+                                </span>
+                              )}
+                              {p.hasNote && (
+                                <span
+                                  className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700"
+                                  title="Note admin"
+                                >
+                                  <Flag className="w-2.5 h-2.5" /> Note
+                                </span>
+                              )}
                             </div>
                           </div>
                         </button>
@@ -706,6 +730,16 @@ export default function KanbanBoard({
                     <span className="text-zinc-800">{selected.city}</span>
                   </div>
                 )}
+                {selected.age != null && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500">Âge (event)</span>
+                    <span className={`font-semibold px-2 py-0.5 rounded ${
+                      selected.age >= 25 ? "bg-amber-100 text-amber-800" : "text-zinc-800"
+                    }`}>
+                      {selected.age} ans{selected.age >= 25 ? " ⚠" : ""}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Inscrite le</span>
                   <span className="text-zinc-800">
@@ -713,6 +747,13 @@ export default function KanbanBoard({
                   </span>
                 </div>
               </div>
+              {selected.hasNote && (
+                <div className="mt-3 pt-3 border-t border-zinc-100">
+                  <p className="flex items-center gap-1.5 text-[11px] text-violet-700 font-semibold">
+                    <Flag className="w-3 h-3" /> Note admin enregistrée
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Timeline */}
