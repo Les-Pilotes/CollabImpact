@@ -197,6 +197,8 @@ export default function KanbanBoard({
   const [infoOpen, setInfoOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("suivi");
   const [walkinQrOpen, setWalkinQrOpen] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<KanbanStatus | null>(null);
   // Seed émargement from the real DB status so présentes already marked show up
   // in the right section after a refresh (it used to be ephemeral local state).
   const [emargState, setEmargState] = useState<Record<string, string>>(() => {
@@ -423,6 +425,52 @@ export default function KanbanBoard({
     showToast("Données réinitialisées");
   };
 
+  const handleDrop = useCallback(
+    (colId: KanbanStatus) => {
+      setDragOverCol(null);
+      const id = draggingId;
+      setDraggingId(null);
+      if (!id) return;
+      const p = participants.find((x) => x.id === id);
+      if (!p || p.status === colId || id.startsWith("demo-")) return;
+
+      // Optimistic: move card immediately
+      const COL_REAL: Record<KanbanStatus, string> = {
+        attente_j7: "inscrit",
+        attente_j2: "confirmee_j7",
+        confirmee: "confirmee_j2",
+        absente: "absente",
+      };
+      setParticipants((prev) =>
+        prev.map((x) =>
+          x.id === id ? { ...x, status: colId, realStatus: COL_REAL[colId] } : x,
+        ),
+      );
+      showToast(
+        `${p.firstName} → ${COLUMNS.find((c) => c.id === colId)?.label ?? colId}`,
+      );
+
+      startStatusUpdate(async () => {
+        let res: { ok: boolean };
+        if (colId === "absente") {
+          res = await markAttendance(id, false);
+        } else if (colId === "confirmee") {
+          res = await updateEnrollmentStatus(id, EnrollmentStatus.confirmee_j2);
+        } else if (colId === "attente_j2") {
+          res = await updateEnrollmentStatus(id, EnrollmentStatus.confirmee_j7);
+        } else {
+          res = await updateEnrollmentStatus(id, EnrollmentStatus.inscrit);
+        }
+        if (!res.ok) {
+          showToast("Erreur lors du changement de statut");
+          router.refresh();
+        }
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draggingId, participants, showToast, router],
+  );
+
   const cols = COLUMNS.map((col) => ({
     ...col,
     items: [...participants.filter((p) => p.status === col.id)].sort((a, b) => {
@@ -514,7 +562,15 @@ export default function KanbanBoard({
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
           <div className="flex gap-4 h-full p-6 min-w-max md:min-w-0">
             {cols.map((col) => (
-              <div key={col.id} className="flex flex-col w-72 md:flex-1 min-w-[260px]">
+              <div
+                key={col.id}
+                className={`flex flex-col w-72 md:flex-1 min-w-[260px] rounded-xl transition-colors ${
+                  dragOverCol === col.id ? "bg-orange-50/60 ring-2 ring-orange-200" : ""
+                }`}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCol(col.id); }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(null); }}
+                onDrop={(e) => { e.preventDefault(); handleDrop(col.id); }}
+              >
                 {/* Column header */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-semibold text-zinc-700">{col.label}</span>
@@ -539,8 +595,16 @@ export default function KanbanBoard({
                     return (
                       <div
                         key={p.id}
-                        className={`relative bg-white border rounded-xl p-3 transition-all hover:shadow-sm ${
-                          p.id === selectedId
+                        draggable={!p.isDemo}
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = "move";
+                          setDraggingId(p.id);
+                        }}
+                        onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }}
+                        className={`relative bg-white border rounded-xl p-3 transition-all hover:shadow-sm cursor-grab active:cursor-grabbing ${
+                          draggingId === p.id
+                            ? "opacity-40 scale-[0.97]"
+                            : p.id === selectedId
                             ? "border-orange-300 shadow-sm ring-1 ring-orange-200"
                             : isChecked
                             ? "border-orange-200 bg-orange-50/40"
