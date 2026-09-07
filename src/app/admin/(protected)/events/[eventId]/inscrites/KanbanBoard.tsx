@@ -665,6 +665,14 @@ export default function KanbanBoard({
                                   {p.age} ans{p.age >= 25 ? " ⚠" : ""}
                                 </span>
                               )}
+                              {p.realStatus === "desistement" && (
+                                <span
+                                  className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700"
+                                  title="Désistement"
+                                >
+                                  Désistement
+                                </span>
+                              )}
                               {p.hasNote && (
                                 <span
                                   className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700"
