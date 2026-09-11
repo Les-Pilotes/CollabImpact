@@ -1524,10 +1524,10 @@ function CheckinQrModal({
 
 function buildRelanceTemplate(name: string, date: Date | null | undefined, address: string) {
   const dateLabel = date
-    ? date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+    ? date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Paris" })
     : "[jour]";
   const timeLabel = date
-    ? date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    ? date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
     : "[heure]";
   const eventName = name || "[nom de l'événement]";
   const eventAddress = address || "[adresse complète]";
