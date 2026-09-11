@@ -200,7 +200,7 @@ export default function KanbanBoard({
   const [walkinQrOpen, setWalkinQrOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<KanbanStatus | null>(null);
-  const [emailModal, setEmailModal] = useState<{ colId: KanbanStatus; label: string; ids: string[] } | null>(null);
+  const [emailModal, setEmailModal] = useState<{ label: string; ids: string[] } | null>(null);
   // Seed émargement from the real DB status so présentes already marked show up
   // in the right section after a refresh (it used to be ephemeral local state).
   const [emargState, setEmargState] = useState<Record<string, string>>(() => {
@@ -580,7 +580,6 @@ export default function KanbanBoard({
                     {col.items.filter((p) => !p.isDemo).length > 0 && (
                       <button
                         onClick={() => setEmailModal({
-                          colId: col.id,
                           label: col.label,
                           ids: col.items.filter((p) => !p.isDemo).map((p) => p.id),
                         })}
@@ -735,6 +734,18 @@ export default function KanbanBoard({
                 className="px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 disabled:opacity-50 disabled:cursor-wait text-white text-xs font-semibold transition-colors"
               >
                 {isSending ? "Envoi…" : "✉️ Envoyer J-2"}
+              </button>
+            )}
+            {/* Email groupé sur la sélection */}
+            {checkedParticipants.filter((p) => !p.isDemo).length > 0 && (
+              <button
+                onClick={() => setEmailModal({
+                  label: `${checkedParticipants.filter((p) => !p.isDemo).length} sélectionnée${checkedParticipants.filter((p) => !p.isDemo).length > 1 ? "s" : ""}`,
+                  ids: checkedParticipants.filter((p) => !p.isDemo).map((p) => p.id),
+                })}
+                className="px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-semibold transition-colors flex items-center gap-1"
+              >
+                <Mail className="w-3 h-3" /> Email
               </button>
             )}
             {/* Bulk status — Jour J: marquer tout le monde présent sans attendre les confirmations */}
@@ -1492,6 +1503,23 @@ function CheckinQrModal({
 
 // ─── Email groupé par colonne ─────────────────────────────────────────────────
 
+const RELANCE_TEMPLATE = {
+  subject: "Infos pratiques — [nom de l'événement]",
+  body: `Bonjour,
+
+On te rappelle que [nom de l'événement] a lieu [jour] à [heure].
+
+📍 Adresse : [adresse complète]
+🕘 Arrivée : [heure d'accueil]
+🚇 Accès : [transports / parking]
+
+[Ajoute ici toute info utile : code d'accès, tenue, documents à prévoir…]
+
+En cas d'empêchement de dernière minute, merci de nous prévenir le plus tôt possible à [email de contact].
+
+On a hâte de te retrouver !`,
+};
+
 function ColumnEmailModal({
   colLabel,
   enrollmentIds,
@@ -1505,10 +1533,12 @@ function ColumnEmailModal({
 }) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [step, setStep] = useState<"compose" | "confirm">("compose");
   const [sending, startSending] = useTransition();
 
+  const canProceed = subject.trim().length > 0 && body.trim().length > 0;
+
   const handleSend = () => {
-    if (!subject.trim() || !body.trim()) return;
     startSending(async () => {
       const res = await sendColumnEmail(enrollmentIds, subject.trim(), body.trim());
       if (res.ok) {
@@ -1523,9 +1553,12 @@ function ColumnEmailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col gap-4 p-6">
+        {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-zinc-900">Email groupé</h2>
+            <h2 className="text-base font-semibold text-zinc-900">
+              {step === "compose" ? "Email groupé" : "Confirmer l'envoi"}
+            </h2>
             <p className="text-xs text-zinc-500 mt-0.5">
               {enrollmentIds.length} participante{enrollmentIds.length > 1 ? "s" : ""} · {colLabel}
             </p>
@@ -1535,42 +1568,83 @@ function ColumnEmailModal({
           </button>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1">Objet</label>
-            <input
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Ex : Infos pratiques pour samedi"
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-300"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 mb-1">Message</label>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Écris ton message ici…"
-              rows={7}
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">
-            Annuler
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={sending || !subject.trim() || !body.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--brand-orange)] text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Mail className="w-3.5 h-3.5" />
-            {sending ? "Envoi…" : `Envoyer à ${enrollmentIds.length}`}
-          </button>
-        </div>
+        {step === "compose" ? (
+          <>
+            <div className="flex flex-col gap-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-zinc-600">Objet</label>
+                  <button
+                    onClick={() => { setSubject(RELANCE_TEMPLATE.subject); setBody(RELANCE_TEMPLATE.body); }}
+                    className="text-[11px] text-orange-500 hover:text-orange-700 font-medium transition-colors"
+                  >
+                    Utiliser le modèle de relance ↓
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Ex : Infos pratiques pour samedi"
+                  className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 mb-1">Message</label>
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Écris ton message ici…"
+                  rows={9}
+                  className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">
+                Annuler
+              </button>
+              <button
+                onClick={() => setStep("confirm")}
+                disabled={!canProceed}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Vérifier avant d'envoyer →
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3">
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 font-medium">
+                ⚠ Cet email sera envoyé à <strong>{enrollmentIds.length} participante{enrollmentIds.length > 1 ? "s" : ""}</strong>. Cette action est irréversible.
+              </div>
+              <div className="rounded-lg border border-zinc-200 p-4 flex flex-col gap-2">
+                <p className="text-xs text-zinc-400 font-medium uppercase tracking-wide">Objet</p>
+                <p className="text-sm font-semibold text-zinc-900">{subject}</p>
+                <p className="text-xs text-zinc-400 font-medium uppercase tracking-wide mt-2">Message</p>
+                <p className="text-sm text-zinc-700 whitespace-pre-line line-clamp-6">{body}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setStep("compose")}
+                disabled={sending}
+                className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors disabled:opacity-50"
+              >
+                ← Modifier
+              </button>
+              <button
+                onClick={handleSend}
+                disabled={sending}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--brand-orange)] text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-wait"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                {sending ? "Envoi en cours…" : `Envoyer définitivement`}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
