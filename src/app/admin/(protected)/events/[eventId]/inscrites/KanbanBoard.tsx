@@ -1609,7 +1609,7 @@ function ColumnEmailModal({
                 disabled={!canProceed}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Vérifier avant d'envoyer →
+                {"Vérifier avant d'envoyer →"}
               </button>
             </div>
           </>
