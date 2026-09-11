@@ -183,10 +183,16 @@ export default function KanbanBoard({
   initialParticipants,
   eventId,
   speakers,
+  eventName,
+  eventDate,
+  eventAddress,
 }: {
   initialParticipants: ParticipantRow[];
   eventId: string;
   speakers: SpeakerRow[];
+  eventName?: string;
+  eventDate?: Date | null;
+  eventAddress?: string;
 }) {
   const router = useRouter();
   const [isSending, startSending] = useTransition();
@@ -785,6 +791,9 @@ export default function KanbanBoard({
           enrollmentIds={emailModal.ids}
           onClose={() => setEmailModal(null)}
           onToast={showToast}
+          eventName={eventName}
+          eventDate={eventDate}
+          eventAddress={eventAddress}
         />
       )}
 
@@ -1503,13 +1512,22 @@ function CheckinQrModal({
 
 // ─── Email groupé par colonne ─────────────────────────────────────────────────
 
-const RELANCE_TEMPLATE = {
-  subject: "Infos pratiques — [nom de l'événement]",
-  body: `Bonjour,
+function buildRelanceTemplate(name: string, date: Date | null | undefined, address: string) {
+  const dateLabel = date
+    ? date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+    : "[jour]";
+  const timeLabel = date
+    ? date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    : "[heure]";
+  const eventName = name || "[nom de l'événement]";
+  const eventAddress = address || "[adresse complète]";
+  return {
+    subject: `Infos pratiques — ${eventName}`,
+    body: `Bonjour,
 
-On te rappelle que [nom de l'événement] a lieu [jour] à [heure].
+On te rappelle que ${eventName} a lieu ${dateLabel} à ${timeLabel}.
 
-📍 Adresse : [adresse complète]
+📍 Adresse : ${eventAddress}
 🕘 Arrivée : [heure d'accueil]
 🚇 Accès : [transports / parking]
 
@@ -1518,18 +1536,25 @@ On te rappelle que [nom de l'événement] a lieu [jour] à [heure].
 En cas d'empêchement de dernière minute, merci de nous prévenir le plus tôt possible à [email de contact].
 
 On a hâte de te retrouver !`,
-};
+  };
+}
 
 function ColumnEmailModal({
   colLabel,
   enrollmentIds,
   onClose,
   onToast,
+  eventName,
+  eventDate,
+  eventAddress,
 }: {
   colLabel: string;
   enrollmentIds: string[];
   onClose: () => void;
   onToast: (msg: string) => void;
+  eventName?: string;
+  eventDate?: Date | null;
+  eventAddress?: string;
 }) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -1575,7 +1600,7 @@ function ColumnEmailModal({
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-medium text-zinc-600">Objet</label>
                   <button
-                    onClick={() => { setSubject(RELANCE_TEMPLATE.subject); setBody(RELANCE_TEMPLATE.body); }}
+                    onClick={() => { const t = buildRelanceTemplate(eventName ?? "", eventDate, eventAddress ?? ""); setSubject(t.subject); setBody(t.body); }}
                     className="text-[11px] text-orange-500 hover:text-orange-700 font-medium transition-colors"
                   >
                     Utiliser le modèle de relance ↓
