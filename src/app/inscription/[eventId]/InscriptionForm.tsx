@@ -249,10 +249,12 @@ export default function InscriptionForm({
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "Europe/Paris",
   }).format(eventDate);
   const eventTimeLabel = new Intl.DateTimeFormat("fr-FR", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Paris",
   }).format(eventDate);
 
   const isMinor = data.birthDate

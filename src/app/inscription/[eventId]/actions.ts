@@ -471,7 +471,7 @@ export async function submitInscription(
         prenom: user.firstName,
         event: event.name,
         date: formatEventDate(event.date),
-        horaire: event.date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+        horaire: event.date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }),
         lieu: event.address,
       });
       await sendEmail({
@@ -511,5 +511,6 @@ function formatEventDate(date: Date): string {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "Europe/Paris",
   }).format(date);
 }

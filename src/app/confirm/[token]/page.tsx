@@ -94,6 +94,7 @@ export default async function ConfirmPage({
         weekday: "long",
         day: "numeric",
         month: "long",
+        timeZone: "Europe/Paris",
       }).format(enrollment.eventDate)
     : "";
 

@@ -40,10 +40,12 @@ export async function GET(request: NextRequest) {
       day: "numeric",
       month: "long",
       year: "numeric",
+      timeZone: "Europe/Paris",
     });
     const timeLabel = enrollment.event.date.toLocaleTimeString("fr-FR", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Europe/Paris",
     });
     const confirmToken = createActionToken(enrollment.id, "confirm");
     const declineToken = createActionToken(enrollment.id, "decline");

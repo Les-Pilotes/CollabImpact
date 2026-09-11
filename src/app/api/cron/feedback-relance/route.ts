@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
       day: "numeric",
       month: "long",
       year: "numeric",
+      timeZone: "Europe/Paris",
     });
 
     await sendEmail({

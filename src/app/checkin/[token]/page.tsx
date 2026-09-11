@@ -9,6 +9,7 @@ function formatTime(d: Date): string {
   return new Intl.DateTimeFormat('fr-FR', {
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Europe/Paris',
   }).format(d);
 }
 
@@ -71,6 +72,7 @@ export default async function CheckinPage({
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    timeZone: 'Europe/Paris',
   }).format(outcome.eventDate);
 
   // Already checked in earlier today — show calmer screen, no confettis
