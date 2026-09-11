@@ -10,6 +10,7 @@ import { resolveEmail } from '@/lib/email/resolve';
 import J7Reminder from '@/lib/email/templates/J7Reminder';
 import J2Reminder from '@/lib/email/templates/J2Reminder';
 import FeedbackInvite from '@/lib/email/templates/FeedbackInvite';
+import CustomMessage from '@/lib/email/templates/CustomMessage';
 import React from 'react';
 
 function buildEmailVars(enrollment: {
@@ -447,4 +448,47 @@ export async function revertStatus(
   }
 }
 
+/**
+ * Send a free-form email to a list of enrollees (bulk column email).
+ * Sends in parallel, returns sent/failed counts.
+ */
+export async function sendColumnEmail(
+  enrollmentIds: string[],
+  subject: string,
+  body: string,
+): Promise<{ ok: boolean; sent: number; failed: number; error?: string }> {
+  await requireAdmin();
+  if (!enrollmentIds.length) return { ok: true, sent: 0, failed: 0 };
 
+  try {
+    const enrollments = await prisma.enrollment.findMany({
+      where: { id: { in: enrollmentIds } },
+      select: {
+        user: { select: { email: true } },
+        event: { select: { replyToEmail: true, emailSignature: true } },
+      },
+    });
+
+    const results = await Promise.all(
+      enrollments.map((e) =>
+        sendEmail({
+          to: e.user.email,
+          subject,
+          replyTo: e.event.replyToEmail ?? undefined,
+          react: React.createElement(CustomMessage, {
+            subject,
+            body,
+            signature: e.event.emailSignature ?? undefined,
+          }),
+        }),
+      ),
+    );
+
+    const sent = results.filter((r) => r.sent).length;
+    const failed = results.length - sent;
+    return { ok: true, sent, failed };
+  } catch (err) {
+    console.error('[sendColumnEmail]', err);
+    return { ok: false, sent: 0, failed: 0, error: "Erreur lors de l'envoi." };
+  }
+}

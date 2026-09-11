@@ -7,7 +7,7 @@ import { createCheckinToken } from "@/lib/tokens";
 function mapStatus(s: string): ParticipantRow["status"] {
   if (s === "confirmee_j7") return "attente_j2";
   if (s === "confirmee_j2" || s === "presente") return "confirmee";
-  if (s === "absente") return "absente";
+  if (s === "absente" || s === "desistement") return "absente";
   return "attente_j7"; // inscrit, contactee
 }
 
@@ -37,7 +37,7 @@ export default async function ParticipantesPage({
         // `presente` and `absente` stay on the board so admins can always see
         // and re-modify them (e.g. a participante marked absente who showed up).
         // Only `desistement` and `feedback_recu` are hidden (terminal states).
-        status: { notIn: ["desistement", "feedback_recu"] },
+        status: { notIn: ["feedback_recu"] },
       },
       include: { user: true },
       orderBy: { enrolledAt: "asc" },
