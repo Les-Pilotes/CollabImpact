@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer, Flag } from "lucide-react";
+import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer, Flag, Mail } from "lucide-react";
 import PageHeader from "../../../PageHeader";
 import { QrCode } from "@/components/ui/qr-code";
 import { EnrollmentStatus } from "@prisma/client";
@@ -15,6 +15,7 @@ import {
   bulkUpdateStatus,
   sendFeedbackInvite,
   generateFeedbackLink,
+  sendColumnEmail,
 } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -199,6 +200,7 @@ export default function KanbanBoard({
   const [walkinQrOpen, setWalkinQrOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<KanbanStatus | null>(null);
+  const [emailModal, setEmailModal] = useState<{ colId: KanbanStatus; label: string; ids: string[] } | null>(null);
   // Seed émargement from the real DB status so présentes already marked show up
   // in the right section after a refresh (it used to be ephemeral local state).
   const [emargState, setEmargState] = useState<Record<string, string>>(() => {
@@ -574,9 +576,24 @@ export default function KanbanBoard({
                 {/* Column header */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-semibold text-zinc-700">{col.label}</span>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${col.color}`}>
-                    {col.items.length}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {col.items.filter((p) => !p.isDemo).length > 0 && (
+                      <button
+                        onClick={() => setEmailModal({
+                          colId: col.id,
+                          label: col.label,
+                          ids: col.items.filter((p) => !p.isDemo).map((p) => p.id),
+                        })}
+                        className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
+                        title={`Envoyer un email à toutes les participantes de cette colonne`}
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${col.color}`}>
+                      {col.items.length}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Cards */}
@@ -749,6 +766,16 @@ export default function KanbanBoard({
 
       {/* ── QR walk-in (inscription sur place Jour J) ── */}
       {walkinQrOpen && <WalkinQrModal eventId={eventId} onClose={() => setWalkinQrOpen(false)} />}
+
+      {/* ── Email groupé par colonne ── */}
+      {emailModal && (
+        <ColumnEmailModal
+          colLabel={emailModal.label}
+          enrollmentIds={emailModal.ids}
+          onClose={() => setEmailModal(null)}
+          onToast={showToast}
+        />
+      )}
 
       {/* ── Side panel — desktop: pushes kanban, mobile: overlay ── */}
       {selected && (
@@ -1456,6 +1483,92 @@ function CheckinQrModal({
             className="flex-1 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-400 text-xs font-semibold cursor-not-allowed"
           >
             Envoyer par email
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Email groupé par colonne ─────────────────────────────────────────────────
+
+function ColumnEmailModal({
+  colLabel,
+  enrollmentIds,
+  onClose,
+  onToast,
+}: {
+  colLabel: string;
+  enrollmentIds: string[];
+  onClose: () => void;
+  onToast: (msg: string) => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [sending, startSending] = useTransition();
+
+  const handleSend = () => {
+    if (!subject.trim() || !body.trim()) return;
+    startSending(async () => {
+      const res = await sendColumnEmail(enrollmentIds, subject.trim(), body.trim());
+      if (res.ok) {
+        onToast(`✓ Email envoyé à ${res.sent} participante${res.sent > 1 ? "s" : ""}${res.failed > 0 ? ` · ${res.failed} échec(s)` : ""}`);
+        onClose();
+      } else {
+        onToast("Erreur lors de l'envoi");
+      }
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col gap-4 p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-900">Email groupé</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              {enrollmentIds.length} participante{enrollmentIds.length > 1 ? "s" : ""} · {colLabel}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1">Objet</label>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Ex : Infos pratiques pour samedi"
+              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1">Message</label>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Écris ton message ici…"
+              rows={7}
+              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">
+            Annuler
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending || !subject.trim() || !body.trim()}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--brand-orange)] text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            {sending ? "Envoi…" : `Envoyer à ${enrollmentIds.length}`}
           </button>
         </div>
       </div>
