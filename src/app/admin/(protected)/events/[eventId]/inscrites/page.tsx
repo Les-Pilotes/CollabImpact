@@ -29,7 +29,7 @@ export default async function ParticipantesPage({
   const { eventId } = await params;
 
   const [eventRow, enrollments, speakersRaw] = await Promise.all([
-    prisma.event.findUnique({ where: { id: eventId }, select: { date: true } }),
+    prisma.event.findUnique({ where: { id: eventId }, select: { date: true, name: true, address: true } }),
     prisma.enrollment.findMany({
       where: {
         eventId,
@@ -142,5 +142,14 @@ export default async function ParticipantesPage({
     };
   });
 
-  return <KanbanBoard initialParticipants={participants} eventId={eventId} speakers={speakers} />;
+  return (
+    <KanbanBoard
+      initialParticipants={participants}
+      eventId={eventId}
+      speakers={speakers}
+      eventName={eventRow?.name ?? ""}
+      eventDate={eventRow?.date ?? null}
+      eventAddress={eventRow?.address ?? ""}
+    />
+  );
 }
