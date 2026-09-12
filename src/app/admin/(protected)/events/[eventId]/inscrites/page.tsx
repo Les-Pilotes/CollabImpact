@@ -25,6 +25,8 @@ export default async function ParticipantesPage({
 }: {
   params: Promise<{ eventId: string }>;
 }) {
+  // eslint-disable-next-line react-hooks/purity -- server component, Date.now() is fine here
+  const now = Date.now();
   const { admin } = await requireAdmin();
   const { eventId } = await params;
 
@@ -73,7 +75,7 @@ export default async function ParticipantesPage({
     if (e.status === "confirmee_j7" || e.status === "confirmee_j2") {
       const confJ7Ts = Math.min(
         (e.j7SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000,
-        Date.now(),
+        now,
       );
       history.push({
         id: "conf_j7",
@@ -95,7 +97,7 @@ export default async function ParticipantesPage({
     if (e.status === "confirmee_j2") {
       const confJ2Ts = Math.min(
         (e.j2SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000,
-        Date.now(),
+        now,
       );
       history.push({
         id: "conf_j2",
