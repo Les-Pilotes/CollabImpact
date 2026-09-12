@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useTransition, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer, Flag, Mail, MoreHorizontal } from "lucide-react";
 import PageHeader from "../../../PageHeader";
 import { QrCode } from "@/components/ui/qr-code";
@@ -17,6 +17,7 @@ import {
   sendFeedbackInvite,
   generateFeedbackLink,
   sendColumnEmail,
+  addParticipantManually,
 } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -203,7 +204,9 @@ export default function KanbanBoard({
   const [simOpen, setSimOpen] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState("suivi");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") ?? "suivi");
+  const [addOpen, setAddOpen] = useState(false);
   const [walkinQrOpen, setWalkinQrOpen] = useState(false);
   const [feedbackQrOpen, setFeedbackQrOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -511,11 +514,19 @@ export default function KanbanBoard({
             { id: "postevent", label: "Post-Event", icon: MessageSquare },
           ]}
           activeTab={activeTab}
-          onTabChange={(id) => { setActiveTab(id); setSelectedId(null); }}
+          onTabChange={(id) => {
+            setActiveTab(id);
+            setSelectedId(null);
+            const p = new URLSearchParams(Array.from(searchParams.entries()));
+            p.set("tab", id);
+            p.delete("wmode");
+            router.replace(`?${p.toString()}`, { scroll: false });
+          }}
           actions={<KanbanActions
             eventId={eventId}
             onWalkinQr={() => setWalkinQrOpen(true)}
             onFeedbackQr={() => setFeedbackQrOpen(true)}
+            onAddParticipant={() => setAddOpen(true)}
           />}
         />
 
@@ -767,6 +778,16 @@ export default function KanbanBoard({
         </div>
       )}
 
+      {/* ── Ajout manuel ── */}
+      {addOpen && (
+        <AddParticipantModal
+          eventId={eventId}
+          onClose={() => setAddOpen(false)}
+          onAdded={() => { setAddOpen(false); router.refresh(); }}
+          onToast={showToast}
+        />
+      )}
+
       {/* ── QR walk-in (inscription sur place Jour J) ── */}
       {walkinQrOpen && <WalkinQrModal eventId={eventId} onClose={() => setWalkinQrOpen(false)} />}
       {feedbackQrOpen && <FeedbackQrModal eventId={eventId} participants={participants} onClose={() => setFeedbackQrOpen(false)} />}
@@ -998,7 +1019,20 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
   avatarColor: (id: string) => string;
   initials: (p: ParticipantRow) => string;
 }) {
-  const [mode, setMode] = useState<"groupes" | "emargement">("groupes");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<"groupes" | "emargement">(() => {
+    const wmode = searchParams.get("wmode");
+    return wmode === "emargement" ? "emargement" : "groupes";
+  });
+
+  const setModeAndUrl = (m: "groupes" | "emargement") => {
+    setMode(m);
+    const p = new URLSearchParams(Array.from(searchParams.entries()));
+    if (m === "emargement") p.set("wmode", "emargement");
+    else p.delete("wmode");
+    router.replace(`?${p.toString()}`, { scroll: false });
+  };
   // Group cards are compact by default (just the name) so the répartition stays
   // readable; this toggle expands the orientation details on every card at once,
   // and each card can also be expanded individually via its chevron.
@@ -1013,15 +1047,24 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
   // admin can start drafting groups before everyone is confirmed.
   const eligible = participants.filter((p) => p.status !== "absente");
 
-  const [groups, setGroups] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
-    if (speakers.length > 0) {
-      eligible.forEach((p, i) => {
-        initial[p.id] = speakers[i % speakers.length].id;
+  const [groups, setGroups] = useState<Record<string, string>>({});
+
+  const autoAssign = () => {
+    if (speakers.length === 0) return;
+    const unassigned = eligible.filter((p) => !groups[p.id]);
+    setGroups((prev) => {
+      const next = { ...prev };
+      // Count existing members per speaker to balance
+      const counts: Record<string, number> = {};
+      speakers.forEach((s) => { counts[s.id] = Object.values(next).filter((v) => v === s.id).length; });
+      unassigned.forEach((p) => {
+        const minSpeaker = speakers.reduce((a, b) => counts[a.id] <= counts[b.id] ? a : b);
+        next[p.id] = minSpeaker.id;
+        counts[minSpeaker.id]++;
       });
-    }
-    return initial;
-  });
+      return next;
+    });
+  };
 
   const assignGroup = (participantId: string, intervenanteId: string) => {
     setGroups((prev) => ({ ...prev, [participantId]: intervenanteId }));
@@ -1054,7 +1097,7 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
       {/* Mode switcher */}
       <div className="px-4 md:px-6 pt-4 pb-3 flex items-center gap-2 shrink-0 border-b border-zinc-100">
         <button
-          onClick={() => { setMode("groupes"); setPicking(null); }}
+          onClick={() => { setModeAndUrl("groupes"); setPicking(null); }}
           className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
             mode === "groupes" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
           }`}
@@ -1062,7 +1105,7 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
           Groupes
         </button>
         <button
-          onClick={() => { setMode("emargement"); setPicking(null); }}
+          onClick={() => { setModeAndUrl("emargement"); setPicking(null); }}
           className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
             mode === "emargement" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
           }`}
@@ -1097,14 +1140,59 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
 
       {/* Groupes view */}
       {mode === "groupes" && (
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-3 content-start auto-rows-min">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
           {speakers.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="text-3xl mb-3">🎤</p>
               <p className="text-sm font-semibold text-zinc-700">Aucune intervenante configurée</p>
               <p className="text-xs text-zinc-400 mt-1">Ajoutez des intervenantes dans l&apos;onglet Intervenantes pour composer les groupes.</p>
             </div>
           )}
+
+          {/* Unassigned pool */}
+          {speakers.length > 0 && (() => {
+            const unassigned = eligible.filter((p) => !groups[p.id]);
+            if (unassigned.length === 0) return null;
+            return (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+                <div className="px-4 py-3 flex items-center justify-between border-b border-amber-100">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                    Non assignées · {unassigned.length}
+                  </span>
+                  <button
+                    onClick={autoAssign}
+                    className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1 rounded-full transition-colors"
+                  >
+                    Répartir automatiquement
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2 p-3">
+                  {unassigned.map((p) => (
+                    <button
+                      key={p.id}
+                      data-participant
+                      onClick={() => handleParticipantTap(p.id)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                        picking === p.id
+                          ? "bg-orange-500 border-orange-500 text-white"
+                          : "bg-white border-amber-200 text-zinc-700 hover:border-orange-300 hover:bg-orange-50"
+                      }`}
+                      draggable
+                      onDragStart={() => { setDraggingId(p.id); setPicking(null); }}
+                      onDragEnd={() => { setDraggingId(null); setDragOverGroup(null); }}
+                    >
+                      <span className={`w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${avatarColor(p.id)}`}>
+                        {initials(p)}
+                      </span>
+                      {p.firstName} {p.lastName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {speakers.map((inv, speakerIdx) => {
             const speakerColor = SPEAKER_COLORS[speakerIdx % SPEAKER_COLORS.length];
             const members = [...eligible.filter((p) => groups[p.id] === inv.id)]
@@ -1174,6 +1262,7 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
               </div>
             );
           })}
+          </div>{/* end grid */}
         </div>
       )}
 
@@ -2266,10 +2355,12 @@ function KanbanActions({
   eventId,
   onWalkinQr,
   onFeedbackQr,
+  onAddParticipant,
 }: {
   eventId: string;
   onWalkinQr: () => void;
   onFeedbackQr: () => void;
+  onAddParticipant: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -2278,8 +2369,12 @@ function KanbanActions({
 
   return (
     <>
-      {/* Desktop — three separate buttons */}
+      {/* Desktop — buttons */}
       <div className="hidden sm:flex items-center gap-2">
+        <button onClick={onAddParticipant} className={`${sharedBtn} border-orange-200 text-orange-700 hover:bg-orange-50`} title="Ajouter une participante manuellement">
+          <Plus className="w-3.5 h-3.5" />
+          Ajouter
+        </button>
         <button onClick={onWalkinQr} className={sharedBtn} title="QR inscription sur place">
           <QrCodeIcon className="w-3.5 h-3.5" />
           QR walk-in
@@ -2308,6 +2403,13 @@ function KanbanActions({
             <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
             <div className="absolute right-0 top-full mt-1 z-40 bg-white border border-zinc-200 rounded-xl shadow-lg overflow-hidden min-w-[160px]">
               <button
+                onClick={() => { setMenuOpen(false); onAddParticipant(); }}
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-orange-700 hover:bg-orange-50"
+              >
+                <Plus className="w-4 h-4 shrink-0" />
+                Ajouter
+              </button>
+              <button
                 onClick={() => { setMenuOpen(false); onWalkinQr(); }}
                 className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50"
               >
@@ -2335,5 +2437,86 @@ function KanbanActions({
         )}
       </div>
     </>
+  );
+}
+
+// ─── Add participant manually ─────────────────────────────────────────────────
+
+function AddParticipantModal({
+  eventId,
+  onClose,
+  onAdded,
+  onToast,
+}: {
+  eventId: string;
+  onClose: () => void;
+  onAdded: () => void;
+  onToast: (msg: string) => void;
+}) {
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({ ...prev, [k]: e.target.value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) return;
+    setBusy(true);
+    const res = await addParticipantManually(eventId, {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email,
+      phone: form.phone || undefined,
+    });
+    setBusy(false);
+    if (res.ok) {
+      onToast(`${form.firstName} ${form.lastName} ajoutée ✓`);
+      onAdded();
+    } else {
+      setError(res.error ?? "Erreur lors de l'ajout.");
+    }
+  };
+
+  const inputCls = "w-full px-3 py-2 rounded-lg border border-zinc-200 text-sm text-zinc-900 placeholder-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent";
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-500">Inscription manuelle</p>
+            <p className="text-base font-extrabold text-zinc-900 mt-0.5">Ajouter une participante</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700" aria-label="Fermer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <input className={inputCls} placeholder="Prénom *" value={form.firstName} onChange={set("firstName")} autoFocus />
+            <input className={inputCls} placeholder="Nom *" value={form.lastName} onChange={set("lastName")} />
+          </div>
+          <input className={inputCls} type="email" placeholder="Email *" value={form.email} onChange={set("email")} />
+          <input className={inputCls} type="tel" placeholder="Téléphone (optionnel)" value={form.phone} onChange={set("phone")} />
+
+          {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={busy || !form.firstName.trim() || !form.lastName.trim() || !form.email.trim()}
+            className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50"
+          >
+            {busy ? "Ajout en cours…" : "Ajouter"}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }

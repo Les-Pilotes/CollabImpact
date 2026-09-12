@@ -494,3 +494,48 @@ export async function sendColumnEmail(
     return { ok: false, sent: 0, failed: 0, error: "Erreur lors de l'envoi." };
   }
 }
+
+/**
+ * Inscription manuelle par un admin (source = "admin").
+ * Finds or creates the User by e-mail, then creates the Enrollment.
+ */
+export async function addParticipantManually(
+  eventId: string,
+  data: { firstName: string; lastName: string; email: string; phone?: string },
+): Promise<{ ok: boolean; error?: string }> {
+  const { admin } = await requireAdmin();
+  const email = data.email.trim().toLowerCase();
+
+  const alreadyEnrolled = await prisma.enrollment.findFirst({
+    where: { eventId, deletedAt: null, user: { email: { equals: email, mode: 'insensitive' } } },
+  });
+  if (alreadyEnrolled) return { ok: false, error: 'Cette personne est déjà inscrite à cet événement.' };
+
+  let user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        organisationId: admin.organisationId,
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        email,
+        phone: data.phone?.trim() || null,
+      },
+    });
+  } else if (user.organisationId !== admin.organisationId) {
+    return { ok: false, error: 'Cette adresse e-mail appartient à une autre organisation.' };
+  }
+
+  await prisma.enrollment.create({
+    data: {
+      organisationId: admin.organisationId,
+      eventId,
+      userId: user.id,
+      status: 'inscrit',
+      source: 'admin',
+    },
+  });
+
+  return { ok: true };
+}
