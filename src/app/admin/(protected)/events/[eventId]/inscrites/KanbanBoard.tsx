@@ -204,6 +204,7 @@ export default function KanbanBoard({
   const [infoOpen, setInfoOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("suivi");
   const [walkinQrOpen, setWalkinQrOpen] = useState(false);
+  const [feedbackQrOpen, setFeedbackQrOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<KanbanStatus | null>(null);
   const [emailModal, setEmailModal] = useState<{ label: string; ids: string[] } | null>(null);
@@ -520,6 +521,14 @@ export default function KanbanBoard({
                 <QrCodeIcon className="w-3.5 h-3.5" />
                 QR walk-in
               </button>
+              <button
+                onClick={() => setFeedbackQrOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
+                title="Afficher le QR de feedback à scanner en fin de session"
+              >
+                <QrCodeIcon className="w-3.5 h-3.5" />
+                QR feedback
+              </button>
               <a
                 href={`/api/events/${eventId}/export`}
                 download
@@ -783,6 +792,7 @@ export default function KanbanBoard({
 
       {/* ── QR walk-in (inscription sur place Jour J) ── */}
       {walkinQrOpen && <WalkinQrModal eventId={eventId} onClose={() => setWalkinQrOpen(false)} />}
+      {feedbackQrOpen && <FeedbackQrModal eventId={eventId} onClose={() => setFeedbackQrOpen(false)} />}
 
       {/* ── Email groupé par colonne ── */}
       {emailModal && (
@@ -1695,6 +1705,51 @@ function WalkinQrModal({ eventId, onClose }: { eventId: string; onClose: () => v
             <p className="text-base font-extrabold text-zinc-900 mt-0.5">Inscription sur place</p>
             <p className="text-[11px] text-zinc-500 mt-0.5">
               À afficher à l&apos;accueil — une participante scanne et s&apos;inscrit (marquée présente).
+            </p>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 print:hidden" aria-label="Fermer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex justify-center">
+          <QrCode value={url} size={200} />
+        </div>
+
+        <p className="text-[10px] text-zinc-400 text-center break-all px-2">{url}</p>
+
+        <button
+          onClick={() => typeof window !== "undefined" && window.print()}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-colors print:hidden"
+        >
+          <Printer className="w-3.5 h-3.5" />
+          Imprimer
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── QR Feedback universel (saisie email Jour J) ──────────────────────────────
+
+function FeedbackQrModal({ eventId, onClose }: { eventId: string; onClose: () => void }) {
+  const url =
+    typeof window !== "undefined" ? `${window.location.origin}/feedback/event/${eventId}` : "";
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 print:shadow-none print:max-w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-500">
+              QR Feedback · Jour J
+            </p>
+            <p className="text-base font-extrabold text-zinc-900 mt-0.5">Formulaire de feedback</p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              À afficher en fin de session — la participante scanne, saisit son e-mail et accède à son formulaire.
             </p>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 print:hidden" aria-label="Fermer">
