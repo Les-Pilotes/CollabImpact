@@ -81,6 +81,7 @@ export async function submitWalkin(input: WalkinInput): Promise<WalkinResult> {
       update: {
         status: EnrollmentStatus.presente,
         attendedAt: new Date(),
+        deletedAt: null,
       },
     });
 
