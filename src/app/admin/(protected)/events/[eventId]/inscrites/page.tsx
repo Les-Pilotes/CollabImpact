@@ -47,11 +47,14 @@ export default async function ParticipantesPage({
     prisma.speaker.findMany({
       where: { eventId, organisationId: admin.organisationId, deletedAt: null },
       orderBy: [{ createdAt: "asc" }],
-      select: { id: true, firstName: true, lastName: true, domain: true },
+      select: { id: true, firstName: true, lastName: true, domain: true, feedbackToken: true, feedbackSubmittedAt: true },
     }),
   ]);
 
-  const speakers: SpeakerRow[] = speakersRaw;
+  const speakers: SpeakerRow[] = speakersRaw.map((s) => ({
+    ...s,
+    feedbackSubmittedAt: s.feedbackSubmittedAt?.toISOString() ?? null,
+  }));
 
   const participants: ParticipantRow[] = enrollments.map((e) => {
     const history: ParticipantRow["history"] = [

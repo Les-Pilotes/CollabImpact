@@ -327,6 +327,7 @@ model Speaker {
 
   profileSubmittedAt  DateTime?
   feedbackSubmittedAt DateTime?
+  feedbackAnswers     Json?
 
   eventId String
   event   Event  @relation(fields: [eventId], references: [id])

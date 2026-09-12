@@ -19,6 +19,7 @@ type Props = {
   immersionName: string;
   eventDate: string; // ISO string
   sections: Section[];
+  submitUrl?: string;
 };
 
 export default function FeedbackForm({
@@ -27,6 +28,7 @@ export default function FeedbackForm({
   immersionName,
   eventDate,
   sections,
+  submitUrl,
 }: Props) {
   // step 0 = intro, step 1..N = sections[step-1]
   const [step, setStep] = useState(0);
@@ -131,7 +133,7 @@ export default function FeedbackForm({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await fetch(`/api/feedback/${token}`, {
+      const res = await fetch(submitUrl ?? `/api/feedback/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers: cleaned }),

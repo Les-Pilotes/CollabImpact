@@ -39,6 +39,8 @@ export type SpeakerRow = {
   firstName: string;
   lastName: string;
   domain: string | null;
+  feedbackToken: string;
+  feedbackSubmittedAt: string | null;
 };
 
 export type ParticipantRow = {
@@ -1224,16 +1226,33 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
                 <div className={`px-4 py-3 flex items-center justify-between ${
                   isDragTarget ? "bg-orange-50" : isTapTarget ? "bg-orange-50" : "border-b border-zinc-100"
                 }`}>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-zinc-900">{inv.firstName} {inv.lastName}</span>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${speakerColor}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-bold text-sm text-zinc-900 truncate">{inv.firstName} {inv.lastName}</span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${speakerColor}`}>
                       {inv.domain ?? "—"}
                     </span>
                     {(isTapTarget || isDragTarget) && (
-                      <span className="text-xs text-orange-500 font-medium">← déposer ici</span>
+                      <span className="text-xs text-orange-500 font-medium shrink-0">← déposer ici</span>
                     )}
                   </div>
-                  <span className="text-xs font-semibold text-zinc-400">{members.length}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {inv.feedbackSubmittedAt ? (
+                      <span title="Feedback reçu" className="text-emerald-500 text-xs font-bold">✓ fb</span>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const url = `${window.location.origin}/feedback/speaker/${inv.feedbackToken}`;
+                          navigator.clipboard.writeText(url).catch(() => {});
+                        }}
+                        title="Copier le lien feedback intervenante"
+                        className="text-[10px] font-semibold text-zinc-400 hover:text-orange-500 transition-colors"
+                      >
+                        fb ↗
+                      </button>
+                    )}
+                    <span className="text-xs font-semibold text-zinc-400">{members.length}</span>
+                  </div>
                 </div>
 
                 {/* Members — hidden during drag hover to keep card clean */}
