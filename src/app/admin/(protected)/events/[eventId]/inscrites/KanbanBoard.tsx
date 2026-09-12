@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useTransition, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer, Flag, Mail, MoreHorizontal } from "lucide-react";
+import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer, Flag, Mail, MoreHorizontal, ExternalLink } from "lucide-react";
 import PageHeader from "../../../PageHeader";
 import { QrCode } from "@/components/ui/qr-code";
 import { QRCodeCanvas } from "qrcode.react";
@@ -1784,13 +1784,24 @@ function WalkinQrModal({ eventId, onClose }: { eventId: string; onClose: () => v
 
         <p className="text-[10px] text-zinc-400 text-center break-all px-2">{url}</p>
 
-        <button
-          onClick={() => typeof window !== "undefined" && window.print()}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-colors print:hidden"
-        >
-          <Printer className="w-3.5 h-3.5" />
-          Imprimer
-        </button>
+        <div className="flex gap-2 print:hidden">
+          <a
+            href={`/admin/events/${eventId}/walkin-qr`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Plein écran
+          </a>
+          <button
+            onClick={() => typeof window !== "undefined" && window.print()}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            Imprimer
+          </button>
+        </div>
       </div>
     </div>
   );
