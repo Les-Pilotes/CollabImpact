@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Toaster } from "sonner";
 import AdminSignOutButton from "./AdminSignOutButton";
 import Sidebar from "./Sidebar";
+import MobileBottomNav from "./MobileBottomNav";
 import NotificationBell from "./_components/NotificationBell";
 import WelcomeDialog from "./_components/WelcomeDialog";
 import {
@@ -50,8 +51,11 @@ export default async function AdminLayout({
       {/* Desktop floating bell */}
       <div className="hidden md:block fixed top-4 right-6 z-40">{bell}</div>
 
-      {/* Main */}
-      <main className="flex-1 min-w-0 md:p-10 p-4 pt-16 md:pt-10 overflow-y-auto">
+      {/* Mobile bottom nav */}
+      <MobileBottomNav />
+
+      {/* Main — extra bottom padding on mobile for the bottom nav */}
+      <main className="flex-1 min-w-0 md:p-10 p-4 pt-16 pb-20 md:pt-10 md:pb-10 overflow-y-auto">
         {children}
       </main>
 
