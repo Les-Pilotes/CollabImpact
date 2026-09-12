@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useTransition, useEffect } from "react";
+import { useState, useCallback, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer, Flag, Mail, MoreHorizontal } from "lucide-react";
 import PageHeader from "../../../PageHeader";
 import { QrCode } from "@/components/ui/qr-code";
+import { QRCodeCanvas } from "qrcode.react";
 import { EnrollmentStatus } from "@prisma/client";
 import {
   sendManualReminder,
@@ -768,7 +769,7 @@ export default function KanbanBoard({
 
       {/* ── QR walk-in (inscription sur place Jour J) ── */}
       {walkinQrOpen && <WalkinQrModal eventId={eventId} onClose={() => setWalkinQrOpen(false)} />}
-      {feedbackQrOpen && <FeedbackQrModal eventId={eventId} onClose={() => setFeedbackQrOpen(false)} />}
+      {feedbackQrOpen && <FeedbackQrModal eventId={eventId} participants={participants} onClose={() => setFeedbackQrOpen(false)} />}
 
       {/* ── Email groupé par colonne ── */}
       {emailModal && (
@@ -1708,9 +1709,34 @@ function WalkinQrModal({ eventId, onClose }: { eventId: string; onClose: () => v
 
 // ─── QR Feedback universel (saisie email Jour J) ──────────────────────────────
 
-function FeedbackQrModal({ eventId, onClose }: { eventId: string; onClose: () => void }) {
+function FeedbackQrModal({
+  eventId,
+  participants,
+  onClose,
+}: {
+  eventId: string;
+  participants: ParticipantRow[];
+  onClose: () => void;
+}) {
   const url =
     typeof window !== "undefined" ? `${window.location.origin}/feedback/event/${eventId}` : "";
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const downloadPng = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = "qr-feedback.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+
+  const eligible = participants.filter(
+    (p) => p.realStatus === "presente" || p.realStatus === "feedback_recu",
+  );
+  const done = eligible.filter((p) => p.realStatus === "feedback_recu").length;
+  const total = eligible.length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
@@ -1737,15 +1763,70 @@ function FeedbackQrModal({ eventId, onClose }: { eventId: string; onClose: () =>
           <QrCode value={url} size={200} />
         </div>
 
+        {/* Hidden canvas for PNG export */}
+        {url && (
+          <QRCodeCanvas
+            ref={canvasRef}
+            value={url}
+            size={600}
+            level="M"
+            fgColor="#ff914d"
+            bgColor="#ffffff"
+            style={{ display: "none" }}
+          />
+        )}
+
         <p className="text-[10px] text-zinc-400 text-center break-all px-2">{url}</p>
 
-        <button
-          onClick={() => typeof window !== "undefined" && window.print()}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-colors print:hidden"
-        >
-          <Printer className="w-3.5 h-3.5" />
-          Imprimer
-        </button>
+        {/* Feedback progress (visible once participants start scanning) */}
+        {total > 0 && (
+          <div className="bg-zinc-50 rounded-xl px-4 py-3 space-y-1.5 print:hidden">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-zinc-700">Feedbacks reçus</span>
+              <span className={`font-bold ${done === total ? "text-emerald-600" : "text-zinc-500"}`}>
+                {done} / {total}
+              </span>
+            </div>
+            <div className="h-2 bg-zinc-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {eligible.map((p) => (
+                <span
+                  key={p.id}
+                  title={`${p.firstName} ${p.lastName}`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                    p.realStatus === "feedback_recu"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-zinc-200 text-zinc-500"
+                  }`}
+                >
+                  {p.firstName}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 print:hidden">
+          <button
+            onClick={downloadPng}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Télécharger PNG
+          </button>
+          <button
+            onClick={() => typeof window !== "undefined" && window.print()}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            Imprimer
+          </button>
+        </div>
       </div>
     </div>
   );
