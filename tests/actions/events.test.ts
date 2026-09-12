@@ -62,6 +62,27 @@ describe("createEvent", () => {
     expect(args.data.status).toBe("brouillon");
     expect(args.data.organisationId).toBe("org-1");
     expect((args.data.date as Date).getFullYear()).toBe(2026);
+    // 09:30 Paris (UTC+2 in September) must be stored as 07:30 UTC
+    expect((args.data.date as Date).getUTCHours()).toBe(7);
+    expect((args.data.date as Date).getUTCMinutes()).toBe(30);
+  });
+
+  it("stores winter time correctly (UTC+1): 09:30 Paris = 08:30 UTC", async () => {
+    ev.create.mockResolvedValue({ id: "new-event-2" } as never);
+
+    await createEvent({
+      name: "Workshop hiver",
+      type: "FEMININ",
+      date: "2026-01-15",
+      time: "09:30",
+      address: "Paris",
+      capacity: 30,
+    });
+
+    const args = ev.create.mock.calls[0][0];
+    // 09:30 Paris (UTC+1 in January) must be stored as 08:30 UTC
+    expect((args.data.date as Date).getUTCHours()).toBe(8);
+    expect((args.data.date as Date).getUTCMinutes()).toBe(30);
   });
 
   it("rejects invalid input with fieldErrors", async () => {

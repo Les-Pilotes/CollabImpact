@@ -46,6 +46,7 @@ export default function FeedbackForm({
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "Europe/Paris",
   }).format(new Date(eventDate));
 
   // ─── Answer helpers ───────────────────────────────────────────────────────

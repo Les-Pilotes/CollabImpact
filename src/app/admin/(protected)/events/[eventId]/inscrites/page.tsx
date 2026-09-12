@@ -25,6 +25,8 @@ export default async function ParticipantesPage({
 }: {
   params: Promise<{ eventId: string }>;
 }) {
+  // eslint-disable-next-line react-hooks/purity -- server component, Date.now() is fine here
+  const now = Date.now();
   const { admin } = await requireAdmin();
   const { eventId } = await params;
 
@@ -71,12 +73,16 @@ export default async function ParticipantesPage({
       });
     }
     if (e.status === "confirmee_j7" || e.status === "confirmee_j2") {
+      const confJ7Ts = Math.min(
+        (e.j7SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000,
+        now,
+      );
       history.push({
         id: "conf_j7",
         label: "Confirmation J-7 · Présence confirmée",
         kind: "success",
-        ts: (e.j7SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000,
-        relTime: relativeTime(new Date((e.j7SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000)),
+        ts: confJ7Ts,
+        relTime: relativeTime(new Date(confJ7Ts)),
       });
     }
     if (e.j2SentAt) {
@@ -89,12 +95,16 @@ export default async function ParticipantesPage({
       });
     }
     if (e.status === "confirmee_j2") {
+      const confJ2Ts = Math.min(
+        (e.j2SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000,
+        now,
+      );
       history.push({
         id: "conf_j2",
         label: "Confirmation J-2 · Présence confirmée",
         kind: "success",
-        ts: (e.j2SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000,
-        relTime: relativeTime(new Date((e.j2SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000)),
+        ts: confJ2Ts,
+        relTime: relativeTime(new Date(confJ2Ts)),
       });
     }
 

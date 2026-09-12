@@ -27,9 +27,13 @@ type ActionResult<T = void> =
   | { ok: false; error: string; fieldErrors?: Record<string, string[] | undefined> };
 
 function combineDateTime(dateISO: string, time: string): Date {
-  // Build a Date in the user's timezone (server runs UTC; treat input as local time).
-  // We construct from an ISO string with no Z suffix → JS parses as local time.
-  return new Date(`${dateISO}T${time}:00`);
+  // Interpret the admin input as Europe/Paris local time and convert to UTC.
+  // The trick: create the moment as if it were UTC, ask what Paris reads at that UTC
+  // moment, then shift by the difference — this handles DST automatically.
+  const asIfUtc = new Date(`${dateISO}T${time}:00Z`);
+  const parisLocal = new Date(asIfUtc.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+  const offsetMs = asIfUtc.getTime() - parisLocal.getTime();
+  return new Date(asIfUtc.getTime() + offsetMs);
 }
 
 export async function createEvent(input: CreateEventInput): Promise<ActionResult<{ id: string }>> {
