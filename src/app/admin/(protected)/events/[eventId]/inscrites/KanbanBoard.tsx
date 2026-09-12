@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer, Flag, Mail } from "lucide-react";
+import { X, Zap, ChevronDown, ChevronUp, RotateCcw, Plus, List, GitBranch, MessageSquare, Download, QrCode as QrCodeIcon, Printer, Flag, Mail, MoreHorizontal } from "lucide-react";
 import PageHeader from "../../../PageHeader";
 import { QrCode } from "@/components/ui/qr-code";
 import { EnrollmentStatus } from "@prisma/client";
@@ -511,35 +511,11 @@ export default function KanbanBoard({
           ]}
           activeTab={activeTab}
           onTabChange={(id) => { setActiveTab(id); setSelectedId(null); }}
-          actions={
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setWalkinQrOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
-                title="Afficher le QR d'inscription sur place (Jour J)"
-              >
-                <QrCodeIcon className="w-3.5 h-3.5" />
-                QR walk-in
-              </button>
-              <button
-                onClick={() => setFeedbackQrOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
-                title="Afficher le QR de feedback à scanner en fin de session"
-              >
-                <QrCodeIcon className="w-3.5 h-3.5" />
-                QR feedback
-              </button>
-              <a
-                href={`/api/events/${eventId}/export`}
-                download
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors"
-                title="Télécharger toutes les inscriptions au format CSV"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Exporter CSV
-              </a>
-            </div>
-          }
+          actions={<KanbanActions
+            eventId={eventId}
+            onWalkinQr={() => setWalkinQrOpen(true)}
+            onFeedbackQr={() => setFeedbackQrOpen(true)}
+          />}
         />
 
         {/* ── Listing tab ── */}
@@ -2199,5 +2175,84 @@ function SimBtn({
     >
       {children}
     </button>
+  );
+}
+
+// ─── Kanban header actions (responsive) ───────────────────────────────────────
+// Desktop: three separate buttons. Mobile: collapsed into a "···" menu.
+
+function KanbanActions({
+  eventId,
+  onWalkinQr,
+  onFeedbackQr,
+}: {
+  eventId: string;
+  onWalkinQr: () => void;
+  onFeedbackQr: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const sharedBtn =
+    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-semibold hover:bg-zinc-50 transition-colors";
+
+  return (
+    <>
+      {/* Desktop — three separate buttons */}
+      <div className="hidden sm:flex items-center gap-2">
+        <button onClick={onWalkinQr} className={sharedBtn} title="QR inscription sur place">
+          <QrCodeIcon className="w-3.5 h-3.5" />
+          QR walk-in
+        </button>
+        <button onClick={onFeedbackQr} className={sharedBtn} title="QR feedback fin de session">
+          <QrCodeIcon className="w-3.5 h-3.5" />
+          QR feedback
+        </button>
+        <a href={`/api/events/${eventId}/export`} download className={sharedBtn} title="Export CSV">
+          <Download className="w-3.5 h-3.5" />
+          CSV
+        </a>
+      </div>
+
+      {/* Mobile — collapsed "···" menu */}
+      <div className="sm:hidden relative">
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          className={`${sharedBtn} px-2`}
+          aria-label="Actions"
+        >
+          <MoreHorizontal className="w-4 h-4" />
+        </button>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-0 top-full mt-1 z-40 bg-white border border-zinc-200 rounded-xl shadow-lg overflow-hidden min-w-[160px]">
+              <button
+                onClick={() => { setMenuOpen(false); onWalkinQr(); }}
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50"
+              >
+                <QrCodeIcon className="w-4 h-4 shrink-0" />
+                QR walk-in
+              </button>
+              <button
+                onClick={() => { setMenuOpen(false); onFeedbackQr(); }}
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50"
+              >
+                <QrCodeIcon className="w-4 h-4 shrink-0" />
+                QR feedback
+              </button>
+              <a
+                href={`/api/events/${eventId}/export`}
+                download
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50"
+              >
+                <Download className="w-4 h-4 shrink-0" />
+                Exporter CSV
+              </a>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
