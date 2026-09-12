@@ -83,6 +83,17 @@ export default async function ImpactPage({
               }`
             : "Synthèse des feedbacks et indicateurs post-événement"
         }
+        actions={
+          total > 0 ? (
+            <a
+              href={`/admin/events/${eventId}/impact/print`}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 bg-white text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors"
+            >
+              ↗ Exporter
+            </a>
+          ) : undefined
+        }
       />
 
       <div className="flex-1 overflow-y-auto px-4 md:px-10 py-8">
