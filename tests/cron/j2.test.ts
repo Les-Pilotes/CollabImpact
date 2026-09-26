@@ -14,7 +14,7 @@ vi.mock("@/lib/cron", () => ({
 }));
 
 vi.mock("@/lib/email/client", () => ({
-  sendEmail: vi.fn().mockResolvedValue({ sent: false, reason: "no-api-key" }),
+  sendEmail: vi.fn().mockResolvedValue({ sent: true, id: "mock-email-id" }),
 }));
 
 vi.mock("@/lib/email/templates/J2Reminder", () => ({
@@ -91,6 +91,21 @@ const makeRequest = () =>
   });
 
 describe("GET /api/cron/j2", () => {
+  it("only queries events that are published/complete/in-progress (never brouillon/termine/archive)", async () => {
+    mockFindMany.mockResolvedValue([] as never);
+    await GET(makeRequest() as never);
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          event: expect.objectContaining({
+            status: { in: ["publie", "complet", "en_cours"] },
+          }),
+        }),
+      }),
+    );
+  });
+
   it("sends emails and updates j2SentAt when eligible enrollments exist", async () => {
     const enrollments = [makeEnrollment("e-1"), makeEnrollment("e-2")];
     mockFindMany.mockResolvedValue(enrollments as never);
@@ -117,6 +132,18 @@ describe("GET /api/cron/j2", () => {
 
     expect(json).toEqual({ ok: true, sent: 0 });
     expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("does NOT mark j2SentAt when the email fails to send", async () => {
+    const enrollments = [makeEnrollment("e-1"), makeEnrollment("e-2")];
+    mockFindMany.mockResolvedValue(enrollments as never);
+    mockSendEmail.mockResolvedValue({ sent: false, reason: "quota_exceeded" } as never);
+
+    const response = await GET(makeRequest() as never);
+    const json = await response.json();
+
+    expect(json).toEqual({ ok: true, sent: 0 });
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

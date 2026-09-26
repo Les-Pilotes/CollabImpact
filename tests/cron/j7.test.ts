@@ -14,7 +14,7 @@ vi.mock("@/lib/cron", () => ({
 }));
 
 vi.mock("@/lib/email/client", () => ({
-  sendEmail: vi.fn().mockResolvedValue({ sent: false, reason: "no-api-key" }),
+  sendEmail: vi.fn().mockResolvedValue({ sent: true, id: "mock-email-id" }),
 }));
 
 vi.mock("@/lib/email/templates/J7Reminder", () => ({
@@ -91,6 +91,21 @@ const makeRequest = () =>
   });
 
 describe("GET /api/cron/j7", () => {
+  it("only queries events that are published/complete/in-progress (never brouillon/termine/archive)", async () => {
+    mockFindMany.mockResolvedValue([] as never);
+    await GET(makeRequest() as never);
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          event: expect.objectContaining({
+            status: { in: ["publie", "complet", "en_cours"] },
+          }),
+        }),
+      }),
+    );
+  });
+
   it("sends emails and updates j7SentAt when eligible enrollments exist", async () => {
     const enrollments = [makeEnrollment("e-1"), makeEnrollment("e-2")];
     mockFindMany.mockResolvedValue(enrollments as never);
@@ -133,7 +148,7 @@ describe("GET /api/cron/j7", () => {
       peak = Math.max(peak, inflight);
       await new Promise((r) => setTimeout(r, 3));
       inflight--;
-      return { sent: false, reason: "no-api-key" } as never;
+      return { sent: true, id: "mock-email-id" } as never;
     });
 
     const response = await GET(makeRequest() as never);
@@ -144,7 +159,7 @@ describe("GET /api/cron/j7", () => {
     expect(peak).toBeGreaterThan(1);
   });
 
-  it("counts a failed send as not-sent without aborting the batch", async () => {
+  it("counts a failed DB update as not-sent without aborting the batch", async () => {
     const enrollments = [
       makeEnrollment("ok-1"),
       makeEnrollment("fail-1"),
@@ -152,12 +167,6 @@ describe("GET /api/cron/j7", () => {
     ];
     mockFindMany.mockResolvedValue(enrollments as never);
 
-    mockSendEmail.mockImplementation(async ({ to }) => {
-      if (String(to).includes("yasmine") === false) {
-        // never matched — we differentiate via update instead below.
-      }
-      return { sent: false, reason: "no-api-key" } as never;
-    });
     // Make the middle update reject; the route should still return sent=2.
     mockUpdate.mockImplementation((async (args: { where: { id?: string } }) => {
       if (args.where.id === "fail-1") throw new Error("db blip");
@@ -168,5 +177,34 @@ describe("GET /api/cron/j7", () => {
     const json = await response.json();
 
     expect(json.sent).toBe(2);
+  });
+
+  it("does NOT mark j7SentAt when the email fails to send (Resend error, quota, bad address...)", async () => {
+    const enrollments = [makeEnrollment("e-1"), makeEnrollment("e-2")];
+    mockFindMany.mockResolvedValue(enrollments as never);
+    mockSendEmail.mockResolvedValue({ sent: false, reason: "quota_exceeded" } as never);
+
+    const response = await GET(makeRequest() as never);
+    const json = await response.json();
+
+    expect(json).toEqual({ ok: true, sent: 0 });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("only marks the enrollments whose email actually succeeded (mixed batch)", async () => {
+    const enrollments = [makeEnrollment("ok-1"), makeEnrollment("bad-1")];
+    mockFindMany.mockResolvedValue(enrollments as never);
+    mockSendEmail
+      .mockResolvedValueOnce({ sent: true, id: "mock-email-id" } as never)
+      .mockResolvedValueOnce({ sent: false, reason: "invalid_email" } as never);
+
+    const response = await GET(makeRequest() as never);
+    const json = await response.json();
+
+    expect(json.sent).toBe(1);
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "ok-1" } }),
+    );
   });
 });

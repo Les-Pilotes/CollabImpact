@@ -162,7 +162,7 @@ export async function sendManualReminder(
 
     const resolved = resolveEmail('j7', enrollment.event.emailConfig, buildEmailVars(enrollment));
 
-    await sendEmail({
+    const result = await sendEmail({
       to: enrollment.user.email,
       subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
@@ -177,6 +177,11 @@ export async function sendManualReminder(
         signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
+
+    if (!result.sent) {
+      console.error(`[sendManualReminder] email failed for ${enrollmentId}:`, result.reason);
+      return { ok: false, error: "L'email n'a pas pu être envoyé. Vérifie l'adresse et réessaie." };
+    }
 
     await prisma.enrollment.update({
       where: { id: enrollmentId },
@@ -246,7 +251,7 @@ export async function sendJ2Reminder(
 
     const resolved = resolveEmail('j2', enrollment.event.emailConfig, buildEmailVars(enrollment));
 
-    await sendEmail({
+    const result = await sendEmail({
       to: enrollment.user.email,
       subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
@@ -261,6 +266,11 @@ export async function sendJ2Reminder(
         signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
+
+    if (!result.sent) {
+      console.error(`[sendJ2Reminder] email failed for ${enrollmentId}:`, result.reason);
+      return { ok: false, error: "L'email n'a pas pu être envoyé. Vérifie l'adresse et réessaie." };
+    }
 
     await prisma.enrollment.update({
       where: { id: enrollmentId },
@@ -337,17 +347,9 @@ export async function sendFeedbackInvite(
     const appUrl = getAppUrl();
     const feedbackUrl = `${appUrl}/feedback/${token}`;
 
-    await prisma.enrollment.update({
-      where: { id: enrollmentId },
-      data: {
-        feedbackToken: token,
-        feedbackSentAt: new Date(),
-      },
-    });
-
     const resolved = resolveEmail('feedback', enrollment.event.emailConfig, buildEmailVars(enrollment));
 
-    await sendEmail({
+    const result = await sendEmail({
       to: enrollment.user.email,
       subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
@@ -359,6 +361,21 @@ export async function sendFeedbackInvite(
         customNote: resolved.note ?? undefined,
         signature: enrollment.event.emailSignature ?? undefined,
       }),
+    });
+
+    if (!result.sent) {
+      console.error(`[sendFeedbackInvite] email failed for ${enrollmentId}:`, result.reason);
+      return { ok: false, error: "L'email n'a pas pu être envoyé. Vérifie l'adresse et réessaie." };
+    }
+
+    // Only persist the token once we know the email actually went out —
+    // otherwise the enrollment looked "invited" while she never received it.
+    await prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: {
+        feedbackToken: token,
+        feedbackSentAt: new Date(),
+      },
     });
 
     return { ok: true };

@@ -15,11 +15,15 @@ export function ActionResultLayout({
   title,
   description,
   variant,
+  action,
 }: {
   emoji: string;
   title: string;
   description: React.ReactNode;
   variant: Variant;
+  /** Optional button/form rendered inside the card — used when the page asks
+   * for an explicit confirmation instead of mutating on a plain GET. */
+  action?: React.ReactNode;
 }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
@@ -38,6 +42,7 @@ export function ActionResultLayout({
           <div className="text-6xl">{emoji}</div>
           <h1 className="text-2xl font-extrabold text-zinc-900 leading-tight">{title}</h1>
           <div className="text-sm text-zinc-700 leading-relaxed">{description}</div>
+          {action && <div className="pt-2">{action}</div>}
         </div>
         <div className="text-center mt-6">
           <Link

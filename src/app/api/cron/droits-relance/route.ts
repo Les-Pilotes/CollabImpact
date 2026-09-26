@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     where: {
       droitsImageStatus: "minor_parental_pending",
       enrolledAt: { gte: windowStart, lte: windowEnd },
-      event: { date: { gt: now }, deletedAt: null },
+      event: { date: { gt: now }, deletedAt: null, status: { in: ["publie", "complet", "en_cours"] } },
       deletedAt: null,
     },
     include: {
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       timeZone: "Europe/Paris",
     });
 
-    await sendEmail({
+    const result = await sendEmail({
       to: enrollment.user.email,
       subject: `Rappel : autorisation parentale pour ${enrollment.event.name}`,
       replyTo: enrollment.event.replyToEmail ?? undefined,
@@ -56,6 +56,9 @@ export async function GET(request: NextRequest) {
         signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
+    if (!result.sent) {
+      throw new Error(`email failed: ${result.reason}`);
+    }
   });
 
   let sent = 0;

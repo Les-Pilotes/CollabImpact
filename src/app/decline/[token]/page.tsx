@@ -1,67 +1,7 @@
-import { verifyActionToken } from "@/lib/tokens";
-import { prisma } from "@/lib/db";
-import { EnrollmentStatus } from "@prisma/client";
+import { readDeclineState, declineEnrollmentForm, undoDeclineForm } from "./actions";
 import { ActionResultLayout } from "./ActionResultLayout";
 
 export const dynamic = "force-dynamic";
-
-type Outcome =
-  | "declined"
-  | "already_declined"
-  | "terminal"
-  | "expired"
-  | "invalid"
-  | "not_found";
-
-async function processDecline(token: string): Promise<{
-  outcome: Outcome;
-  enrollment?: {
-    firstName: string;
-    eventName: string;
-  };
-}> {
-  const result = verifyActionToken(token);
-  if (!result.valid) {
-    return { outcome: result.reason === "expired" ? "expired" : "invalid" };
-  }
-  if (result.action !== "decline") {
-    return { outcome: "invalid" };
-  }
-
-  const enrollment = await prisma.enrollment.findUnique({
-    where: { id: result.enrollmentId },
-    include: {
-      user: { select: { firstName: true } },
-      event: { select: { name: true } },
-    },
-  });
-  if (!enrollment || enrollment.deletedAt) {
-    return { outcome: "not_found" };
-  }
-
-  const enrollmentMeta = {
-    firstName: enrollment.user.firstName,
-    eventName: enrollment.event.name,
-  };
-
-  if (enrollment.status === EnrollmentStatus.desistement) {
-    return { outcome: "already_declined", enrollment: enrollmentMeta };
-  }
-  if (
-    enrollment.status === EnrollmentStatus.absente ||
-    enrollment.status === EnrollmentStatus.presente ||
-    enrollment.status === EnrollmentStatus.feedback_recu
-  ) {
-    return { outcome: "terminal", enrollment: enrollmentMeta };
-  }
-
-  await prisma.enrollment.update({
-    where: { id: enrollment.id },
-    data: { status: EnrollmentStatus.desistement },
-  });
-
-  return { outcome: "declined", enrollment: enrollmentMeta };
-}
 
 export default async function DeclinePage({
   params,
@@ -69,28 +9,81 @@ export default async function DeclinePage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const { outcome, enrollment } = await processDecline(token);
+  const state = await readDeclineState(token);
 
-  switch (outcome) {
+  switch (state.outcome) {
+    case "ask":
+      return (
+        <ActionResultLayout
+          emoji="🤔"
+          title={`${state.firstName}, tu confirmes ne pas pouvoir venir ?`}
+          description={
+            <>
+              Ça concerne ta place sur <strong>{state.eventName}</strong>. Si tu te désistes, on
+              pourra proposer ta place à quelqu&apos;un d&apos;autre.
+            </>
+          }
+          variant="warning"
+          action={
+            <form action={declineEnrollmentForm.bind(null, token)}>
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-semibold transition-colors"
+              >
+                Oui, je me désiste
+              </button>
+            </form>
+          }
+        />
+      );
     case "declined":
-    case "already_declined":
       return (
         <ActionResultLayout
           emoji="🙏"
-          title={
-            outcome === "already_declined"
-              ? `On avait déjà noté ton désistement, ${enrollment!.firstName}.`
-              : `On note ton désistement, ${enrollment!.firstName}.`
-          }
+          title={`On note ton désistement, ${state.firstName}.`}
           description={
             <>
               Merci de nous avoir prévenu.es — ça permet à quelqu&apos;un d&apos;autre de
-              prendre ta place sur <strong>{enrollment!.eventName}</strong>.
+              prendre ta place sur <strong>{state.eventName}</strong>.
               <br />
               <br />À très vite sur un prochain événement ✨
             </>
           }
           variant="info"
+        />
+      );
+    case "already_declined":
+      return (
+        <ActionResultLayout
+          emoji="🙏"
+          title={`On avait déjà noté ton désistement, ${state.firstName}.`}
+          description="Si tu changes d'avis et que tu peux finalement venir, tu peux annuler ton désistement ci-dessous."
+          variant="info"
+          action={
+            state.canUndo ? (
+              <form action={undoDeclineForm.bind(null, token)}>
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl border border-zinc-300 hover:bg-zinc-50 text-zinc-900 font-semibold transition-colors"
+                >
+                  Annuler mon désistement, je viens finalement
+                </button>
+              </form>
+            ) : undefined
+          }
+        />
+      );
+    case "undone":
+      return (
+        <ActionResultLayout
+          emoji="✅"
+          title={`Parfait ${state.firstName}, on t'attend !`}
+          description={
+            <>
+              Ton désistement est annulé pour <strong>{state.eventName}</strong>.
+            </>
+          }
+          variant="success"
         />
       );
     case "terminal":

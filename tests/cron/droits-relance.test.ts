@@ -11,7 +11,7 @@ vi.mock("@/lib/cron", () => ({
 }));
 
 vi.mock("@/lib/email/client", () => ({
-  sendEmail: vi.fn().mockResolvedValue({ sent: false, reason: "no-api-key" }),
+  sendEmail: vi.fn().mockResolvedValue({ sent: true, id: "mock-email-id" }),
 }));
 
 vi.mock("@/lib/email/templates/DroitsRelance", () => ({
@@ -64,5 +64,20 @@ describe("GET /api/cron/droits-relance", () => {
     const json = await (await GET(makeRequest() as never)).json();
     expect(json).toEqual({ ok: true, sent: 0 });
     expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not count a failed send as sent", async () => {
+    mockFindMany.mockResolvedValue([
+      makeEnrollment({
+        id: "minor-1",
+        droitsImageStatus: "minor_parental_pending",
+        user: makeUser({ firstName: "Ada" }),
+        event: makeEvent({ name: "Workshop A" }),
+      }),
+    ] as never);
+    mockSendEmail.mockResolvedValue({ sent: false, reason: "quota_exceeded" } as never);
+
+    const json = await (await GET(makeRequest() as never)).json();
+    expect(json).toEqual({ ok: true, sent: 0 });
   });
 });

@@ -12,6 +12,7 @@ import {
   type CreateEventInput,
   type UpdateEventInput,
 } from "@/lib/validation/event";
+import { combineParisDateTime } from "@/lib/datetime";
 
 const STATUS_LABEL_FR: Record<ImmersionStatus, string> = {
   brouillon: "Brouillon",
@@ -25,16 +26,6 @@ const STATUS_LABEL_FR: Record<ImmersionStatus, string> = {
 type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string; fieldErrors?: Record<string, string[] | undefined> };
-
-function combineDateTime(dateISO: string, time: string): Date {
-  // Interpret the admin input as Europe/Paris local time and convert to UTC.
-  // The trick: create the moment as if it were UTC, ask what Paris reads at that UTC
-  // moment, then shift by the difference — this handles DST automatically.
-  const asIfUtc = new Date(`${dateISO}T${time}:00Z`);
-  const parisLocal = new Date(asIfUtc.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  const offsetMs = asIfUtc.getTime() - parisLocal.getTime();
-  return new Date(asIfUtc.getTime() + offsetMs);
-}
 
 export async function createEvent(input: CreateEventInput): Promise<ActionResult<{ id: string }>> {
   const ctx = await requireAdmin();
@@ -54,7 +45,7 @@ export async function createEvent(input: CreateEventInput): Promise<ActionResult
         organisationId: ctx.admin.organisationId,
         name: data.name,
         type: data.type,
-        date: combineDateTime(data.date, data.time),
+        date: combineParisDateTime(data.date, data.time),
         address: data.address,
         capacity: data.capacity,
         description: data.description,
@@ -91,8 +82,8 @@ export async function updateEvent(
       data: {
         name: data.name,
         type: data.type,
-        date: combineDateTime(data.date, data.time),
-        endTime: data.endTime && data.endTime !== "" ? combineDateTime(data.date, data.endTime) : null,
+        date: combineParisDateTime(data.date, data.time),
+        endTime: data.endTime && data.endTime !== "" ? combineParisDateTime(data.date, data.endTime) : null,
         address: data.address,
         capacity: data.capacity,
         description: data.description,

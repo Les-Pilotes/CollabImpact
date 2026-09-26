@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       feedbackSentAt: { gte: windowStart, lte: windowEnd },
       feedback: null,
       deletedAt: null,
+      event: { deletedAt: null },
     },
     include: {
       user: true,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       timeZone: "Europe/Paris",
     });
 
-    await sendEmail({
+    const result = await sendEmail({
       to: enrollment.user.email,
       subject: `Rappel : ton avis sur ${enrollment.event.name}`,
       replyTo: enrollment.event.replyToEmail ?? undefined,
@@ -56,6 +57,9 @@ export async function GET(request: NextRequest) {
         signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
+    if (!result.sent) {
+      throw new Error(`email failed: ${result.reason}`);
+    }
   });
 
   let sent = 0;

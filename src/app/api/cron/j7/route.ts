@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       event: {
         date: { gte: minDate, lte: maxDate },
         deletedAt: null,
+        status: { in: ["publie", "complet", "en_cours"] },
       },
       status: { in: ["inscrit", "contactee"] },
       j7SentAt: null,
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
       lieu: enrollment.event.address,
     });
 
-    await sendEmail({
+    const result = await sendEmail({
       to: enrollment.user.email,
       subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
@@ -78,6 +79,9 @@ export async function GET(request: NextRequest) {
         signature: enrollment.event.emailSignature ?? undefined,
       }),
     });
+    if (!result.sent) {
+      throw new Error(`email failed: ${result.reason}`);
+    }
     await prisma.enrollment.update({
       where: { id: enrollment.id },
       data: { j7SentAt: new Date() },

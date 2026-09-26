@@ -11,7 +11,7 @@ vi.mock("@/lib/cron", () => ({
 }));
 
 vi.mock("@/lib/email/client", () => ({
-  sendEmail: vi.fn().mockResolvedValue({ sent: false, reason: "no-api-key" }),
+  sendEmail: vi.fn().mockResolvedValue({ sent: true, id: "mock-email-id" }),
 }));
 
 vi.mock("@/lib/email/templates/FeedbackInvite", () => ({
@@ -62,5 +62,19 @@ describe("GET /api/cron/feedback-relance", () => {
     const json = await (await GET(makeRequest() as never)).json();
     expect(json).toEqual({ ok: true, sent: 0 });
     expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not count a failed send as sent", async () => {
+    const withToken = makeEnrollment({
+      id: "with",
+      feedbackToken: "tok-1",
+      user: makeUser({ firstName: "Léa" }),
+      event: makeEvent({ name: "Atelier X" }),
+    });
+    mockFindMany.mockResolvedValue([withToken] as never);
+    mockSendEmail.mockResolvedValue({ sent: false, reason: "quota_exceeded" } as never);
+
+    const json = await (await GET(makeRequest() as never)).json();
+    expect(json).toEqual({ ok: true, sent: 0 });
   });
 });

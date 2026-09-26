@@ -21,7 +21,7 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/email/client', () => ({
-  sendEmail: vi.fn().mockResolvedValue({ sent: false, reason: 'no-api-key' }),
+  sendEmail: vi.fn().mockResolvedValue({ sent: true, id: 'mock-email-id' }),
 }));
 
 vi.mock('@/lib/tokens', () => ({
@@ -30,6 +30,7 @@ vi.mock('@/lib/tokens', () => ({
 
 // Import after vi.mock declarations
 import { prisma } from '@/lib/db';
+import { sendEmail } from '@/lib/email/client';
 import {
   updateEnrollmentStatus,
   markAttendance,
@@ -160,5 +161,31 @@ describe('participants server actions', () => {
       },
     });
     expect(result).toEqual({ ok: true });
+  });
+
+  it('sendFeedbackInvite does NOT persist the token when the email fails to send', async () => {
+    vi.mocked(prisma.enrollment.findUnique).mockResolvedValueOnce({
+      id: 'enrollment-5',
+      status: EnrollmentStatus.presente,
+      feedbackToken: null,
+      feedbackSentAt: null,
+      user: {
+        id: 'user-1',
+        email: 'participante@test.com',
+        firstName: 'Marie',
+        lastName: 'Dupont',
+      },
+      event: {
+        id: 'seed-event-cite-audacieuse',
+        name: 'Cité Audacieuse',
+        date: new Date('2026-05-10'),
+      },
+    } as never);
+    vi.mocked(sendEmail).mockResolvedValueOnce({ sent: false, reason: 'quota_exceeded' } as never);
+
+    const result = await sendFeedbackInvite('enrollment-5');
+
+    expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: false, error: expect.any(String) });
   });
 });

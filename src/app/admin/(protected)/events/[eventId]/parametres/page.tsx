@@ -7,6 +7,7 @@ import CommunicationsTab from "./CommunicationsTab";
 import NotificationsTab, { type AdminOption } from "./NotificationsTab";
 import ParametresShell from "./ParametresShell";
 import { parseNotificationConfig } from "@/lib/notifications/config";
+import { splitParisDateTime } from "@/lib/datetime";
 
 export const metadata = { title: "Paramètres — Event" };
 
@@ -63,8 +64,11 @@ export default async function EventParametresPage({
   }));
   const notificationCfg = parseNotificationConfig(event.notificationConfig);
 
-  const dateISO = event.date.toISOString();
-  const endTimeISO = event.endTime?.toISOString();
+  // Prefill in Europe/Paris local time — slicing the raw UTC ISO string here
+  // would show UTC values, and re-saving unchanged would then shift the event
+  // by the Paris/UTC offset every time (see combineParisDateTime).
+  const { date: eventDateStr, time: eventTimeStr } = splitParisDateTime(event.date);
+  const endTimeStr = event.endTime ? splitParisDateTime(event.endTime).time : "";
 
   const formCfg = event.formConfig ?? {
     phoneEnabled: true,
@@ -115,9 +119,9 @@ export default async function EventParametresPage({
               initial={{
                 name: event.name,
                 type: event.type,
-                date: dateISO.slice(0, 10),
-                time: dateISO.slice(11, 16),
-                endTime: endTimeISO ? endTimeISO.slice(11, 16) : "",
+                date: eventDateStr,
+                time: eventTimeStr,
+                endTime: endTimeStr,
                 address: event.address,
                 capacity: event.capacity,
                 description: event.description ?? "",

@@ -4,6 +4,7 @@ import { EnrollmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { emitNotification } from "@/lib/notifications/emit";
 import { walkinSchema, type WalkinInput } from "@/lib/validation/walkin";
+import { isWalkinWindowOpen } from "@/lib/datetime";
 
 export type WalkinResult =
   | { ok: true; enrollmentId: string }
@@ -32,29 +33,44 @@ export async function submitWalkin(input: WalkinInput): Promise<WalkinResult> {
   try {
     const event = await prisma.event.findUnique({
       where: { id: data.eventId, deletedAt: null },
-      select: { id: true, organisationId: true, name: true },
+      select: { id: true, organisationId: true, name: true, date: true, status: true },
     });
     if (!event) return { ok: false, error: "Événement introuvable." };
+
+    const openStatuses = ["publie", "complet", "en_cours"];
+    if (!openStatuses.includes(event.status) || !isWalkinWindowOpen(event.date)) {
+      return {
+        ok: false,
+        error:
+          "L'inscription sur place n'est ouverte que le jour de l'événement. Contacte l'équipe sur place.",
+      };
+    }
 
     const email = data.email; // already lowercased+trimmed by the schema
     const droitsImageStatus = data.droitsImageAccepted ? "accepted" : "pending";
 
-    const user = await prisma.user.upsert({
+    // Never overwrite an existing profile's identity — a walk-in must only
+    // create a new person or fill in what was missing, never let a mistyped
+    // email on the tablet silently rewrite someone else's name/phone.
+    const existingUser = await prisma.user.findUnique({
       where: { email },
-      create: {
-        organisationId: event.organisationId,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email,
-        phone: data.phone ?? null,
-        source: "walk_in",
-      },
-      update: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone ?? null,
-      },
+      select: { id: true, firstName: true, lastName: true, phone: true },
     });
+    const user = existingUser
+      ? await prisma.user.update({
+          where: { id: existingUser.id },
+          data: existingUser.phone ? {} : { phone: data.phone ?? null },
+        })
+      : await prisma.user.create({
+          data: {
+            organisationId: event.organisationId,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email,
+            phone: data.phone ?? null,
+            source: "walk_in",
+          },
+        });
 
     // New vs existing enrollment — fire the in-app notif only once.
     const existing = await prisma.enrollment.findUnique({
