@@ -594,3 +594,56 @@ export async function addParticipantManually(
 
   return { ok: true };
 }
+
+// ─── Groupes Jour J ─────────────────────────────────────────────────────────
+// Un groupe = une intervenante. Persisté sur Enrollment.groupSpeakerId —
+// jusqu'ici la répartition vivait dans un useState côté client et
+// disparaissait au moindre rechargement de page ou second téléphone.
+
+/**
+ * Assign (or unassign, with speakerId = null) a single participante to an
+ * intervenante's group.
+ */
+export async function assignGroup(
+  enrollmentId: string,
+  speakerId: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
+  try {
+    await prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: { groupSpeakerId: speakerId },
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error('[assignGroup]', err);
+    return { ok: false, error: "Erreur lors de l'affectation au groupe." };
+  }
+}
+
+/**
+ * Assign many participantes at once (used by "Répartir automatiquement").
+ * Runs as a single transaction so a partial failure doesn't leave the
+ * répartition half-applied.
+ */
+export async function bulkAssignGroups(
+  assignments: { enrollmentId: string; speakerId: string }[],
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
+  if (assignments.length === 0) return { ok: true };
+
+  try {
+    await prisma.$transaction(
+      assignments.map(({ enrollmentId, speakerId }) =>
+        prisma.enrollment.update({
+          where: { id: enrollmentId },
+          data: { groupSpeakerId: speakerId },
+        }),
+      ),
+    );
+    return { ok: true };
+  } catch (err) {
+    console.error('[bulkAssignGroups]', err);
+    return { ok: false, error: 'Erreur lors de la répartition automatique.' };
+  }
+}

@@ -18,6 +18,7 @@ vi.mock('@/lib/db', () => ({
     },
     emailLog: { create: vi.fn().mockResolvedValue({}) },
     enrollmentEvent: { create: vi.fn().mockResolvedValue({}) },
+    $transaction: vi.fn().mockResolvedValue([]),
   },
   currentOrgId: vi.fn().mockReturnValue('seed-org-lespilotes'),
 }));
@@ -38,6 +39,8 @@ import {
   markAttendance,
   bulkUpdateStatus,
   sendFeedbackInvite,
+  assignGroup,
+  bulkAssignGroups,
 } from '@/app/admin/(protected)/events/[eventId]/inscrites/actions';
 
 describe('participants server actions', () => {
@@ -188,6 +191,65 @@ describe('participants server actions', () => {
     const result = await sendFeedbackInvite('enrollment-5');
 
     expect(prisma.enrollment.update).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: false, error: expect.any(String) });
+  });
+});
+
+describe('assignGroup / bulkAssignGroups (Jour J groups persistence)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(prisma.enrollment.update).mockResolvedValue({} as never);
+    vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+  });
+
+  it('assignGroup persists groupSpeakerId on the enrollment', async () => {
+    const result = await assignGroup('enrollment-1', 'speaker-1');
+
+    expect(prisma.enrollment.update).toHaveBeenCalledWith({
+      where: { id: 'enrollment-1' },
+      data: { groupSpeakerId: 'speaker-1' },
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('assignGroup(id, null) unassigns the enrollment from its group', async () => {
+    const result = await assignGroup('enrollment-1', null);
+
+    expect(prisma.enrollment.update).toHaveBeenCalledWith({
+      where: { id: 'enrollment-1' },
+      data: { groupSpeakerId: null },
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('bulkAssignGroups runs all assignments in a single transaction', async () => {
+    const assignments = [
+      { enrollmentId: 'e-1', speakerId: 's-1' },
+      { enrollmentId: 'e-2', speakerId: 's-1' },
+      { enrollmentId: 'e-3', speakerId: 's-2' },
+    ];
+
+    const result = await bulkAssignGroups(assignments);
+
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.arrayContaining(assignments.map(() => expect.anything())),
+    );
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('bulkAssignGroups([]) short-circuits without touching the DB', async () => {
+    const result = await bulkAssignGroups([]);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('bulkAssignGroups returns ok:false when the transaction fails', async () => {
+    vi.mocked(prisma.$transaction).mockRejectedValueOnce(new Error('db blip'));
+
+    const result = await bulkAssignGroups([{ enrollmentId: 'e-1', speakerId: 's-1' }]);
+
     expect(result).toEqual({ ok: false, error: expect.any(String) });
   });
 });

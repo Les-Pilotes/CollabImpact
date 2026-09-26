@@ -18,6 +18,8 @@ import {
   generateFeedbackLink,
   sendColumnEmail,
   addParticipantManually,
+  assignGroup as assignGroupAction,
+  bulkAssignGroups as bulkAssignGroupsAction,
 } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -75,6 +77,10 @@ export type ParticipantRow = {
   age?: number | null;
   /** True when the enrollment has a non-empty internalNote. */
   hasNote?: boolean;
+  /** Jour J group — the id of the Speaker she's assigned to, persisted in DB. */
+  groupSpeakerId?: string | null;
+  regime?: string[];
+  accessibilite?: string | null;
   history: HistoryItem[];
   isDemo?: boolean;
   archivedAs?: "desistee" | "presente" | "absente";
@@ -224,6 +230,16 @@ export default function KanbanBoard({
     }
     return initial;
   });
+  // Seed Jour J groups from Enrollment.groupSpeakerId — same reasoning: this
+  // used to be a plain useState with nothing behind it, wiped on every reload
+  // or second device.
+  const [groups, setGroups] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const p of initialParticipants) {
+      if (p.groupSpeakerId) initial[p.id] = p.groupSpeakerId;
+    }
+    return initial;
+  });
 
   // When router.refresh() causes the server to push fresh initialParticipants
   // (e.g. after a status change), sync local state so the UI reflects the DB
@@ -238,7 +254,45 @@ export default function KanbanBoard({
       }
       return s;
     });
+    setGroups(() => {
+      const g: Record<string, string> = {};
+      for (const p of initialParticipants) {
+        if (p.groupSpeakerId) g[p.id] = p.groupSpeakerId;
+      }
+      return g;
+    });
   }, [initialParticipants]);
+
+  // Groupes Jour J now persist: assigning a group writes through to the DB
+  // (optimistic local update first, same pattern as markEmarg).
+  const assignGroup = useCallback((participantId: string, speakerId: string) => {
+    setGroups((prev) => ({ ...prev, [participantId]: speakerId }));
+    if (participantId.startsWith("demo-")) return;
+    void assignGroupAction(participantId, speakerId);
+  }, []);
+
+  const autoAssign = useCallback((speakers: SpeakerRow[], eligible: ParticipantRow[]) => {
+    if (speakers.length === 0) return;
+    setGroups((prevGroups) => {
+      const unassigned = eligible.filter((p) => !prevGroups[p.id]);
+      if (unassigned.length === 0) return prevGroups;
+      const counts: Record<string, number> = {};
+      speakers.forEach((s) => {
+        counts[s.id] = Object.values(prevGroups).filter((v) => v === s.id).length;
+      });
+      const next = { ...prevGroups };
+      const newAssignments: { enrollmentId: string; speakerId: string }[] = [];
+      unassigned.forEach((p) => {
+        const minSpeaker = speakers.reduce((a, b) => (counts[a.id] <= counts[b.id] ? a : b));
+        next[p.id] = minSpeaker.id;
+        newAssignments.push({ enrollmentId: p.id, speakerId: minSpeaker.id });
+        counts[minSpeaker.id]++;
+      });
+      const toPersist = newAssignments.filter(({ enrollmentId }) => !enrollmentId.startsWith("demo-"));
+      if (toPersist.length > 0) void bulkAssignGroupsAction(toPersist);
+      return next;
+    });
+  }, []);
 
   // Émargement now persists: marking présente/absente writes through to the DB
   // (optimistic local update first so the day-J UX stays instant).
@@ -550,6 +604,9 @@ export default function KanbanBoard({
             speakers={speakers}
             emargState={emargState}
             onMarkEmarg={markEmarg}
+            groups={groups}
+            onAssignGroup={assignGroup}
+            onAutoAssign={() => autoAssign(speakers, participants.filter((p) => p.status !== "absente"))}
             avatarColor={avatarColor}
             initials={initials}
           />
@@ -1012,12 +1069,25 @@ function EmargRow({ p, st, groups, speakers, onMarkEmarg, avatarColor, initials 
   );
 }
 
-function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarColor, initials }: {
+function WorkshopTab({
+  participants,
+  speakers,
+  emargState,
+  onMarkEmarg,
+  groups,
+  onAssignGroup,
+  onAutoAssign,
+  avatarColor,
+  initials,
+}: {
   participants: ParticipantRow[];
   archived: ParticipantRow[];
   speakers: SpeakerRow[];
   emargState: Record<string, string>;
   onMarkEmarg: (id: string, st: string) => void;
+  groups: Record<string, string>;
+  onAssignGroup: (participantId: string, speakerId: string) => void;
+  onAutoAssign: () => void;
   avatarColor: (id: string) => string;
   initials: (p: ParticipantRow) => string;
 }) {
@@ -1049,28 +1119,8 @@ function WorkshopTab({ participants, speakers, emargState, onMarkEmarg, avatarCo
   // admin can start drafting groups before everyone is confirmed.
   const eligible = participants.filter((p) => p.status !== "absente");
 
-  const [groups, setGroups] = useState<Record<string, string>>({});
-
-  const autoAssign = () => {
-    if (speakers.length === 0) return;
-    const unassigned = eligible.filter((p) => !groups[p.id]);
-    setGroups((prev) => {
-      const next = { ...prev };
-      // Count existing members per speaker to balance
-      const counts: Record<string, number> = {};
-      speakers.forEach((s) => { counts[s.id] = Object.values(next).filter((v) => v === s.id).length; });
-      unassigned.forEach((p) => {
-        const minSpeaker = speakers.reduce((a, b) => counts[a.id] <= counts[b.id] ? a : b);
-        next[p.id] = minSpeaker.id;
-        counts[minSpeaker.id]++;
-      });
-      return next;
-    });
-  };
-
-  const assignGroup = (participantId: string, intervenanteId: string) => {
-    setGroups((prev) => ({ ...prev, [participantId]: intervenanteId }));
-  };
+  const autoAssign = onAutoAssign;
+  const assignGroup = onAssignGroup;
 
   // Mobile: tap-to-select
   const handleParticipantTap = (id: string) => {

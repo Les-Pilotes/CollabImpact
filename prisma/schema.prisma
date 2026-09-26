@@ -283,13 +283,18 @@ model Enrollment {
 
   feedback Feedback?
   events   EnrollmentEvent[]
-  // V3: groupId String?, group Group?
+
+  // Jour J — un groupe = une intervenante (pas d'algorithme d'appariement,
+  // l'admin répartit à la main). Remplace le modèle Group jamais persisté.
+  groupSpeakerId String?
+  groupSpeaker   Speaker? @relation("EnrollmentGroup", fields: [groupSpeakerId], references: [id])
 
   @@unique([eventId, userId])
   @@index([organisationId])
   @@index([eventId])
   @@index([userId])
   @@index([status])
+  @@index([groupSpeakerId])
 }
 
 // Réponse feedback post-évent.
@@ -361,7 +366,8 @@ model Speaker {
   eventId String
   event   Event  @relation(fields: [eventId], references: [id])
 
-  group Group?
+  group        Group?
+  groupMembers Enrollment[] @relation("EnrollmentGroup")
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())

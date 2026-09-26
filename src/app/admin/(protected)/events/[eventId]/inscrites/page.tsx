@@ -20,13 +20,21 @@ function relativeTime(date: Date): string {
   return `il y a ${Math.floor(h / 24)}j`;
 }
 
+function historyKind(type: string, label: string): ParticipantRow["history"][number]["kind"] {
+  if (type === "email_sent") return "email";
+  if (type === "email_failed") return "warning";
+  if (type === "checked_in" || type === "feedback_submitted") return "success";
+  if (type === "status_changed") {
+    return label.includes("absente") || label.includes("Désistement") ? "warning" : "success";
+  }
+  return "info";
+}
+
 export default async function ParticipantesPage({
   params,
 }: {
   params: Promise<{ eventId: string }>;
 }) {
-  // eslint-disable-next-line react-hooks/purity -- server component, Date.now() is fine here
-  const now = Date.now();
   const { admin } = await requireAdmin();
   const { eventId } = await params;
 
@@ -41,7 +49,7 @@ export default async function ParticipantesPage({
         // Only `desistement` and `feedback_recu` are hidden (terminal states).
         status: { notIn: ["feedback_recu"] },
       },
-      include: { user: true },
+      include: { user: true, events: { orderBy: { createdAt: "asc" } } },
       orderBy: { enrolledAt: "asc" },
     }),
     prisma.speaker.findMany({
@@ -57,6 +65,11 @@ export default async function ParticipantesPage({
   }));
 
   const participants: ParticipantRow[] = enrollments.map((e) => {
+    // "Inscription" comes from the reliable enrolledAt field; everything
+    // else (confirmations, emails, présence, feedback) comes from the real
+    // EnrollmentEvent log — this used to fabricate "Confirmation J-7/J-2"
+    // timestamps as sentAt + 1h, which could show a confirmation time in
+    // the future relative to "now".
     const history: ParticipantRow["history"] = [
       {
         id: "enroll",
@@ -66,48 +79,13 @@ export default async function ParticipantesPage({
         relTime: relativeTime(e.enrolledAt),
       },
     ];
-    if (e.j7SentAt) {
+    for (const ev of e.events) {
       history.push({
-        id: "j7",
-        label: "Confirmation J-7 · Email envoyé",
-        kind: "email",
-        ts: e.j7SentAt.getTime(),
-        relTime: relativeTime(e.j7SentAt),
-      });
-    }
-    if (e.status === "confirmee_j7" || e.status === "confirmee_j2") {
-      const confJ7Ts = Math.min(
-        (e.j7SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000,
-        now,
-      );
-      history.push({
-        id: "conf_j7",
-        label: "Confirmation J-7 · Présence confirmée",
-        kind: "success",
-        ts: confJ7Ts,
-        relTime: relativeTime(new Date(confJ7Ts)),
-      });
-    }
-    if (e.j2SentAt) {
-      history.push({
-        id: "j2",
-        label: "Confirmation J-2 · Email envoyé",
-        kind: "email",
-        ts: e.j2SentAt.getTime(),
-        relTime: relativeTime(e.j2SentAt),
-      });
-    }
-    if (e.status === "confirmee_j2") {
-      const confJ2Ts = Math.min(
-        (e.j2SentAt?.getTime() ?? e.enrolledAt.getTime()) + 3600000,
-        now,
-      );
-      history.push({
-        id: "conf_j2",
-        label: "Confirmation J-2 · Présence confirmée",
-        kind: "success",
-        ts: confJ2Ts,
-        relTime: relativeTime(new Date(confJ2Ts)),
+        id: ev.id,
+        label: ev.label,
+        kind: historyKind(ev.type, ev.label),
+        ts: ev.createdAt.getTime(),
+        relTime: relativeTime(ev.createdAt),
       });
     }
 
@@ -151,6 +129,9 @@ export default async function ParticipantesPage({
       checkinToken,
       feedbackToken: e.feedbackToken ?? null,
       feedbackSentAt: e.feedbackSentAt?.toISOString() ?? null,
+      groupSpeakerId: e.groupSpeakerId ?? null,
+      regime: e.regime ?? [],
+      accessibilite: e.accessibilite ?? null,
       history,
     };
   });
