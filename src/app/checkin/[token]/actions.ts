@@ -18,6 +18,7 @@ import { prisma } from '@/lib/db';
 import { verifyCheckinToken } from '@/lib/tokens';
 import { EnrollmentStatus } from '@prisma/client';
 import { isAttendanceLocked } from '@/lib/enrollment/eligibility';
+import { logEnrollmentEvent } from '@/lib/enrollment/timeline';
 
 export type CheckinOutcome =
   | {
@@ -87,6 +88,11 @@ export async function markPresent(token: string): Promise<CheckinOutcome> {
       attendedAt: now,
       noShow: false,
     },
+  });
+  await logEnrollmentEvent({
+    enrollmentId: enrollment.id,
+    type: 'checked_in',
+    label: 'Présente — QR personnel scanné',
   });
 
   return {

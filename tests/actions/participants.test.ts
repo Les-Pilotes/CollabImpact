@@ -16,6 +16,8 @@ vi.mock('@/lib/db', () => ({
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       findUnique: vi.fn(),
     },
+    emailLog: { create: vi.fn().mockResolvedValue({}) },
+    enrollmentEvent: { create: vi.fn().mockResolvedValue({}) },
   },
   currentOrgId: vi.fn().mockReturnValue('seed-org-lespilotes'),
 }));

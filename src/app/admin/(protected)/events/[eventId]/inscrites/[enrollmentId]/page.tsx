@@ -7,7 +7,7 @@ import { ParticipantActions } from "./ParticipantActions";
 import { ParticipantSummary } from "./ParticipantSummary";
 import { OrientationLayer } from "./OrientationLayer";
 import { EventLayer } from "./EventLayer";
-import { Timeline, type TimelineEntry } from "./Timeline";
+import { Timeline, type TimelineEntry, type TimelineKind } from "./Timeline";
 import { InternalNote } from "./InternalNote";
 import { FeedbackCard } from "./FeedbackCard";
 
@@ -44,6 +44,16 @@ const STATUS_TONE: Record<EnrollmentStatus, BadgeTone> = {
   feedback_recu: "success",
 };
 
+function eventKind(type: string, label: string): TimelineKind {
+  if (type === "email_failed") return "danger";
+  if (type === "email_sent") return "email";
+  if (type === "checked_in" || type === "feedback_submitted") return "success";
+  if (type === "status_changed") {
+    return label.includes("absente") || label.includes("Désistement") ? "danger" : "success";
+  }
+  return "neutral";
+}
+
 function computeAge(birthDate: Date, atDate: Date): number {
   let age = atDate.getFullYear() - birthDate.getFullYear();
   const m = atDate.getMonth() - birthDate.getMonth();
@@ -68,6 +78,7 @@ export default async function ParticipantDetailPage({
       user: true,
       event: true,
       feedback: true,
+      events: { orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -91,7 +102,12 @@ export default async function ParticipantDetailPage({
     : null;
   const isMinor = ageOnEventDay !== null && ageOnEventDay < 18;
 
-  // Timeline assembly — chronological events for this enrollment.
+  // Timeline assembly — "Inscription" and "Droits image" come from reliable
+  // real fields; everything else (confirmations, emails, présence, feedback)
+  // comes from EnrollmentEvent, the real history log (see
+  // src/lib/enrollment/timeline.ts). This replaces the previous version,
+  // which fabricated "Confirmée J-7/J-2" timestamps as sentAt + 1h and used
+  // `updatedAt` as a stand-in for "when was she marked absente/désistée".
   const timeline: TimelineEntry[] = [];
   timeline.push({
     id: "enroll",
@@ -124,79 +140,12 @@ export default async function ParticipantDetailPage({
       ts: enrollment.droitsImageSignedAt.getTime(),
     });
   }
-  if (enrollment.j7SentAt) {
+  for (const e of enrollment.events) {
     timeline.push({
-      id: "j7",
-      kind: "email",
-      label: "Email J-7 envoyé",
-      ts: enrollment.j7SentAt.getTime(),
-    });
-  }
-  if (enrollment.status === "confirmee_j7" || enrollment.status === "confirmee_j2") {
-    timeline.push({
-      id: "conf_j7",
-      kind: "success",
-      label: "Confirmée J-7",
-      ts: (enrollment.j7SentAt?.getTime() ?? enrollment.enrolledAt.getTime()) + 3_600_000,
-    });
-  }
-  if (enrollment.j2SentAt) {
-    timeline.push({
-      id: "j2",
-      kind: "email",
-      label: "Email J-2 envoyé",
-      ts: enrollment.j2SentAt.getTime(),
-    });
-  }
-  if (enrollment.status === "confirmee_j2") {
-    timeline.push({
-      id: "conf_j2",
-      kind: "success",
-      label: "Confirmée J-2",
-      ts: (enrollment.j2SentAt?.getTime() ?? enrollment.enrolledAt.getTime()) + 3_600_000,
-    });
-  }
-  if (enrollment.attendedAt) {
-    timeline.push({
-      id: "att",
-      kind: "success",
-      label: "Présente — émargement Jour J",
-      ts: enrollment.attendedAt.getTime(),
-    });
-  }
-  if (enrollment.status === "absente" && !enrollment.attendedAt) {
-    timeline.push({
-      id: "absent",
-      kind: "danger",
-      label: "Marquée absente",
-      ts: enrollment.updatedAt.getTime(),
-    });
-  }
-  if (enrollment.status === "desistement") {
-    timeline.push({
-      id: "desist",
-      kind: "danger",
-      label: "Désistement",
-      ts: enrollment.updatedAt.getTime(),
-    });
-  }
-  if (enrollment.feedbackSentAt) {
-    timeline.push({
-      id: "fb_sent",
-      kind: "email",
-      label: "Invitation feedback envoyée",
-      ts: enrollment.feedbackSentAt.getTime(),
-    });
-  }
-  if (feedback) {
-    timeline.push({
-      id: "fb_recu",
-      kind: "success",
-      label:
-        feedback.overallRating != null
-          ? `Feedback reçu — note ${feedback.overallRating}/5`
-          : "Feedback reçu",
-      ts: feedback.submittedAt.getTime(),
+      id: e.id,
+      kind: eventKind(e.type, e.label),
+      label: e.label,
+      ts: e.createdAt.getTime(),
     });
   }
 

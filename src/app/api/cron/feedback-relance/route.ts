@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import React from "react";
 import { assertCronRequest } from "@/lib/cron";
 import { prisma } from "@/lib/db";
-import { sendEmail } from "@/lib/email/client";
+import { deliver } from "@/lib/messaging/deliver";
 import { getAppUrl } from "@/lib/app-url";
 import { parallelLimit } from "@/lib/concurrency";
 import FeedbackInvite from "@/lib/email/templates/FeedbackInvite";
@@ -45,7 +45,11 @@ export async function GET(request: NextRequest) {
       timeZone: "Europe/Paris",
     });
 
-    const result = await sendEmail({
+    const result = await deliver({
+      kind: "feedback_relance",
+      organisationId: enrollment.organisationId,
+      eventId: enrollment.eventId,
+      enrollmentId: enrollment.id,
       to: enrollment.user.email,
       subject: `Rappel : ton avis sur ${enrollment.event.name}`,
       replyTo: enrollment.event.replyToEmail ?? undefined,

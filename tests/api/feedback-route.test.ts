@@ -4,6 +4,7 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     enrollment: { findUnique: vi.fn(), update: vi.fn() },
     feedback: { create: vi.fn() },
+    enrollmentEvent: { create: vi.fn().mockResolvedValue({}) },
   },
 }));
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import React from "react";
 import { assertCronRequest } from "@/lib/cron";
 import { prisma } from "@/lib/db";
-import { sendEmail } from "@/lib/email/client";
+import { deliver } from "@/lib/messaging/deliver";
 import { createActionToken } from "@/lib/tokens";
 import { getAppUrl } from "@/lib/app-url";
 import { resolveEmail } from "@/lib/email/resolve";
@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
       lieu: enrollment.event.address,
     });
 
-    const result = await sendEmail({
+    const result = await deliver({
+      kind: "j2_reminder",
+      organisationId: enrollment.organisationId,
+      eventId: enrollment.eventId,
+      enrollmentId: enrollment.id,
       to: enrollment.user.email,
       subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,

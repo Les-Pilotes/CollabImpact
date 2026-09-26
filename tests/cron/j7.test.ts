@@ -6,6 +6,8 @@ vi.mock("@/lib/db", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    emailLog: { create: vi.fn().mockResolvedValue({}) },
+    enrollmentEvent: { create: vi.fn().mockResolvedValue({}) },
   },
 }));
 

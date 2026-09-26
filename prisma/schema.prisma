@@ -80,6 +80,33 @@ enum SpeakerStatus {
   confirmee
 }
 
+enum EmailKind {
+  inscription_confirmation
+  j7_reminder
+  j2_reminder
+  feedback_invite
+  feedback_relance
+  droits_relance
+  admin_alert
+  admin_invitation
+  custom
+}
+
+enum EmailDeliveryStatus {
+  sent
+  failed
+}
+
+enum EnrollmentEventType {
+  enrolled
+  status_changed
+  email_sent
+  email_failed
+  checked_in
+  feedback_submitted
+  note_added
+}
+
 // =====================
 // Entities
 // =====================
@@ -96,6 +123,7 @@ model Organisation {
   enrollments   Enrollment[]
   speakers      Speaker[]
   notifications Notification[]
+  emailLogs     EmailLog[]
   // V3: partnerCompanies PartnerCompany[]
 }
 
@@ -254,6 +282,7 @@ model Enrollment {
   updatedAt  DateTime  @updatedAt
 
   feedback Feedback?
+  events   EnrollmentEvent[]
   // V3: groupId String?, group Group?
 
   @@unique([eventId, userId])
@@ -475,6 +504,51 @@ model NotificationRead {
 
   @@unique([notificationId, adminId])
   @@index([adminId])
+}
+
+/// Journal de tout email transactionnel tenté (succès ou échec). Un email en
+/// échec est visible ici — plus jamais silencieusement compté comme envoyé.
+/// Écrit par src/lib/messaging/deliver.ts, jamais directement.
+model EmailLog {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+
+  kind   EmailKind
+  to     String
+  status EmailDeliveryStatus
+
+  /// Id du message côté Resend (présent seulement si status = sent)
+  providerId String?
+  /// Raison de l'échec (présent seulement si status = failed)
+  error String?
+
+  eventId      String?
+  enrollmentId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organisationId, createdAt])
+  @@index([enrollmentId])
+  @@index([eventId, kind])
+}
+
+/// Historique réel d'une inscription — remplace les horodatages reconstruits
+/// (ex. "+3600000") affichés dans la frise de la fiche participante.
+model EnrollmentEvent {
+  id           String     @id @default(cuid())
+  enrollmentId String
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  type  EnrollmentEventType
+  /// Libellé prêt à afficher (français), ex. "Confirmation J-7 · email envoyé"
+  label String
+  /// Détails additionnels selon le type (ex. { fromStatus, toStatus } pour status_changed)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([enrollmentId, createdAt])
 }
 
 // V3: model PartnerCompany (requires partnerCompanyId FK on Event + migration)

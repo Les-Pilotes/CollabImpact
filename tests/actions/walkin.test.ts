@@ -6,6 +6,7 @@ vi.mock("@/lib/db", () => ({
     event: { findUnique: vi.fn() },
     user: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
     enrollment: { findUnique: vi.fn(), upsert: vi.fn() },
+    enrollmentEvent: { create: vi.fn().mockResolvedValue({}) },
   },
 }));
 

@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email/client";
+import { deliver } from "@/lib/messaging/deliver";
 import { inscriptionSchema, type InscriptionInput } from "@/lib/validation/inscription";
 import InscriptionConfirmation from "@/lib/email/templates/InscriptionConfirmation";
 import ResumeInscription from "@/lib/email/templates/ResumeInscription";
@@ -484,7 +485,11 @@ export async function submitInscription(
         horaire: event.date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }),
         lieu: event.address,
       });
-      await sendEmail({
+      await deliver({
+        kind: "inscription_confirmation",
+        organisationId: event.organisationId,
+        eventId: event.id,
+        enrollmentId: enrollment.id,
         to: user.email,
         subject: resolved.subject,
         replyTo: event.replyToEmail ?? undefined,

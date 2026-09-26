@@ -7,6 +7,7 @@ vi.mock("@/lib/db", () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    enrollmentEvent: { create: vi.fn().mockResolvedValue({}) },
   },
 }));
 

@@ -4,6 +4,7 @@ import { verifyActionToken } from "@/lib/tokens";
 import { prisma } from "@/lib/db";
 import { EnrollmentStatus } from "@prisma/client";
 import { isAttendanceLocked } from "@/lib/enrollment/eligibility";
+import { logEnrollmentEvent } from "@/lib/enrollment/timeline";
 
 export type ConfirmState =
   | {
@@ -122,5 +123,10 @@ export async function confirmEnrollment(token: string): Promise<ConfirmState> {
   }
 
   await prisma.enrollment.update({ where: { id: enrollment.id }, data: { status: next } });
+  await logEnrollmentEvent({
+    enrollmentId: enrollment.id,
+    type: "status_changed",
+    label: next === EnrollmentStatus.confirmee_j2 ? "Confirmée J-2" : "Confirmée J-7",
+  });
   return { outcome: "confirmed", ...meta(enrollment) };
 }

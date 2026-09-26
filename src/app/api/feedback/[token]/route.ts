@@ -5,6 +5,7 @@ import { feedbackSchema } from "@/lib/validation/feedback";
 import { emitNotification } from "@/lib/notifications/emit";
 import { ALL_FEEDBACK_KEYS } from "@/lib/feedback/questions";
 import { isFeedbackEligible } from "@/lib/enrollment/eligibility";
+import { logEnrollmentEvent } from "@/lib/enrollment/timeline";
 
 export async function POST(
   request: NextRequest,
@@ -85,6 +86,14 @@ export async function POST(
   await prisma.enrollment.update({
     where: { id: enrollmentId },
     data: { status: "feedback_recu" },
+  });
+  await logEnrollmentEvent({
+    enrollmentId,
+    type: "feedback_submitted",
+    label:
+      overallRating != null
+        ? `Feedback reçu — note animation ${overallRating}/5`
+        : "Feedback reçu",
   });
 
   after(() =>

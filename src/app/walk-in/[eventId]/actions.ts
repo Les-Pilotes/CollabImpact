@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { emitNotification } from "@/lib/notifications/emit";
 import { walkinSchema, type WalkinInput } from "@/lib/validation/walkin";
 import { canWalkIn } from "@/lib/enrollment/eligibility";
+import { logEnrollmentEvent } from "@/lib/enrollment/timeline";
 
 export type WalkinResult =
   | { ok: true; enrollmentId: string }
@@ -99,6 +100,12 @@ export async function submitWalkin(input: WalkinInput): Promise<WalkinResult> {
         attendedAt: new Date(),
         deletedAt: null,
       },
+    });
+
+    await logEnrollmentEvent({
+      enrollmentId: enrollment.id,
+      type: "checked_in",
+      label: "Présente — inscription sur place (walk-in)",
     });
 
     if (isNew) {

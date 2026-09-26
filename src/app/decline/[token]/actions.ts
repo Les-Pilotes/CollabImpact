@@ -4,6 +4,7 @@ import { verifyActionToken } from "@/lib/tokens";
 import { prisma } from "@/lib/db";
 import { EnrollmentStatus } from "@prisma/client";
 import { isDeclineLocked } from "@/lib/enrollment/eligibility";
+import { logEnrollmentEvent } from "@/lib/enrollment/timeline";
 
 export type DeclineState =
   | { outcome: "ask"; firstName: string; eventName: string }
@@ -110,6 +111,11 @@ export async function declineEnrollment(token: string): Promise<DeclineState> {
     where: { id: enrollment.id },
     data: { status: EnrollmentStatus.desistement },
   });
+  await logEnrollmentEvent({
+    enrollmentId: enrollment.id,
+    type: "status_changed",
+    label: "Désistement",
+  });
   return { outcome: "declined", ...meta(enrollment) };
 }
 
@@ -139,6 +145,11 @@ export async function undoDecline(token: string): Promise<DeclineState> {
   await prisma.enrollment.update({
     where: { id: enrollment.id },
     data: { status: restored },
+  });
+  await logEnrollmentEvent({
+    enrollmentId: enrollment.id,
+    type: "status_changed",
+    label: "Désistement annulé",
   });
   return { outcome: "undone", ...meta(enrollment) };
 }

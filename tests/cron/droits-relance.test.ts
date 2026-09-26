@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/db", () => ({
   prisma: {
     enrollment: { findMany: vi.fn() },
+    emailLog: { create: vi.fn().mockResolvedValue({}) },
+    enrollmentEvent: { create: vi.fn().mockResolvedValue({}) },
   },
 }));
 

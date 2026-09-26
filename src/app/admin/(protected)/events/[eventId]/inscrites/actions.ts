@@ -6,7 +6,9 @@ import { requireAdmin } from '@/lib/auth';
 import { createFeedbackToken, createActionToken } from '@/lib/tokens';
 import { getAppUrl } from '@/lib/app-url';
 import { sendEmail } from '@/lib/email/client';
+import { deliver } from '@/lib/messaging/deliver';
 import { resolveEmail } from '@/lib/email/resolve';
+import { logEnrollmentEvent } from '@/lib/enrollment/timeline';
 import J7Reminder from '@/lib/email/templates/J7Reminder';
 import J2Reminder from '@/lib/email/templates/J2Reminder';
 import FeedbackInvite from '@/lib/email/templates/FeedbackInvite';
@@ -52,6 +54,7 @@ export async function updateEnrollmentStatus(
       where: { id: enrollmentId },
       data: { status },
     });
+    await logEnrollmentEvent({ enrollmentId, type: 'status_changed', label: `Statut → ${status}` });
     return { ok: true };
   } catch (err) {
     console.error('[updateEnrollmentStatus]', err);
@@ -90,6 +93,15 @@ export async function bulkUpdateStatus(
       where: { id: { in: enrollmentIds } },
       data,
     });
+    await Promise.all(
+      enrollmentIds.map((enrollmentId) =>
+        logEnrollmentEvent({
+          enrollmentId,
+          type: 'status_changed',
+          label: `Statut → ${status} (action groupée)`,
+        }),
+      ),
+    );
     return { ok: true, count: result.count };
   } catch (err) {
     console.error('[bulkUpdateStatus]', err);
@@ -117,6 +129,11 @@ export async function markAttendance(
           noShow: false,
         },
       });
+      await logEnrollmentEvent({
+        enrollmentId,
+        type: 'checked_in',
+        label: 'Présente — émargement Jour J (admin)',
+      });
     } else {
       await prisma.enrollment.update({
         where: { id: enrollmentId },
@@ -124,6 +141,11 @@ export async function markAttendance(
           status: EnrollmentStatus.absente,
           noShow: true,
         },
+      });
+      await logEnrollmentEvent({
+        enrollmentId,
+        type: 'status_changed',
+        label: 'Marquée absente',
       });
     }
     return { ok: true };
@@ -162,7 +184,11 @@ export async function sendManualReminder(
 
     const resolved = resolveEmail('j7', enrollment.event.emailConfig, buildEmailVars(enrollment));
 
-    const result = await sendEmail({
+    const result = await deliver({
+      kind: 'j7_reminder',
+      organisationId: enrollment.organisationId,
+      eventId: enrollment.eventId,
+      enrollmentId: enrollment.id,
       to: enrollment.user.email,
       subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
@@ -203,6 +229,7 @@ export async function markContactee(enrollmentId: string): Promise<{ ok: boolean
       where: { id: enrollmentId },
       data: { status: EnrollmentStatus.contactee },
     });
+    await logEnrollmentEvent({ enrollmentId, type: 'status_changed', label: 'Marquée contactée' });
     return { ok: true };
   } catch (err) {
     console.error('[markContactee]', err);
@@ -218,6 +245,7 @@ export async function markConfirmeeJ7(enrollmentId: string): Promise<{ ok: boole
       where: { id: enrollmentId },
       data: { status: EnrollmentStatus.confirmee_j7 },
     });
+    await logEnrollmentEvent({ enrollmentId, type: 'status_changed', label: 'Confirmée J-7 (admin)' });
     return { ok: true };
   } catch (err) {
     console.error('[markConfirmeeJ7]', err);
@@ -251,7 +279,11 @@ export async function sendJ2Reminder(
 
     const resolved = resolveEmail('j2', enrollment.event.emailConfig, buildEmailVars(enrollment));
 
-    const result = await sendEmail({
+    const result = await deliver({
+      kind: 'j2_reminder',
+      organisationId: enrollment.organisationId,
+      eventId: enrollment.eventId,
+      enrollmentId: enrollment.id,
       to: enrollment.user.email,
       subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
@@ -292,6 +324,7 @@ export async function markConfirmeeJ2(enrollmentId: string): Promise<{ ok: boole
       where: { id: enrollmentId },
       data: { status: EnrollmentStatus.confirmee_j2 },
     });
+    await logEnrollmentEvent({ enrollmentId, type: 'status_changed', label: 'Confirmée J-2 (admin)' });
     return { ok: true };
   } catch (err) {
     console.error('[markConfirmeeJ2]', err);
@@ -318,6 +351,7 @@ export async function markDesistement(
       where: { id: enrollmentId },
       data: { status: EnrollmentStatus.desistement },
     });
+    await logEnrollmentEvent({ enrollmentId, type: 'status_changed', label: 'Désistement (admin)' });
     return { ok: true, previousStatus: before.status };
   } catch (err) {
     console.error('[markDesistement]', err);
@@ -349,7 +383,11 @@ export async function sendFeedbackInvite(
 
     const resolved = resolveEmail('feedback', enrollment.event.emailConfig, buildEmailVars(enrollment));
 
-    const result = await sendEmail({
+    const result = await deliver({
+      kind: 'feedback_invite',
+      organisationId: enrollment.organisationId,
+      eventId: enrollment.eventId,
+      enrollmentId: enrollment.id,
       to: enrollment.user.email,
       subject: resolved.subject,
       replyTo: enrollment.event.replyToEmail ?? undefined,
