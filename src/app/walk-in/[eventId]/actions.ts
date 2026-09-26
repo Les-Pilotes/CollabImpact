@@ -1,10 +1,11 @@
 "use server";
 
 import { EnrollmentStatus } from "@prisma/client";
+import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { emitNotification } from "@/lib/notifications/emit";
 import { walkinSchema, type WalkinInput } from "@/lib/validation/walkin";
-import { isWalkinWindowOpen } from "@/lib/datetime";
+import { canWalkIn } from "@/lib/enrollment/eligibility";
 
 export type WalkinResult =
   | { ok: true; enrollmentId: string }
@@ -37,8 +38,7 @@ export async function submitWalkin(input: WalkinInput): Promise<WalkinResult> {
     });
     if (!event) return { ok: false, error: "Événement introuvable." };
 
-    const openStatuses = ["publie", "complet", "en_cours"];
-    if (!openStatuses.includes(event.status) || !isWalkinWindowOpen(event.date)) {
+    if (!canWalkIn(event)) {
       return {
         ok: false,
         error:
@@ -102,14 +102,16 @@ export async function submitWalkin(input: WalkinInput): Promise<WalkinResult> {
     });
 
     if (isNew) {
-      void emitNotification({
-        organisationId: event.organisationId,
-        type: "enrollment.created",
-        title: `${user.firstName} ${user.lastName} (walk-in) à ${event.name}`,
-        body: "Inscription sur place le Jour J.",
-        eventId: event.id,
-        enrollmentId: enrollment.id,
-      });
+      after(() =>
+        emitNotification({
+          organisationId: event.organisationId,
+          type: "enrollment.created",
+          title: `${user.firstName} ${user.lastName} (walk-in) à ${event.name}`,
+          body: "Inscription sur place le Jour J.",
+          eventId: event.id,
+          enrollmentId: enrollment.id,
+        }),
+      );
     }
 
     return { ok: true, enrollmentId: enrollment.id };

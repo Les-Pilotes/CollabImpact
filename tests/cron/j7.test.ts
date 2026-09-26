@@ -29,6 +29,12 @@ const mockFindMany = vi.mocked(prisma.enrollment.findMany);
 const mockUpdate = vi.mocked(prisma.enrollment.update);
 const mockSendEmail = vi.mocked(sendEmail);
 
+// 5 days out — safely inside the J-7 window (3..7 calendar days, Europe/Paris)
+// regardless of when the test suite actually runs, without needing to freeze
+// the clock (which would also freeze the real setTimeout used by the
+// concurrency test below).
+const EVENT_DATE = new Date(Date.now() + 5 * 86400000);
+
 const makeEnrollment = (id: string) => ({
   id,
   userId: "user-1",
@@ -71,7 +77,7 @@ const makeEnrollment = (id: string) => ({
     name: "Découverte métiers de la tech",
     status: "publie" as const,
     address: "1 rue de la Paix, 75002 Paris",
-    date: new Date("2026-06-12T14:00:00Z"),
+    date: EVENT_DATE,
     capacity: 20,
     description: null,
     deletedAt: null,
@@ -189,6 +195,34 @@ describe("GET /api/cron/j7", () => {
 
     expect(json).toEqual({ ok: true, sent: 0 });
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("excludes an enrollment whose event is 8 days out (outside the J-7 window)", async () => {
+    const tooFar = {
+      ...makeEnrollment("too-far"),
+      event: { ...makeEnrollment("too-far").event, date: new Date(Date.now() + 8 * 86400000) },
+    };
+    mockFindMany.mockResolvedValue([tooFar] as never);
+
+    const response = await GET(makeRequest() as never);
+    const json = await response.json();
+
+    expect(json).toEqual({ ok: true, sent: 0 });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("excludes an enrollment whose event is only 2 days out (J-2 territory, not J-7)", async () => {
+    const tooClose = {
+      ...makeEnrollment("too-close"),
+      event: { ...makeEnrollment("too-close").event, date: new Date(Date.now() + 2 * 86400000) },
+    };
+    mockFindMany.mockResolvedValue([tooClose] as never);
+
+    const response = await GET(makeRequest() as never);
+    const json = await response.json();
+
+    expect(json).toEqual({ ok: true, sent: 0 });
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   it("only marks the enrollments whose email actually succeeded (mixed batch)", async () => {

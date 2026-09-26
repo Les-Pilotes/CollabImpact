@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyFeedbackToken } from "@/lib/tokens";
 import { feedbackSchema } from "@/lib/validation/feedback";
 import { emitNotification } from "@/lib/notifications/emit";
 import { ALL_FEEDBACK_KEYS } from "@/lib/feedback/questions";
+import { isFeedbackEligible } from "@/lib/enrollment/eligibility";
 
 export async function POST(
   request: NextRequest,
@@ -27,7 +28,7 @@ export async function POST(
     },
   });
 
-  if (!enrollment || enrollment.status !== "presente") {
+  if (!enrollment || !isFeedbackEligible(enrollment.status)) {
     return NextResponse.json({ error: "Inscription introuvable ou non éligible" }, { status: 404 });
   }
 
@@ -86,18 +87,20 @@ export async function POST(
     data: { status: "feedback_recu" },
   });
 
-  void emitNotification({
-    organisationId: enrollment.organisationId,
-    type: "feedback.received",
-    title: `${enrollment.user.firstName} ${enrollment.user.lastName} a laissé un feedback sur ${enrollment.event.name}`,
-    body:
-      overallRating != null
-        ? `Note animation : ${overallRating}/5 · ${Object.keys(answers).length} réponses`
-        : `${Object.keys(answers).length} réponses`,
-    eventId: enrollment.event.id,
-    enrollmentId,
-    metadata: { overallRating, answerCount: Object.keys(answers).length },
-  });
+  after(() =>
+    emitNotification({
+      organisationId: enrollment.organisationId,
+      type: "feedback.received",
+      title: `${enrollment.user.firstName} ${enrollment.user.lastName} a laissé un feedback sur ${enrollment.event.name}`,
+      body:
+        overallRating != null
+          ? `Note animation : ${overallRating}/5 · ${Object.keys(answers).length} réponses`
+          : `${Object.keys(answers).length} réponses`,
+      eventId: enrollment.event.id,
+      enrollmentId,
+      metadata: { overallRating, answerCount: Object.keys(answers).length },
+    }),
+  );
 
   return NextResponse.json({ ok: true });
 }

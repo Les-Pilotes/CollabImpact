@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { AdminRole } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -70,13 +71,18 @@ export async function inviteAdmin(input: InviteAdminInput): Promise<Result> {
       [ctx.admin.firstName, ctx.admin.lastName].filter(Boolean).join(" ").trim() ||
       null;
 
-    void sendAdminInvitation({
-      email: normalizedEmail,
-      firstName: created.firstName,
-      invitedByName: inviterName,
-    }).catch((err) => {
-      console.error("[inviteAdmin] invitation email failed:", err);
-    });
+    // Fire the invite email after the response is sent, but keep the
+    // serverless function alive until it settles — a bare `void` risks the
+    // function being frozen mid-send before Resend is even called.
+    after(() =>
+      sendAdminInvitation({
+        email: normalizedEmail,
+        firstName: created.firstName,
+        invitedByName: inviterName,
+      }).catch((err) => {
+        console.error("[inviteAdmin] invitation email failed:", err);
+      }),
+    );
 
     revalidatePath("/admin/parametres/admins");
     return { ok: true };

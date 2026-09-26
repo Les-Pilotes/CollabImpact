@@ -68,11 +68,26 @@ describe("getKpis", () => {
     const kpis: KpiData = await getKpis(EVENT_ID);
 
     expect(kpis.totalEnrolled).toBe(8);
-    expect(kpis.confirmed).toBe(1);
-    expect(kpis.attended).toBe(2);
+    // confirmed/attended are supersets: feedback_recu is reached FROM presente,
+    // it doesn't replace it — see src/lib/impact/metrics.ts.
+    expect(kpis.confirmed).toBe(4); // confirmee_j2(1) + presente(2) + feedback_recu(1)
+    expect(kpis.attended).toBe(3); // presente(2) + feedback_recu(1)
     expect(kpis.feedbackReceived).toBe(2);
     expect(kpis.capacity).toBe(20);
     expect(kpis.eventName).toBe("Cité Audacieuse");
+  });
+
+  it("never lets attended or confirmed exceed totalEnrolled (no double counting)", async () => {
+    mockPrisma.event.findUnique.mockResolvedValue(baseEvent);
+    mockPrisma.enrollment.groupBy.mockResolvedValue([group("feedback_recu", 5)]);
+    mockPrisma.enrollment.count.mockResolvedValue(5);
+
+    const kpis: KpiData = await getKpis(EVENT_ID);
+
+    expect(kpis.totalEnrolled).toBe(5);
+    expect(kpis.attended).toBe(5);
+    expect(kpis.confirmed).toBe(5);
+    expect(kpis.feedbackReceived).toBe(5);
   });
 
   it("returns zeroed KpiData when event does not exist", async () => {

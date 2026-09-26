@@ -9,6 +9,7 @@ import { resolveEmail } from "@/lib/email/resolve";
 import { emitNotification } from "@/lib/notifications/emit";
 import { dispatchEnrollmentAlerts } from "@/lib/notifications/admin-alerts";
 import { getAppUrl } from "@/lib/app-url";
+import { after } from "next/server";
 import { createResumeToken, verifyResumeToken } from "@/lib/tokens";
 import React from "react";
 
@@ -433,35 +434,44 @@ export async function submitInscription(
     });
 
     if (isNewEnrollment) {
-      void emitNotification({
-        organisationId: event.organisationId,
-        type: "enrollment.created",
-        title: `${user.firstName} ${user.lastName} s'est inscrite à ${event.name}`,
-        body: user.city ? `Depuis ${user.city}.` : undefined,
-        eventId: event.id,
-        enrollmentId: enrollment.id,
-      });
+      // Fired after the response is sent, but the serverless function stays
+      // alive until these settle — a bare `void` risks the function being
+      // frozen mid-flight before the notification/alert email even goes out.
+      after(() =>
+        emitNotification({
+          organisationId: event.organisationId,
+          type: "enrollment.created",
+          title: `${user.firstName} ${user.lastName} s'est inscrite à ${event.name}`,
+          body: user.city ? `Depuis ${user.city}.` : undefined,
+          eventId: event.id,
+          enrollmentId: enrollment.id,
+        }),
+      );
 
       // Fan-out email alert to admins who opted in (best-effort, never blocks).
-      void dispatchEnrollmentAlerts({
-        eventId: event.id,
-        enrollmentId: enrollment.id,
-        organisationId: event.organisationId,
-      });
+      after(() =>
+        dispatchEnrollmentAlerts({
+          eventId: event.id,
+          enrollmentId: enrollment.id,
+          organisationId: event.organisationId,
+        }),
+      );
 
       if (event.capacity > 0) {
         const count = await prisma.enrollment.count({
           where: { eventId: event.id, deletedAt: null },
         });
         if (count >= event.capacity) {
-          void emitNotification({
-            organisationId: event.organisationId,
-            type: "event.capacity_reached",
-            title: `${event.name} est complet`,
-            body: `${count} inscrites sur ${event.capacity} places.`,
-            eventId: event.id,
-            dedupePerEvent: true,
-          });
+          after(() =>
+            emitNotification({
+              organisationId: event.organisationId,
+              type: "event.capacity_reached",
+              title: `${event.name} est complet`,
+              body: `${count} inscrites sur ${event.capacity} places.`,
+              eventId: event.id,
+              dedupePerEvent: true,
+            }),
+          );
         }
       }
     }

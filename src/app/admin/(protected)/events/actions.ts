@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { ImmersionStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
@@ -127,13 +128,15 @@ export async function transitionEventStatus(
       data: { status: newStatus },
     });
 
-    void emitNotification({
-      organisationId: event.organisationId,
-      type: "event.status_changed",
-      title: `${event.name} : ${STATUS_LABEL_FR[event.status]} → ${STATUS_LABEL_FR[newStatus]}`,
-      eventId,
-      metadata: { from: event.status, to: newStatus },
-    });
+    after(() =>
+      emitNotification({
+        organisationId: event.organisationId,
+        type: "event.status_changed",
+        title: `${event.name} : ${STATUS_LABEL_FR[event.status]} → ${STATUS_LABEL_FR[newStatus]}`,
+        eventId,
+        metadata: { from: event.status, to: newStatus },
+      }),
+    );
 
     revalidatePath(`/admin/events/${eventId}`);
     revalidatePath("/admin/events");

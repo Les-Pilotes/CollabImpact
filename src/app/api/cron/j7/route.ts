@@ -7,19 +7,31 @@ import { createActionToken } from "@/lib/tokens";
 import { getAppUrl } from "@/lib/app-url";
 import { resolveEmail } from "@/lib/email/resolve";
 import { parallelLimit } from "@/lib/concurrency";
+import { isInReminderWindow } from "@/lib/enrollment/eligibility";
 import J7Reminder from "@/lib/email/templates/J7Reminder";
 
 const CONCURRENCY = 8;
+
+// "J-7" means 3 to 7 calendar days before the event in Europe/Paris — a
+// 5-day-wide net so the daily cron always catches it exactly once
+// (idempotency comes from j7SentAt, not from this window). A raw millisecond
+// range here would drift to J-8/J-9 depending on the event's time-of-day and
+// the season — see src/lib/datetime.ts:parisCalendarDaysUntil.
+const MIN_DAYS = 3;
+const MAX_DAYS = 7;
 
 export async function GET(request: NextRequest) {
   const unauthorized = assertCronRequest(request);
   if (unauthorized) return unauthorized;
 
   const now = new Date();
-  const minDate = new Date(now.getTime() + 5 * 86400000);
-  const maxDate = new Date(now.getTime() + 9 * 86400000);
+  // Coarse DB-level net (in real elapsed time) just wide enough to contain
+  // the calendar-day window above under any DST offset; the exact filter
+  // below is what actually decides eligibility.
+  const minDate = new Date(now.getTime() + (MIN_DAYS - 1) * 86400000);
+  const maxDate = new Date(now.getTime() + (MAX_DAYS + 1) * 86400000);
 
-  const enrollments = await prisma.enrollment.findMany({
+  const candidates = await prisma.enrollment.findMany({
     where: {
       event: {
         date: { gte: minDate, lte: maxDate },
@@ -32,6 +44,8 @@ export async function GET(request: NextRequest) {
     },
     include: { user: true, event: { include: { emailConfig: true } } },
   });
+
+  const enrollments = candidates.filter((e) => isInReminderWindow(e.event.date, MIN_DAYS, MAX_DAYS, now));
 
   const appUrl = getAppUrl();
 

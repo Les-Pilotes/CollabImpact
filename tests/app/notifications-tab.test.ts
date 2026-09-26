@@ -152,8 +152,8 @@ describe("notifications — dispatch on new enrollment", () => {
     expect(dispatchIdx).toBeGreaterThan(ifIdx);
   });
 
-  it("dispatch is fire-and-forget (void ...) so it never blocks inscription", () => {
-    expect(actionsSrc).toMatch(/void\s+dispatchEnrollmentAlerts\(/);
+  it("dispatch runs via after() so it never blocks inscription but survives the response", () => {
+    expect(actionsSrc).toMatch(/after\(\s*\(\)\s*=>\s*\n?\s*dispatchEnrollmentAlerts\(/);
   });
 
   it("dispatch short-circuits when the alert is disabled", () => {

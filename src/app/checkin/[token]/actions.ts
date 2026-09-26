@@ -17,6 +17,7 @@
 import { prisma } from '@/lib/db';
 import { verifyCheckinToken } from '@/lib/tokens';
 import { EnrollmentStatus } from '@prisma/client';
+import { isAttendanceLocked } from '@/lib/enrollment/eligibility';
 
 export type CheckinOutcome =
   | {
@@ -70,11 +71,7 @@ export async function markPresent(token: string): Promise<CheckinOutcome> {
   }
 
   // Blocked: terminal states
-  if (
-    enrollment.status === EnrollmentStatus.absente ||
-    enrollment.status === EnrollmentStatus.desistement ||
-    enrollment.status === EnrollmentStatus.feedback_recu
-  ) {
+  if (isAttendanceLocked(enrollment.status)) {
     return {
       ok: false,
       reason: 'terminal',

@@ -7,19 +7,26 @@ import { createActionToken } from "@/lib/tokens";
 import { getAppUrl } from "@/lib/app-url";
 import { resolveEmail } from "@/lib/email/resolve";
 import { parallelLimit } from "@/lib/concurrency";
+import { isInReminderWindow } from "@/lib/enrollment/eligibility";
 import J2Reminder from "@/lib/email/templates/J2Reminder";
 
 const CONCURRENCY = 8;
+
+// "J-2" means 1 to 2 calendar days before the event in Europe/Paris. See
+// src/lib/datetime.ts:parisCalendarDaysUntil and the J-7 cron for why a raw
+// millisecond range drifts (J-3 instead of J-2 depending on event time/DST).
+const MIN_DAYS = 1;
+const MAX_DAYS = 2;
 
 export async function GET(request: NextRequest) {
   const unauthorized = assertCronRequest(request);
   if (unauthorized) return unauthorized;
 
   const now = new Date();
-  const minDate = new Date(now.getTime() + 1 * 86400000);
-  const maxDate = new Date(now.getTime() + 3 * 86400000);
+  const minDate = new Date(now.getTime() + (MIN_DAYS - 1) * 86400000);
+  const maxDate = new Date(now.getTime() + (MAX_DAYS + 1) * 86400000);
 
-  const enrollments = await prisma.enrollment.findMany({
+  const candidates = await prisma.enrollment.findMany({
     where: {
       event: {
         date: { gte: minDate, lte: maxDate },
@@ -32,6 +39,8 @@ export async function GET(request: NextRequest) {
     },
     include: { user: true, event: { include: { emailConfig: true } } },
   });
+
+  const enrollments = candidates.filter((e) => isInReminderWindow(e.event.date, MIN_DAYS, MAX_DAYS, now));
 
   const appUrl = getAppUrl();
 

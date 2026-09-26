@@ -3,6 +3,7 @@
 import { verifyActionToken } from "@/lib/tokens";
 import { prisma } from "@/lib/db";
 import { EnrollmentStatus } from "@prisma/client";
+import { isAttendanceLocked } from "@/lib/enrollment/eligibility";
 
 export type ConfirmState =
   | {
@@ -61,14 +62,6 @@ function meta(enrollment: Ctx["enrollment"]) {
   };
 }
 
-function isTerminal(status: EnrollmentStatus): boolean {
-  return (
-    status === EnrollmentStatus.absente ||
-    status === EnrollmentStatus.desistement ||
-    status === EnrollmentStatus.feedback_recu
-  );
-}
-
 /**
  * Decides the next status a "confirm" click should reach — or null if there
  * is nothing to upgrade. Handles the case where a participante already
@@ -100,7 +93,7 @@ export async function readConfirmState(token: string): Promise<ConfirmState> {
   if ("error" in ctx) return { outcome: ctx.error };
   const { enrollment } = ctx;
 
-  if (isTerminal(enrollment.status)) return { outcome: "terminal" };
+  if (isAttendanceLocked(enrollment.status)) return { outcome: "terminal" };
 
   const next = targetStatus(enrollment);
   return next === null
@@ -121,7 +114,7 @@ export async function confirmEnrollment(token: string): Promise<ConfirmState> {
   if ("error" in ctx) return { outcome: ctx.error };
   const { enrollment } = ctx;
 
-  if (isTerminal(enrollment.status)) return { outcome: "terminal" };
+  if (isAttendanceLocked(enrollment.status)) return { outcome: "terminal" };
 
   const next = targetStatus(enrollment);
   if (next === null) {

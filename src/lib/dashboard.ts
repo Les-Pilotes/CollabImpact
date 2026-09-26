@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { EnrollmentStatus } from "@prisma/client";
+import { ATTENDED_STATUSES, getEnrollmentCounts, getFunnelCounts } from "@/lib/impact/metrics";
 
 // =====================
 // Types
@@ -56,52 +57,12 @@ const CONFIRMED_STATUSES: ReadonlySet<EnrollmentStatus> = new Set<EnrollmentStat
   "desistement",
 ]);
 
-type StatusCounts = Partial<Record<EnrollmentStatus, number>> & {
-  __total: number;
-};
-
-/**
- * Aggregates enrollment counts by status in a single SQL roundtrip. Replaces
- * the previous pattern of loading every enrollment into RAM and filtering
- * in JS — that scaled linearly with attendance.
- */
-async function getEnrollmentCounts(eventId: string): Promise<{
-  byStatus: StatusCounts;
-  feedbackReceived: number;
-}> {
-  const [groups, feedbackReceived] = await Promise.all([
-    prisma.enrollment.groupBy({
-      by: ["status"],
-      where: { eventId, deletedAt: null },
-      _count: { _all: true },
-    }),
-    // Union of (status=feedback_recu) and (feedback row exists) — matches
-    // the prior JS predicate `e.status === "feedback_recu" || e.feedback !== null`.
-    prisma.enrollment.count({
-      where: {
-        eventId,
-        deletedAt: null,
-        OR: [{ status: "feedback_recu" }, { feedback: { isNot: null } }],
-      },
-    }),
-  ]);
-
-  const byStatus: StatusCounts = { __total: 0 };
-  for (const g of groups) {
-    const n = g._count?._all ?? 0;
-    byStatus[g.status] = n;
-    byStatus.__total += n;
-  }
-
-  return { byStatus, feedbackReceived };
-}
-
 // =====================
 // Functions
 // =====================
 
 export async function getKpis(eventId: string): Promise<KpiData> {
-  const [event, counts] = await Promise.all([
+  const [event, funnel] = await Promise.all([
     prisma.event.findUnique({
       where: { id: eventId },
       select: {
@@ -111,16 +72,16 @@ export async function getKpis(eventId: string): Promise<KpiData> {
         address: true,
       },
     }),
-    getEnrollmentCounts(eventId),
+    getFunnelCounts(eventId),
   ]);
 
   if (!event) return ZEROED_KPI;
 
   return {
-    totalEnrolled: counts.byStatus.__total,
-    confirmed: counts.byStatus.confirmee_j2 ?? 0,
-    attended: counts.byStatus.presente ?? 0,
-    feedbackReceived: counts.feedbackReceived,
+    totalEnrolled: funnel.totalEnrolled,
+    confirmed: funnel.confirmed,
+    attended: funnel.attended,
+    feedbackReceived: funnel.feedbackReceived,
     capacity: event.capacity,
     eventDate: event.date,
     eventName: event.name,
@@ -190,7 +151,8 @@ export async function getNextActions(eventId: string): Promise<NextAction[]> {
     });
   }
 
-  const attended = counts.byStatus.presente ?? 0;
+  let attended = 0;
+  for (const status of ATTENDED_STATUSES) attended += counts.byStatus[status] ?? 0;
   const pendingFeedbacks = attended - counts.feedbackReceived;
   if (attended > 0 && pendingFeedbacks > 0) {
     actions.push({

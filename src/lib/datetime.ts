@@ -38,6 +38,21 @@ export function isWalkinWindowOpen(eventDate: Date, now: Date = new Date()): boo
   return now.getTime() >= windowStart.getTime() && now.getTime() < windowEnd.getTime();
 }
 
+/**
+ * Whole calendar days between "now" and an event's date, both read in
+ * Europe/Paris — not a raw millisecond division, which drifts by ±1 day
+ * depending on the event's time-of-day and the season (DST). This is what
+ * "J-7" / "J-2" actually mean to the team: a day count on the calendar, not
+ * a duration.
+ */
+export function parisCalendarDaysUntil(eventDate: Date, now: Date = new Date()): number {
+  const today = splitParisDateTime(now).date;
+  const eventDay = splitParisDateTime(eventDate).date;
+  const [ty, tm, td] = today.split("-").map(Number);
+  const [ey, em, ed] = eventDay.split("-").map(Number);
+  return Math.round((Date.UTC(ey, em - 1, ed) - Date.UTC(ty, tm - 1, td)) / 86400000);
+}
+
 export function splitParisDateTime(date: Date): { date: string; time: string } {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: PARIS_TZ,

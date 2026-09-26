@@ -29,6 +29,10 @@ const mockFindMany = vi.mocked(prisma.enrollment.findMany);
 const mockUpdate = vi.mocked(prisma.enrollment.update);
 const mockSendEmail = vi.mocked(sendEmail);
 
+// 2 days out — safely inside the J-2 window (1..2 calendar days, Europe/Paris)
+// regardless of when the test suite actually runs.
+const EVENT_DATE = new Date(Date.now() + 2 * 86400000);
+
 const makeEnrollment = (id: string) => ({
   id,
   userId: "user-1",
@@ -71,7 +75,7 @@ const makeEnrollment = (id: string) => ({
     name: "Découverte métiers de la tech",
     status: "publie" as const,
     address: "1 rue de la Paix, 75002 Paris",
-    date: new Date("2026-06-12T14:00:00Z"),
+    date: EVENT_DATE,
     capacity: 20,
     description: null,
     deletedAt: null,
@@ -133,6 +137,20 @@ describe("GET /api/cron/j2", () => {
     expect(json).toEqual({ ok: true, sent: 0 });
     expect(mockSendEmail).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("excludes an enrollment whose event is 7 days out (J-7 territory, not J-2)", async () => {
+    const tooFar = {
+      ...makeEnrollment("too-far"),
+      event: { ...makeEnrollment("too-far").event, date: new Date(Date.now() + 7 * 86400000) },
+    };
+    mockFindMany.mockResolvedValue([tooFar] as never);
+
+    const response = await GET(makeRequest() as never);
+    const json = await response.json();
+
+    expect(json).toEqual({ ok: true, sent: 0 });
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   it("does NOT mark j2SentAt when the email fails to send", async () => {

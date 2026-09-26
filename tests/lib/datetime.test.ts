@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { combineParisDateTime, splitParisDateTime, isWalkinWindowOpen } from "@/lib/datetime";
+import {
+  combineParisDateTime,
+  splitParisDateTime,
+  isWalkinWindowOpen,
+  parisCalendarDaysUntil,
+} from "@/lib/datetime";
 
 describe("combineParisDateTime", () => {
   it("converts summer time (UTC+2) correctly: 09:30 Paris = 07:30 UTC", () => {
@@ -44,6 +49,37 @@ describe("splitParisDateTime — regression for the Informations save timezone s
     // but 01:15 Paris is the day AFTER 23:15 UTC the previous day.
     const combined = combineParisDateTime("2026-09-13", "01:15");
     expect(splitParisDateTime(combined)).toEqual({ date: "2026-09-13", time: "01:15" });
+  });
+});
+
+describe("parisCalendarDaysUntil — regression for the J-7 drifting to J-8/J-9 bug", () => {
+  it("counts whole calendar days, ignoring time-of-day", () => {
+    // Event at 23:00 Paris, "now" at 01:00 Paris the same relative week —
+    // a millisecond-based diff would round this down to 6 days, not 7.
+    const now = combineParisDateTime("2026-06-05", "23:30");
+    const event = combineParisDateTime("2026-06-12", "01:00");
+    expect(parisCalendarDaysUntil(event, now)).toBe(7);
+  });
+
+  it("does not drift by a day depending on the event's hour (late evening event)", () => {
+    const now = combineParisDateTime("2026-06-05", "08:00");
+    const eventLateEvening = combineParisDateTime("2026-06-12", "23:00");
+    const eventEarlyMorning = combineParisDateTime("2026-06-12", "07:00");
+    // Both are the same calendar day away, regardless of the hour.
+    expect(parisCalendarDaysUntil(eventLateEvening, now)).toBe(7);
+    expect(parisCalendarDaysUntil(eventEarlyMorning, now)).toBe(7);
+  });
+
+  it("is 0 on the event's own calendar day, even a few hours before it starts", () => {
+    const now = combineParisDateTime("2026-06-12", "06:00");
+    const event = combineParisDateTime("2026-06-12", "18:00");
+    expect(parisCalendarDaysUntil(event, now)).toBe(0);
+  });
+
+  it("is negative once the event's calendar day has passed", () => {
+    const now = combineParisDateTime("2026-06-13", "08:00");
+    const event = combineParisDateTime("2026-06-12", "18:00");
+    expect(parisCalendarDaysUntil(event, now)).toBe(-1);
   });
 });
 

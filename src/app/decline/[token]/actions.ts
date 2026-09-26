@@ -3,6 +3,7 @@
 import { verifyActionToken } from "@/lib/tokens";
 import { prisma } from "@/lib/db";
 import { EnrollmentStatus } from "@prisma/client";
+import { isDeclineLocked } from "@/lib/enrollment/eligibility";
 
 export type DeclineState =
   | { outcome: "ask"; firstName: string; eventName: string }
@@ -54,14 +55,6 @@ function meta(enrollment: Ctx["enrollment"]) {
   return { firstName: enrollment.user.firstName, eventName: enrollment.event.name };
 }
 
-function isTerminal(status: EnrollmentStatus): boolean {
-  return (
-    status === EnrollmentStatus.absente ||
-    status === EnrollmentStatus.presente ||
-    status === EnrollmentStatus.feedback_recu
-  );
-}
-
 /**
  * Read-only: decides what the page should show. Never mutates — safe to run
  * on a plain GET, including link-preview crawlers and antivirus scanners
@@ -79,7 +72,7 @@ export async function readDeclineState(token: string): Promise<DeclineState> {
       canUndo: enrollment.event.date.getTime() > Date.now(),
     };
   }
-  if (isTerminal(enrollment.status)) {
+  if (isDeclineLocked(enrollment.status)) {
     return { outcome: "terminal" };
   }
   return { outcome: "ask", ...meta(enrollment) };
@@ -109,7 +102,7 @@ export async function declineEnrollment(token: string): Promise<DeclineState> {
       canUndo: enrollment.event.date.getTime() > Date.now(),
     };
   }
-  if (isTerminal(enrollment.status)) {
+  if (isDeclineLocked(enrollment.status)) {
     return { outcome: "terminal" };
   }
 
