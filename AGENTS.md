@@ -24,14 +24,8 @@ La DB Supabase a été créée par `prisma db push` jusqu'à `prisma/migrations/
 
 `prisma/migrations/0_init/migration.sql` a été généré par `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script` — un diff purement basé sur le fichier schéma, sans connexion DB. Il ne doit **jamais être exécuté tel quel sur la base de prod** (elle a déjà toutes ces tables) : il faut le marquer comme déjà appliqué, une seule fois, avec `prisma migrate resolve --applied 0_init` (nécessite `DATABASE_URL`/`DIRECT_URL` de prod dans `.env.local`, comme pour `db:push` précédemment). Après ce `resolve`, `prisma migrate deploy` ne rejoue plus 0_init et applique normalement les migrations suivantes.
 
-### État actuel : `vercel-build` ne fait PAS encore `migrate deploy`
+### Historique : panne du 2026-09-26 — résolue le 2026-09-28
 
-Tentative faite le 2026-09-26 : le build Vercel a échoué avec `P1001 Can't reach database server at db.gtvcbymbremngkeijkfd.supabase.co:5432`. Cause : `DIRECT_URL` (utilisée par Prisma pour les migrations) pointait vers la connexion directe Supabase, IPv6-only, injoignable depuis les machines de build Vercel (IPv4 only). `vercel-build` a donc été repassé temporairement à `prisma generate && next build` (identique à `build`) pour débloquer les déploiements.
+Le build Vercel a échoué avec `P1001 Can't reach database server at db.gtvcbymbremngkeijkfd.supabase.co:5432`. Cause : `DIRECT_URL` (utilisée par Prisma pour les migrations) pointait vers la connexion directe Supabase, IPv6-only, injoignable depuis les machines de build Vercel (IPv4 only).
 
-**Pour réactiver `migrate deploy` dans `vercel-build`** :
-1. Dans Supabase → Project Settings → Database → Connection string → onglet **Session pooler**, récupérer l'URL (même hôte que le pooler déjà utilisé pour `DATABASE_URL`, mais port **5432** au lieu de 6543).
-2. Mettre à jour la variable d'env Vercel `DIRECT_URL` (Production **et** Preview) avec cette URL.
-3. Remettre `"vercel-build": "prisma migrate deploy && prisma generate && next build"` dans `package.json`.
-4. Redéployer et vérifier que le build passe.
-
-Tant que ce n'est pas fait, **toute nouvelle migration doit être appliquée manuellement** en local avant/après le merge (`pnpm prisma migrate deploy` avec les creds prod dans `.env.local`), comme on le faisait avec `db:push` — sinon le code qui requête les nouvelles colonnes/tables plantera en prod.
+Corrigé en mettant à jour la variable d'env Vercel `DIRECT_URL` (Production et Preview) avec l'URL **Session pooler** de Supabase (même hôte que `DATABASE_URL`, port **5432** au lieu de 6543 — Supabase → Project Settings → Database → Connection string → onglet Session pooler). `vercel-build` exécute de nouveau `prisma migrate deploy` normalement (cf. règle ci-dessus).
